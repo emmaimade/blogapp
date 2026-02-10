@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@layer base {
+  /* your custom base styles */
+}
+
+@layer components {
+  /* your custom components */
+}
+
+/* Fix SimpleMDE styling to match your theme */
+.editor-toolbar {
+  border-top-left-radius: 12px !important;
+  border-top-right-radius: 12px !important;
+  border: 1px solid #f3f4f6 !important;
+  background: #f9fafb;
+}
+
+.CodeMirror {
+  border-bottom-left-radius: 12px !important;
+  border-bottom-right-radius: 12px !important;
+  border: 1px solid #f3f4f6 !important;
+  min-height: 500px !important;
+}
+
+/* Force list styles back for prose components */
+.prose ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5em !important;
+}
+
+.prose ul {
+  list-style-type: disc !important;
+  padding-left: 1.5em !important;
+}
+
+.prose li {
+  display: list-item !important;
+}
