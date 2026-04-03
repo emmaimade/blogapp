@@ -17,33 +17,33 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div className="admin-card w-full max-w-md overflow-hidden rounded-[1.8rem]">
         <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className={`p-2 rounded-full ${isDanger ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className={`rounded-2xl p-3 ${isDanger ? 'bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'}`}>
               <AlertTriangle size={24} />
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white">
               <X size={20} />
             </button>
           </div>
           
-          <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
-          <p className="text-gray-600">{message}</p>
+          <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">{title}</h3>
+          <p className="whitespace-pre-line text-sm leading-6 text-slate-600 dark:text-slate-300">{message}</p>
         </div>
 
-        <div className="bg-gray-50 p-4 flex gap-3 justify-end">
+        <div className="flex justify-end gap-3 border-t border-[var(--admin-line)] bg-[color:var(--admin-bg)]/80 p-4">
           <button 
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition"
+            className="admin-btn admin-btn-secondary px-4 py-2 text-sm"
           >
             Cancel
           </button>
           <button 
             onClick={() => { onConfirm(); onClose(); }}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition ${
-              isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
+            className={`admin-btn px-4 py-2 text-sm ${
+              isDanger ? 'bg-red-600 text-white hover:bg-red-700' : 'admin-btn-primary'
             }`}
           >
             {confirmText}

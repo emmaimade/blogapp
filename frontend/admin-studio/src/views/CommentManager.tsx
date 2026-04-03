@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Trash2, 
-  MessageSquare, 
-  User, 
-  ExternalLink, 
-  ShieldAlert, 
-  ChevronDown, 
-  ChevronRight, 
-  FileText 
+import {
+  Trash2,
+  MessageSquare,
+  User,
+  ExternalLink,
+  ShieldAlert,
+  ChevronDown,
+  ChevronRight,
+  FileText,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -28,18 +28,16 @@ export const CommentManager = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [targetComment, setTargetComment] = useState<Comment | null>(null);
-  
-  // Track which post groups are collapsed
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const { data: comments, isLoading } = useQuery<Comment[]>({
     queryKey: ['adminComments'],
-    queryFn: async () => (await api.get('/admin/comments')).data
+    queryFn: async () => (await api.get('/admin/comments')).data,
   });
 
-  // Group comments by post title using useMemo for performance
   const groupedComments = useMemo(() => {
     if (!comments) return {};
+
     return comments.reduce((acc, comment) => {
       const title = comment.post?.title || 'Unknown Post';
       if (!acc[title]) acc[title] = [];
@@ -49,7 +47,7 @@ export const CommentManager = () => {
   }, [comments]);
 
   const toggleGroup = (title: string) => {
-    setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
+    setCollapsedGroups((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
   const moderateMutation = useMutation({
@@ -59,82 +57,100 @@ export const CommentManager = () => {
       toast.success('Comment redacted');
       setTargetComment(null);
     },
-    onError: () => toast.error('Moderation failed')
+    onError: () => toast.error('Moderation failed'),
   });
 
-  if (isLoading) return <div className="p-20 text-center animate-pulse text-gray-500 text-lg">Organizing moderation queue...</div>;
+  if (isLoading) {
+    return <div className="p-20 text-center text-lg text-slate-500 animate-pulse">Organizing moderation queue...</div>;
+  }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="admin-page max-w-6xl">
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <ShieldAlert className="text-indigo-600" size={32} /> 
+        <div className="admin-kicker">Moderation</div>
+        <h1 className="mt-3 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
+          <ShieldAlert className="text-indigo-600 dark:text-indigo-400" size={30} />
           Moderation Studio
         </h1>
-        <p className="text-gray-500 mt-2">Manage discussions organized by post. Redacted comments are preserved to maintain thread structure.</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Manage discussions organized by post. Redacted comments remain in place to preserve thread structure.
+        </p>
       </div>
 
       <div className="space-y-6">
         {Object.entries(groupedComments).map(([postTitle, postComments]) => (
-          <div key={postTitle} className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            {/* Group Header */}
-            <div 
+          <div key={postTitle} className="admin-card overflow-hidden rounded-[1.8rem]">
+            <div
               onClick={() => toggleGroup(postTitle)}
-              className="bg-gray-50/80 px-6 py-4 border-b border-gray-100 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+              className="flex cursor-pointer items-center justify-between border-b border-[var(--admin-line)] bg-[color:var(--admin-primary-soft)]/70 px-6 py-4 transition-colors hover:bg-[color:var(--admin-primary-soft)]"
             >
               <div className="flex items-center gap-3">
-                {collapsedGroups[postTitle] ? <ChevronRight size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}
-                <FileText size={20} className="text-indigo-500" />
-                <h2 className="font-bold text-gray-800">{postTitle}</h2>
+                {collapsedGroups[postTitle] ? (
+                  <ChevronRight size={20} className="text-slate-400" />
+                ) : (
+                  <ChevronDown size={20} className="text-slate-400" />
+                )}
+                <FileText size={20} className="text-indigo-600 dark:text-indigo-400" />
+                <h2 className="font-bold text-slate-900 dark:text-white">{postTitle}</h2>
               </div>
+
               <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                <span className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">
                   {postComments.length} {postComments.length === 1 ? 'Comment' : 'Comments'}
                 </span>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(`/admin/posts/view/${postComments[0].post.id}`);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition"
+                  className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-indigo-700 dark:hover:bg-slate-900 dark:hover:text-indigo-300"
                 >
                   <ExternalLink size={16} />
                 </button>
               </div>
             </div>
 
-            {/* Nested Comments List */}
             {!collapsedGroups[postTitle] && (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-[rgba(126,92,54,0.08)]">
                 {postComments.map((comment) => (
-                  <div 
-                    key={comment.id} 
-                    className={`p-6 flex justify-between items-start gap-6 transition-colors ${comment.is_deleted ? 'bg-gray-50/40' : 'hover:bg-gray-50/20'}`}
+                  <div
+                    key={comment.id}
+                    className={`flex items-start justify-between gap-6 p-6 transition-colors ${
+                      comment.is_deleted
+                        ? 'bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-400'
+                        : 'hover:bg-indigo-50/30 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200'
+                    }`}
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                           <User size={14} />
                         </div>
-                        <span className="text-sm font-bold text-gray-900">{comment.user.username}</span>
-                        <span className="text-xs text-gray-400">• {new Date(comment.created_at).toLocaleDateString()}</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{comment.user.username}</span>
+                        <span className="text-xs text-slate-400">• {new Date(comment.created_at).toLocaleDateString()}</span>
                       </div>
-                      
-                      <p className={`text-gray-700 leading-relaxed ${comment.is_deleted ? 'italic text-gray-400' : ''}`}>
+
+                      <p
+                        className={`leading-relaxed text-slate-700 dark:text-slate-300 ${
+                          comment.is_deleted ? 'italic text-slate-400 dark:text-slate-500' : ''
+                        }`}
+                      >
                         {comment.content}
                       </p>
                     </div>
 
                     <div className="flex items-center">
                       {!comment.is_deleted ? (
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => setTargetComment(comment)}
-                          className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition"
+                          aria-label={`Moderate comment from ${comment.user.username}`}
+                          className="admin-btn inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition-all duration-150 ease-out hover:bg-red-100 hover:text-red-800 hover:shadow-md dark:border-red-600 dark:bg-red-900/20 dark:text-red-200 dark:hover:bg-red-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                         >
                           <Trash2 size={14} /> Moderate
                         </button>
                       ) : (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-300 border border-gray-200 px-2 py-1 rounded">
+                        <span className="rounded-full border border-stone-200 px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-stone-300 dark:border-slate-700 dark:text-slate-500">
                           Redacted
                         </span>
                       )}
@@ -147,14 +163,14 @@ export const CommentManager = () => {
         ))}
 
         {Object.keys(groupedComments).length === 0 && (
-          <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-            <MessageSquare className="mx-auto text-gray-300 mb-4" size={48} />
-            <p className="text-gray-500 font-medium">No comments found to moderate.</p>
+          <div className="admin-section border-2 border-dashed bg-transparent py-20 text-center">
+            <MessageSquare className="mx-auto mb-4 text-slate-300" size={48} />
+            <p className="font-medium text-slate-500 dark:text-slate-400">No comments found to moderate.</p>
           </div>
         )}
       </div>
 
-      <Modal 
+      <Modal
         isOpen={!!targetComment}
         onClose={() => setTargetComment(null)}
         onConfirm={() => targetComment && moderateMutation.mutate(targetComment.id)}
