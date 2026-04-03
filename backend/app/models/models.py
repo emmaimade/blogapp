@@ -19,6 +19,7 @@ class User(SQLModel, table=True):
     hashed_password : str
     role: UserRole = Field(default=UserRole.USER)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    posts: List["Post"] = Relationship(back_populates="author")
 
 class Tag(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -40,9 +41,14 @@ class Post(SQLModel, table=True):
     title: str
     slug: str = Field(unique=True, index=True)
     content: str
+    author_id: Optional[int] = Field(default=None, foreign_key="user.id")
     thumbnail_url: Optional[str] = Field(default=None)
+    views: int = Field(default=0)
     is_project: bool = Field(default=False)
     published: bool = Field(default=True)
+
+    #Relationship to User (Author)
+    author: Optional[User] = Relationship(back_populates="posts")
 
     # Relationship to Comment
     comments: List["Comment"] = Relationship(back_populates="post")
@@ -100,4 +106,18 @@ class Comment(SQLModel, table=True):
             "lazy": "selectin",  # Efficient loading strategy
             "join_depth": 3  # Load up to 3 levels deep automatically
         }
+    )
+
+
+# ✅ NEW: Site Settings Model for editable About page
+class SiteSettings(SQLModel, table=True):
+    """Store site-wide settings as key-value pairs"""
+    __tablename__ = "site_settings"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    setting_key: str = Field(unique=True, index=True)  # e.g., "about_page"
+    setting_value: str  # JSON string for flexibility
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column_kwargs={"onupdate": datetime.utcnow}
     )
