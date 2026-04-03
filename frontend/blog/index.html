@@ -1,13 +1,100 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>blog</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>Inko - Your ideas, amplified</title>
+    <meta name="title" content="Inko - Your ideas, amplified" />
+    <meta name="description" content="Modern blog CMS built with React, FastAPI, and PostgreSQL. Create beautiful blogs with Markdown support, comments, and more." />
+    <meta name="keywords" content="blog, cms, markdown, react, fastapi, blogging platform, content management" />
+    <meta name="author" content="Inko" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/inko-logo.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <!-- <link rel="manifest" href="/site.webmanifest" /> -->
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="msapplication-TileColor" content="#4F46E5" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://yourdomain.com/" />
+    <meta property="og:title" content="Inko - Your ideas, amplified" />
+    <meta property="og:description" content="Modern blog CMS built with React, FastAPI, and PostgreSQL. Create beautiful blogs with ease." />
+    <meta property="og:image" content="https://yourdomain.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Inko" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://yourdomain.com/" />
+    <meta name="twitter:title" content="Inko - Your ideas, amplified" />
+    <meta name="twitter:description" content="Modern blog CMS built with React, FastAPI, and PostgreSQL. Create beautiful blogs with ease." />
+    <meta name="twitter:image" content="https://yourdomain.com/twitter-card.png" />
+    <meta name="twitter:creator" content="@InkoCMS" />
+    
+    <!-- Additional Meta Tags for SEO -->
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="7 days" />
+    <link rel="canonical" href="https://yourdomain.com/" />
+    
+    <!-- Preconnect for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Inko",
+      "description": "Your ideas, amplified. Modern blog CMS.",
+      "url": "https://yourdomain.com",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://yourdomain.com/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Inko",
+      "description": "Modern blog CMS platform",
+      "url": "https://yourdomain.com",
+      "logo": "https://yourdomain.com/inko-logo.svg",
+      "sameAs": [
+        "https://twitter.com/InkoCMS",
+        "https://github.com/yourusername/inko"
+      ]
+    }
+    </script>
   </head>
+  
   <body>
+    <noscript>
+      <div style="padding: 2rem; text-align: center; font-family: system-ui, -apple-system, sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>Please enable JavaScript to use Inko.</p>
+      </div>
+    </noscript>
+    
     <div id="root"></div>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
