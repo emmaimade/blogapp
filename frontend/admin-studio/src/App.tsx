@@ -9,12 +9,29 @@ import { PostEditor } from './views/PostEditor';
 import { PostView } from './views/PostView';
 import { TagManager } from './views/TagManager';
 import { CommentManager } from './views/CommentManager';
+import { AboutPageSettings } from './views/AboutPageSettings';
+import { GeneralSettings } from './views/GeneralSettings';
+import { FooterSettings } from './views/FooterSettings';
+import { BrandingSettings } from './views/BrandingSettings';
+import { SEOSettings } from './views/SEOSettings';
+import { ContactSettings } from './views/ContactSettings';
+import { SettingsLayout } from './layouts/SettingsLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
   return (
     <>
-      <Toaster position="top-right" reverseOrder={false} />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            borderRadius: "16px",
+            background: "var(--admin-panel-solid)",
+            color: "var(--admin-ink)",
+            border: "1px solid var(--admin-line)",
+          },
+        }}
+      />
       <BrowserRouter>
         <Routes>
           {/* Public Route */}
@@ -37,6 +54,17 @@ function App() {
               <Route path="/admin/posts/view/:id" element={<PostView />} />
               <Route path="/admin/tags" element={<TagManager />} />
               <Route path="/admin/comments" element={<CommentManager />} />
+
+              <Route path="/admin/settings" element={<SettingsLayout />}>
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="about" element={<AboutPageSettings />} />
+                <Route path="footer" element={<FooterSettings />} />
+                <Route path="branding" element={<BrandingSettings />} />
+                <Route path="seo" element={<SEOSettings />} />
+                <Route path="contact" element={<ContactSettings />} />
+                {/* Redirect /admin/settings to /admin/settings/general */}
+                <Route index element={<Navigate to="general" replace />} />
+              </Route>
             </Route>
           </Route>
 

@@ -1,39 +1,677 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-@layer base {
-  /* your custom base styles */
+:root {
+  color-scheme: light dark;
+  
+  /* ✅ INKO BRAND COLORS - Logo Gradient (Indigo → Purple → Pink) */
+  --inko-primary: #4F46E5;           /* Indigo - Main brand */
+  --inko-secondary: #7C3AED;         /* Purple - Mid gradient */
+  --inko-accent: #EC4899;            /* Pink - End gradient */
+  --inko-primary-light: #6366F1;     /* Lighter indigo */
+  --inko-primary-dark: #4338CA;      /* Darker indigo */
+  
+  /* ============================================================
+     LIGHT MODE - Professional & Clean
+     ============================================================ */
+  --admin-bg: #f8fafc;                    /* Page background */
+  --admin-panel: rgba(255, 255, 255, 0.97); /* Glass panels */
+  --admin-panel-solid: #ffffff;           /* Solid panels/cards */
+  --admin-line: rgba(15, 23, 42, 0.08);  /* Borders */
+  
+  /* Text Colors - Proper Hierarchy */
+  --admin-text-primary: #0f172a;      /* Main headings */
+  --admin-text-secondary: #334155;    /* Body text */
+  --admin-text-tertiary: #64748b;     /* Muted text */
+  --admin-text-quaternary: #94a3b8;   /* Disabled/placeholder */
+  
+  /* Brand Colors */
+  --admin-primary: var(--inko-primary);
+  --admin-primary-dark: var(--inko-primary-dark);
+  --admin-primary-soft: rgba(79, 70, 229, 0.12);
+  --admin-secondary: var(--inko-secondary);
+  --admin-accent: var(--inko-accent);
+  
+  --admin-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08);
+  --admin-glass-shadow: 0 8px 25px rgba(15, 23, 42, 0.06);
+  
+  /* Semantic Colors */
+  --admin-success: #10b981;
+  --admin-warning: #f59e0b;
+  --admin-error: #ef4444;
+  --admin-info: #3b82f6;
 }
 
-@layer components {
-  /* your custom components */
+.dark {
+  /* ============================================================
+     DARK MODE - Industry Standard (WordPress/Ghost/Linear)
+     ============================================================ */
+  --admin-bg: #0f172a;                    /* Dark slate background */
+  --admin-panel: rgba(30, 41, 59, 0.95);  /* Dark glass panels */
+  --admin-panel-solid: #1e293b;           /* Solid dark panels */
+  --admin-line: rgba(148, 163, 184, 0.1); /* Subtle borders */
+  
+  /* ✅ Text Colors - Proper Dark Mode Hierarchy */
+  --admin-text-primary: #f1f5f9;      /* Main headings - brightest */
+  --admin-text-secondary: #e2e8f0;    /* Body text - slightly dimmer */
+  --admin-text-tertiary: #cbd5e1;     /* Muted text - dimmer */
+  --admin-text-quaternary: #94a3b8;   /* Disabled/placeholder - dimmest */
+  
+  /* Brand Colors - Adjusted for dark mode */
+  --admin-primary: #6366F1;           /* Lighter indigo for visibility */
+  --admin-primary-dark: #818cf8;      /* Even lighter for hover */
+  --admin-primary-soft: rgba(99, 102, 241, 0.15);
+  --admin-secondary: #A78BFA;         /* Lighter purple */
+  --admin-accent: #F472B6;            /* Lighter pink */
+  
+  --admin-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+  
+  /* Semantic Colors - Brighter for dark mode */
+  --admin-success: #34d399;
+  --admin-warning: #fbbf24;
+  --admin-error: #f87171;
+  --admin-info: #60a5fa;
 }
 
-/* Fix SimpleMDE styling to match your theme */
-.editor-toolbar {
-  border-top-left-radius: 12px !important;
-  border-top-right-radius: 12px !important;
-  border: 1px solid #f3f4f6 !important;
-  background: #f9fafb;
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+* {
+  box-sizing: border-box;
 }
 
-.CodeMirror {
-  border-bottom-left-radius: 12px !important;
-  border-bottom-right-radius: 12px !important;
-  border: 1px solid #f3f4f6 !important;
-  min-height: 500px !important;
+html, body {
+  background: var(--admin-bg);
+  color: var(--admin-text-secondary);
+  font-family: "Manrope", system-ui, sans-serif;
+  min-height: 100vh;
+  margin: 0;
 }
 
-/* Force list styles back for prose components */
-.prose ol {
-  list-style-type: decimal !important;
-  padding-left: 1.5em !important;
+body {
+  overflow-x: hidden;
 }
 
-.prose ul {
-  list-style-type: disc !important;
-  padding-left: 1.5em !important;
+#root {
+  min-height: 100vh;
 }
 
-.prose li {
-  display: list-item !important;
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Space Grotesk", "Manrope", system-ui, sans-serif;
+  letter-spacing: -0.025em;
+  color: var(--admin-text-primary);
+}
+
+/* ============================================================
+   ✅ PROPER TAILWIND DARK MODE OVERRIDES
+   ============================================================ */
+
+/* Primary text (headings) */
+.dark .text-slate-900 { color: var(--admin-text-primary) !important; }
+
+/* Secondary text (body) */
+.dark .text-slate-800,
+.dark .text-slate-700 { color: var(--admin-text-secondary) !important; }
+
+/* Tertiary text (muted) */
+.dark .text-slate-600,
+.dark .text-slate-500 { color: var(--admin-text-tertiary) !important; }
+
+/* Quaternary text (disabled/placeholder) */
+.dark .text-slate-400,
+.dark .text-slate-300 { color: var(--admin-text-quaternary) !important; }
+
+/* Brand colors */
+.dark .text-indigo-600,
+.dark .text-indigo-700 { color: var(--admin-primary) !important; }
+
+.dark .text-indigo-400,
+.dark .text-indigo-300 { color: var(--admin-primary-dark) !important; }
+
+.dark .text-purple-600 { color: var(--admin-secondary) !important; }
+.dark .text-pink-600 { color: var(--admin-accent) !important; }
+
+/* White text should stay white */
+.dark .text-white { color: #ffffff !important; }
+
+/* Background overrides */
+.dark .bg-white { background-color: var(--admin-panel-solid) !important; }
+.dark .bg-slate-50 { background-color: rgba(30, 41, 59, 0.5) !important; }
+.dark .bg-slate-100 { background-color: rgba(51, 65, 85, 0.5) !important; }
+
+/* Border overrides */
+.dark .border-slate-200 { border-color: var(--admin-line) !important; }
+.dark .border-slate-300 { border-color: rgba(148, 163, 184, 0.2) !important; }
+
+/* ============================================================
+   QUICK ACTIONS - Dark Mode Hover Fix
+   ============================================================ */
+.quick-action-card {
+  transition-property: border-color, background-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.quick-action-card:hover {
+  background-color: var(--admin-primary-soft);
+}
+
+.dark .quick-action-card:hover {
+  background-color: var(--admin-primary-soft);
+  border-color: var(--admin-primary) !important;
+}
+
+/* ============================================================
+   GLANCE ITEMS - Dark Mode Hover Fix
+   ============================================================ */
+.glance-item-card {
+  transition-property: border-color, background-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glance-item-card:hover {
+  background-color: var(--admin-primary-soft);
+  border-color: var(--admin-line);
+}
+
+.dark .glance-item-card:hover {
+  background-color: var(--admin-primary-soft);
+  border-color: var(--admin-primary) !important;
+}
+
+/* ============================================================
+   SIDEBAR NAVIGATION - Dark Mode Hover Fix
+   ============================================================ */
+.sidebar-nav-link {
+  transition-property: background-color, color, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-link:hover {
+  background-color: rgba(224, 232, 244, 1);
+  color: rgb(79, 70, 229);
+}
+
+.dark .sidebar-nav-link:hover {
+  background-color: rgba(79, 70, 229, 0.15);
+  color: white;
+}
+
+.sidebar-nav-link.active {
+  background-color: rgba(224, 232, 244, 1);
+  color: rgb(79, 70, 229);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(224, 232, 244, 1);
+}
+
+.dark .sidebar-nav-link.active {
+  background-color: rgba(79, 70, 229, 0.15);
+  color: rgb(165, 180, 252);
+  border-color: rgba(79, 70, 229, 0.4);
+}
+
+/* ============================================================
+   DARK MODE TOGGLE BUTTON - Dark Mode Hover Fix
+   ============================================================ */
+.sidebar-toggle-btn {
+  transition-property: background-color, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: rgb(224, 232, 244);
+  border-color: rgb(165, 180, 252);
+}
+
+.dark .sidebar-toggle-btn {
+  background-color: #1e293b;
+  border-color: var(--admin-line);
+}
+
+.dark .sidebar-toggle-btn:hover {
+  background-color: #334155;
+  border-color: var(--admin-primary) !important;
+}
+
+/* ============================================================
+   LOGOUT BUTTON - Dark Mode Hover Fix
+   ============================================================ */
+.sidebar-logout-btn {
+  transition-property: background-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-logout-btn:hover {
+  background-color: rgb(254, 242, 242);
+}
+
+.dark .sidebar-logout-btn {
+  background-color: #1e293b;
+  border-color: rgb(153, 27, 27);
+}
+
+.dark .sidebar-logout-btn:hover {
+  background-color: rgb(153, 27, 27);
+  border-color: rgb(220, 38, 38) !important;
+}
+
+/* ============================================================
+   GLASS & CARDS
+   ============================================================ */
+.admin-glass {
+  background: var(--admin-panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--admin-line);
+  box-shadow: var(--admin-glass-shadow);
+}
+
+.admin-card {
+  background: var(--admin-panel-solid);
+  border: 1px solid var(--admin-line);
+  box-shadow: var(--admin-shadow);
+  border-radius: 1.25rem;
+}
+
+.admin-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-btn-secondary {
+  background: color-mix(in srgb, var(--admin-panel-solid) 78%, transparent);
+  color: var(--admin-text-primary);
+  border: 1px solid var(--admin-line);
+}
+
+.admin-btn-secondary:hover {
+  background: color-mix(in srgb, var(--admin-primary-soft) 45%, var(--admin-panel-solid));
+}
+
+.admin-btn-secondary-accent {
+  background: color-mix(in srgb, var(--inko-primary) 6%, transparent);
+  color: var(--inko-primary);
+  border: 1.5px solid var(--inko-primary);
+}
+
+.admin-btn-secondary-accent:hover {
+  background: color-mix(in srgb, var(--inko-primary) 15%, transparent);
+}
+
+.admin-page {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 80rem;
+}
+
+.admin-section {
+  background: var(--admin-panel-solid);
+  border: 1px solid var(--admin-line);
+  border-radius: 1.5rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-note {
+  border: 1px solid color-mix(in srgb, var(--admin-primary) 18%, transparent);
+  background: color-mix(in srgb, var(--admin-primary-soft) 68%, transparent);
+  border-radius: 1.25rem;
+}
+
+.admin-table-shell {
+  overflow: hidden;
+  border-radius: 1.75rem;
+}
+
+.admin-table-head {
+  background: color-mix(in srgb, var(--admin-primary-soft) 46%, var(--admin-panel-solid));
+  border-bottom: 1px solid var(--admin-line);
+}
+
+.admin-table-row:hover {
+  background: color-mix(in srgb, var(--admin-primary-soft) 20%, transparent);
+}
+
+.admin-form-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-form-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--admin-text-primary);
+}
+
+.admin-form-help {
+  font-size: 0.78rem;
+  color: var(--admin-text-tertiary);
+}
+
+.admin-input,
+.admin-select,
+.admin-textarea {
+  width: 100%;
+  border-radius: 0.875rem;
+  border: 1px solid var(--admin-line);
+  background: var(--admin-panel-solid);
+  color: var(--admin-text-primary);
+}
+
+.admin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--admin-text-quaternary) 45%, transparent) transparent;
+}
+
+.admin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--admin-text-quaternary) 38%, transparent);
+  border-radius: 9999px;
+}
+
+.admin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+.admin-input {
+  padding: 0.75rem 1rem;
+}
+
+.admin-select,
+.admin-textarea {
+  padding: 0.75rem 1rem;
+}
+
+.admin-input::placeholder,
+.admin-textarea::placeholder {
+  color: var(--admin-text-quaternary);
+}
+
+.admin-input:focus,
+.admin-select:focus,
+.admin-textarea:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 4px var(--admin-primary-soft);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.admin-btn {
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.admin-btn-primary {
+  background: linear-gradient(135deg, var(--inko-primary), var(--inko-secondary));
+  color: white;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+}
+
+.dark .admin-btn-primary {
+  background: linear-gradient(135deg, var(--admin-primary), var(--admin-secondary));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.admin-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
+}
+
+/* ============================================================
+   POST EDITOR - EASYMDE THEME
+   ============================================================ */
+.editor-container .EasyMDEContainer {
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--admin-panel-solid);
+  box-shadow: var(--admin-shadow);
+}
+
+.editor-container .editor-toolbar {
+  border: 0;
+  border-bottom: 1px solid var(--admin-line);
+  background: color-mix(in srgb, var(--admin-primary-soft) 32%, var(--admin-panel-solid));
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.editor-container .editor-toolbar button,
+.editor-container .editor-toolbar i.separator {
+  color: var(--admin-text-tertiary);
+  flex-shrink: 0;
+}
+
+.editor-container .editor-toolbar button:hover,
+.editor-container .editor-toolbar button.active {
+  background: var(--admin-primary-soft);
+  border-color: transparent;
+  color: var(--admin-text-primary);
+}
+
+.editor-container .CodeMirror,
+.editor-container .CodeMirror-scroll,
+.editor-container .editor-preview,
+.editor-container .editor-preview-side {
+  background: var(--admin-panel-solid);
+  color: var(--admin-text-secondary);
+}
+
+.dark .editor-container .CodeMirror,
+.dark .editor-container .CodeMirror-scroll,
+.dark .editor-container .editor-preview,
+.dark .editor-container .editor-preview-side,
+.dark .editor-container .editor-toolbar {
+  color-scheme: dark;
+}
+
+.editor-container .CodeMirror {
+  min-height: 500px;
+}
+
+.editor-container .CodeMirror-scroll {
+  scrollbar-color: color-mix(in srgb, var(--admin-text-quaternary) 55%, transparent) var(--admin-panel-solid);
+}
+
+.editor-container .CodeMirror-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.editor-container .CodeMirror-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--admin-text-quaternary) 55%, transparent);
+  border-radius: 9999px;
+}
+
+.editor-container .CodeMirror-scroll::-webkit-scrollbar-track,
+.editor-container .CodeMirror-scroll::-webkit-scrollbar-corner {
+  background: var(--admin-panel-solid);
+}
+
+.editor-container .CodeMirror-cursor {
+  border-left: 1px solid var(--admin-text-primary);
+}
+
+.editor-container .CodeMirror-gutters {
+  border-right: 1px solid var(--admin-line);
+  background: color-mix(in srgb, var(--admin-primary-soft) 20%, var(--admin-panel-solid));
+}
+
+.editor-container .CodeMirror-vscrollbar,
+.editor-container .CodeMirror-hscrollbar,
+.editor-container .CodeMirror-scrollbar-filler,
+.editor-container .CodeMirror-gutter-filler {
+  background: var(--admin-panel-solid);
+}
+
+.editor-container .CodeMirror-vscrollbar,
+.editor-container .CodeMirror-hscrollbar {
+  scrollbar-color: color-mix(in srgb, var(--admin-text-quaternary) 55%, transparent) var(--admin-panel-solid);
+}
+
+.editor-container .CodeMirror-vscrollbar::-webkit-scrollbar,
+.editor-container .CodeMirror-hscrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.editor-container .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+.editor-container .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--admin-text-quaternary) 55%, transparent);
+  border-radius: 9999px;
+}
+
+.editor-container .CodeMirror-vscrollbar::-webkit-scrollbar-track,
+.editor-container .CodeMirror-hscrollbar::-webkit-scrollbar-track {
+  background: var(--admin-panel-solid);
+}
+
+.editor-container .CodeMirror-lines,
+.editor-container .editor-preview,
+.editor-container .editor-preview-side {
+  padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .editor-container .CodeMirror {
+    min-height: 380px;
+  }
+
+  .editor-container .CodeMirror-lines,
+  .editor-container .editor-preview,
+  .editor-container .editor-preview-side {
+    padding: 1rem;
+  }
+}
+
+.editor-container .CodeMirror-placeholder {
+  color: var(--admin-text-quaternary) !important;
+}
+
+.dark .editor-container .editor-toolbar button {
+  color: var(--admin-text-tertiary);
+}
+
+.dark .editor-container .editor-toolbar.fullscreen,
+.dark .editor-container .CodeMirror-fullscreen,
+.dark .editor-container .editor-preview-side,
+.dark .editor-container .editor-preview {
+  background: var(--admin-panel-solid);
+}
+
+.dark .admin-btn-primary:hover {
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+}
+
+.admin-btn-danger {
+  background: #fee2e2;
+  color: #ef4444;
+  border: 1.5px solid #ef4444;
+}
+
+.dark .admin-btn-danger {
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+.admin-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  padding: 0.625rem;
+  color: var(--admin-text-quaternary);
+  background: transparent;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-icon-btn:hover {
+  transform: translateY(-1px);
+}
+
+.admin-icon-btn-edit:hover {
+  background: color-mix(in srgb, var(--admin-primary) 12%, transparent);
+  color: var(--admin-primary);
+}
+
+.admin-icon-btn-delete:hover {
+  background: color-mix(in srgb, var(--admin-error) 14%, transparent);
+  color: var(--admin-error);
+}
+
+/* ============================================================
+   INKO GRADIENT UTILITIES
+   ============================================================ */
+.inko-gradient {
+  background: linear-gradient(135deg, var(--inko-primary) 0%, var(--inko-secondary) 50%, var(--inko-accent) 100%);
+}
+
+.inko-gradient-text {
+  background: linear-gradient(135deg, var(--inko-primary) 0%, var(--inko-secondary) 50%, var(--inko-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.inko-gradient-border {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.inko-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--inko-primary) 0%, var(--inko-secondary) 50%, var(--inko-accent) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
 }
