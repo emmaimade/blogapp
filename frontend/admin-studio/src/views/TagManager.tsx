@@ -19,13 +19,16 @@ export const TagManager = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => api.post(`/tags/?tag_name=${name}`),
+    mutationFn: (name: string) => api.post('/tags/', { name }), // ✅ FIXED: Send as JSON body
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       setNewTagName('');
       toast.success('Tag added successfully');
     },
-    onError: () => toast.error('Failed to create tag')
+    onError: (error: any) => {
+      const errorMsg = error.response?.data?.detail || 'Failed to create tag';
+      toast.error(errorMsg);
+    }
   });
 
   const updateMutation = useMutation({
@@ -35,6 +38,10 @@ export const TagManager = () => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       setEditingId(null);
       toast.success('Tag updated');
+    },
+    onError: (error: any) => {
+      const errorMsg = error.response?.data?.detail || 'Failed to update tag';
+      toast.error(errorMsg);
     }
   });
 
@@ -42,82 +49,156 @@ export const TagManager = () => {
     mutationFn: (id: number) => api.delete(`/tags/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setDeleteTarget(null); // ✅ Close modal after delete
       toast.success('Tag removed');
+    },
+    onError: (error: any) => {
+      const errorMsg = error.response?.data?.detail || 'Failed to delete tag';
+      toast.error(errorMsg);
     }
   });
 
-  if (isLoading) return <div className="p-10 text-center animate-pulse">Loading taxonomy...</div>;
+  // ✅ NEW: Validate tag name before submission
+  const handleCreateTag = () => {
+    if (!newTagName.trim()) {
+      toast.error('Tag name cannot be empty');
+      return;
+    }
+    
+    // Check for duplicate (case-insensitive)
+    const duplicate = tags?.find(
+      tag => tag.name.toLowerCase() === newTagName.trim().toLowerCase()
+    );
+    
+    if (duplicate) {
+      toast.error(`Tag "${duplicate.name}" already exists`);
+      return;
+    }
+    
+    createMutation.mutate(newTagName.trim());
+  };
+
+  if (isLoading) return (
+    <div className="flex h-64 items-center justify-center">
+      <div className="animate-pulse text-slate-400">Loading tags...</div>
+    </div>
+  );
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <div className="admin-page max-w-3xl">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Taxonomy Management</h1>
-          <p className="text-sm text-gray-500">Organize your blog categories and project stacks.</p>
+          <div className="admin-kicker">Taxonomy</div>
+          <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">Tag Management</h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Organize your blog categories and topics. ({tags?.length || 0} tags)
+          </p>
         </div>
       </div>
       
-      {/* Create Tag Input */}
-      <div className="flex gap-2 mb-8 bg-white p-2 rounded-xl shadow-sm border">
+      <div className="flex items-center gap-4 mb-6">
         <input 
           value={newTagName}
           onChange={(e) => setNewTagName(e.target.value)}
-          placeholder="New tag name (e.g. TypeScript)"
-          className="flex-1 p-2 bg-transparent outline-none px-4"
-          onKeyDown={(e) => e.key === 'Enter' && createMutation.mutate(newTagName)}
+          placeholder="New tag name (e.g. React, TypeScript, Web Dev)"
+          className="admin-input pl-10 py-2.5 text-sm placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-slate-900"
+          onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
         />
         <button 
-          onClick={() => createMutation.mutate(newTagName)}
-          disabled={!newTagName}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50 transition"
+          onClick={handleCreateTag}
+          disabled={!newTagName.trim() || createMutation.isPending}
+          className="flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          <Plus size={18} /> Add Tag
+          {createMutation.isPending ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Plus size={18} /> Add Tag
+            </>
+          )}
         </button>
       </div>
 
-      {/* Tags List */}
-      <div className="bg-white border rounded-xl shadow-sm divide-y overflow-hidden">
-        {tags?.map(tag => (
-          <div key={tag.id} className="flex justify-between items-center p-4 hover:bg-gray-50 transition">
-            {editingId === tag.id ? (
-              <div className="flex items-center gap-2 flex-1">
-                <input 
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  className="border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button onClick={() => updateMutation.mutate({ id: tag.id, name: editValue })} className="text-green-600"><Check size={18}/></button>
-                <button onClick={() => setEditingId(null)} className="text-red-400"><X size={18}/></button>
-              </div>
-            ) : (
-              <span className="font-medium text-gray-700">#{tag.name}</span>
-            )}
-            
-            <div className="flex gap-2">
-              <button 
-                onClick={() => { setEditingId(tag.id); setEditValue(tag.name); }}
-                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
-              >
-                <Edit3 size={18} />
-              </button>
-              <button 
-                onClick={() => setDeleteTarget(tag)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-              >
-                <Trash2 size={18} />
-              </button>
+      {tags && tags.length > 0 ? (
+        <div className="admin-card divide-y divide-[rgba(126,92,54,0.08)] overflow-hidden rounded-[1.7rem]">
+          {tags.map(tag => (
+            <div key={tag.id} className="admin-table-row flex items-center justify-between p-4 transition-colors">
+              {editingId === tag.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input 
+                    autoFocus
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="admin-input max-w-sm px-3 py-2 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        updateMutation.mutate({ id: tag.id, name: editValue });
+                      }
+                      if (e.key === 'Escape') {
+                        setEditingId(null);
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={() => updateMutation.mutate({ id: tag.id, name: editValue })}
+                    disabled={!editValue.trim() || updateMutation.isPending}
+                    className="rounded-xl p-2 text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+                  >
+                    <Check size={18}/>
+                  </button>
+                  <button 
+                    onClick={() => setEditingId(null)} 
+                    className="rounded-xl p-2 text-red-400 transition hover:bg-red-50"
+                  >
+                    <X size={18}/>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="admin-badge bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">#{tag.name}</span>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => { 
+                        setEditingId(tag.id); 
+                        setEditValue(tag.name); 
+                      }}
+                      className="admin-icon-btn admin-icon-btn-edit"
+                      title="Edit tag"
+                      aria-label={`Edit ${tag.name}`}
+                    >
+                      <Edit3 size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setDeleteTarget(tag)}
+                      className="admin-icon-btn admin-icon-btn-delete"
+                      title="Delete tag"
+                      aria-label={`Delete ${tag.name}`}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="admin-section border-dashed bg-transparent p-12 text-center">
+          <p className="mb-2 text-slate-500 dark:text-slate-400">No tags yet</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Create your first tag to get started organizing your content</p>
+        </div>
+      )}
 
       <Modal 
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         title="Delete Tag?"
-        message={`Are you sure you want to delete #${deleteTarget?.name}? This may affect filtered views in your portfolio.`}
+        message={`Are you sure you want to delete #${deleteTarget?.name}? This will remove it from all posts.`}
       />
     </div>
   );
