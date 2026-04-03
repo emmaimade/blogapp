@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.dbConfig import create_db_and_tables
-from app.routes import posts, tags, users, comments, admin
+from app.routes import posts, tags, users, comments, admin, settings
 
 app = FastAPI(title="CMS Backend", version="0.1.0")
 
@@ -11,7 +11,9 @@ app = FastAPI(title="CMS Backend", version="0.1.0")
 origins = [
     "http://localhost:3000",    # Standard React port
     "http://localhost:5173",    # Vite (modern React) port
+    "http://localhost:5174",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
 ]
 
 # 3. Add the middleware to the app
@@ -33,6 +35,7 @@ app.include_router(tags.router)
 app.include_router(users.router)
 app.include_router(comments.router)
 app.include_router(admin.router)
+app.include_router(settings.router)
 
 @app.get("/")
 def read_root():

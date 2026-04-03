@@ -40,7 +40,6 @@ frontend/blog/.vercel/
 *.swp
 *.swo
 *~
-.env.example
 
 # --- IDE ---
 *.iml
