@@ -103,9 +103,12 @@ def delete_comment(
         )
 
     # Perform Soft Delete (Redaction) to keep the thread structure intact
-    comment.content = "[This comment has been removed by a moderator]"
+    if is_author:
+        comment.content = "[This comment has been deleted by the author]"
+    elif is_admin:
+        comment.content = "[This comment has been deleted by a moderator]"
     comment.is_deleted = True
-      
+
     session.add(comment)
     session.commit()
     return {"ok": True, "message": "Comment moderated successfully"}

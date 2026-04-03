@@ -9,9 +9,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from app.dbConfig import get_session
-from app.models import Post, Tag, User, Comment
+from app.models import Post, Tag, User, Comment, UserRole
 from app.schemas.schemas import PostRead, PostCreate, PostUpdate
-from app.utils.auth import admin_only
+from app.utils.auth import admin_only, get_current_user_optional
 
 load_dotenv()
 
@@ -43,6 +43,7 @@ def upload_post_image(
 @router.post("/", response_model=PostRead)
 def create_post(post_data: PostCreate, session: Session = Depends(get_session), current_admin: User =Depends(admin_only)):
     new_post = Post(**post_data.model_dump(exclude={"tag_ids", "slug"}))
+    new_post.author_id = current_admin.id
 
     # Generate unique slug
     # If the user provided a custom slug, slugify it. Otherwise, use title.
@@ -62,10 +63,24 @@ def create_post(post_data: PostCreate, session: Session = Depends(get_session), 
 
 # --- READ POSTS ROUTE ---
 @router.get("/", response_model=List[PostRead])
-def read_posts(session: Session = Depends(get_session), current_admin: Optional[User] = Depends(admin_only)):
-    query = select(Post)
-    if not current_admin:
+def read_posts(
+    session: Session = Depends(get_session), 
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    filter: Optional[str] = None
+):
+    query = select(Post).options(
+        selectinload(Post.tags),
+        selectinload(Post.author)
+    )
+
+    # Filter: Guests see only published; Admins see all
+    if not current_user or current_user.role != UserRole.ADMIN:
         query = query.where(Post.published == True)
+
+    # Server-side filter for projects: /posts/?filter=projects
+    if filter and filter.lower() == 'projects':
+        query = query.where(Post.is_project == True)
+        
     posts = session.exec(query).all()
     return posts
 
@@ -92,6 +107,7 @@ def search_posts(
     if tag:
         statement = statement.join(Post.tags).where(Tag.name == tag)
 
+    statement = statement.options(selectinload(Post.author))
     results = session.exec(statement).all()
     return results
 
@@ -157,6 +173,7 @@ def read_post(post_id: int, session: Session = Depends(get_session)):
         select(Post)
         .where(Post.id == post_id)
         .options(
+            selectinload(Post.author),
             selectinload(Post.tags),
             selectinload(Post.project_metadata),
             # 1. Load users for top-level comments
@@ -171,5 +188,43 @@ def read_post(post_id: int, session: Session = Depends(get_session)):
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+
+    return post
+
+# --- READ POST BY SLUG ROUTE ---
+@router.get("/slug/{slug}", response_model=PostRead)
+def read_post_by_slug(
+    slug: str, 
+    session: Session = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    statement = (
+        select(Post)
+        .where(Post.slug == slug)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.tags),
+            selectinload(Post.comments).selectinload(Comment.user)
+        )
+    )
+    post = session.exec(statement).first()
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # Initialize view count
+    if post.views is None:
+        post.views = 0
+
+    # Increment view count
+    post.views += 1
+    session.add(post)
+    session.commit()
+    session.refresh(post)
+
+    # Protection: Block non-admins from viewing drafts via direct link
+    if not post.published:
+        if not current_user or current_user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=403, detail="Not authorized to view drafts")
 
     return post

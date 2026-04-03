@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
+from sqlalchemy import or_
 from app.dbConfig import get_session
 from app.models import User
 from app.schemas.schemas import UserCreate, UserRead, UserUpdate
@@ -29,14 +30,19 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
-    # Check if user exists
-    user = session.exec(select(User).where(User.username == form_data.username)).first()
+    # Allow login with either username or email
+    identifier = form_data.username
+    user = session.exec(select(User).where(or_(User.username == identifier, User.email == identifier))).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     
     # Create the token
     access_token = create_access_token(data={"sub": user.username})
-    return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
+    return {"message": "Login successful", "access_token": access_token, "token_type": "bearer", "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        }}
 
 @router.get("/me", response_model=UserRead)
 async def get_current_user_info(
