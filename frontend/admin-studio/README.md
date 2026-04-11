@@ -1,5 +1,7 @@
 # Admin Studio - CMS Dashboard
 
+**Live Demo:** [https://blogapp-admin-studio-livid.vercel.app](https://blogapp-admin-studio-livid.vercel.app)
+
 React + TypeScript admin dashboard for managing blog content, users, comments, and site settings.
 
 ## Stack
