@@ -86,28 +86,18 @@ export const TagManager = () => {
 
   return (
     <div className="admin-page max-w-3xl">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <div className="admin-kicker">Taxonomy</div>
-          <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">Tag Management</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Organize your blog categories and topics. ({tags?.length || 0} tags)
-          </p>
-        </div>
-      </div>
-      
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex justify-between items-center gap-4 mb-8">
         <input 
           value={newTagName}
           onChange={(e) => setNewTagName(e.target.value)}
           placeholder="New tag name (e.g. React, TypeScript, Web Dev)"
-          className="admin-input pl-10 py-2.5 text-sm placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-slate-900"
+          className="admin-input flex-1 pl-10 py-2.5 text-sm placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-slate-900"
           onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
         />
         <button 
           onClick={handleCreateTag}
           disabled={!newTagName.trim() || createMutation.isPending}
-          className="flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           {createMutation.isPending ? (
             <>

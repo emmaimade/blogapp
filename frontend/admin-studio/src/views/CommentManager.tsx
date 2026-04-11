@@ -66,17 +66,6 @@ export const CommentManager = () => {
 
   return (
     <div className="admin-page max-w-6xl">
-      <div className="mb-10">
-        <div className="admin-kicker">Moderation</div>
-        <h1 className="mt-3 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
-          <ShieldAlert className="text-indigo-600 dark:text-indigo-400" size={30} />
-          Moderation Studio
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Manage discussions organized by post. Redacted comments remain in place to preserve thread structure.
-        </p>
-      </div>
-
       <div className="space-y-6">
         {Object.entries(groupedComments).map(([postTitle, postComments]) => (
           <div key={postTitle} className="admin-card overflow-hidden rounded-[1.8rem]">

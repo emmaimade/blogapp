@@ -63,23 +63,9 @@ export const PostList = () => {
 
   return (
     <div className="admin-page">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="admin-kicker">Content library</div>
-          <h1 className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">Posts and project entries</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Review content status, search titles, and move into edit or view flows without leaving the table.</p>
-        </div>
-        <button
-          onClick={() => navigate("/admin/posts/new")}
-          className="flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          <Plus size={18} /> New Entry
-        </button>
-      </div>
-
       <div className="admin-section mb-6 p-4">
-        <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-        <div className="flex w-full rounded-[1.2rem] bg-[var(--admin-primary-soft)] p-1.5 md:w-fit">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex w-full rounded-[1.2rem] bg-[var(--admin-primary-soft)] p-1.5 md:w-fit">
           {(["all", "published", "draft"] as const).map((type) => (
             <button
               key={type}
@@ -91,19 +77,26 @@ export const PostList = () => {
               {type === "published" ? "Live" : type}
             </button>
           ))}
-        </div>
+          </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
-          <input 
-            type="text"
-            placeholder="Search titles..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-[1.2rem] bg-[var(--admin-primary-soft)] px-10 py-2.5 text-sm font-semibold placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-slate-900"
-          />
-
-        </div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
+              <input 
+                type="text"
+                placeholder="Search titles..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-[1.2rem] bg-[var(--admin-primary-soft)] px-10 py-2.5 text-sm font-semibold placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-slate-900"
+              />
+            </div>
+            <button
+              onClick={() => navigate("/admin/posts/new")}
+              className="flex shrink-0 items-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              <Plus size={18} /> New Entry
+            </button>
+          </div>
         </div>
       </div>
 

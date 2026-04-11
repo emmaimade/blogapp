@@ -96,17 +96,7 @@ export const UserManager = () => {
 
   return (
     <div className="admin-page">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="admin-kicker">Access control</div>
-          <h1 className="mt-3 flex items-center gap-3 text-3xl font-bold text-slate-900 dark:text-white">
-            <Users className="text-indigo-600 dark:text-indigo-400" size={30} /> User Directory
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Manage user permissions and community status. ({users?.length || 0} users)
-          </p>
-        </div>
-
+      <div className="mb-8 flex items-center justify-end">
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
