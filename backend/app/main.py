@@ -8,13 +8,7 @@ app = FastAPI(title="CMS Backend", version="0.1.0")
 # Define allowed origins
 # For development, you can use ["*"] to allow everything, 
 # but listing specific URLs is safer.
-origins = [
-    "http://localhost:3000",    # Standard React port
-    "http://localhost:5173",    # Vite (modern React) port
-    "http://localhost:5174",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-]
+origins = ["*"]
 
 # 3. Add the middleware to the app
 app.add_middleware(
