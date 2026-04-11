@@ -2,6 +2,8 @@
 
 FastAPI-based REST API for the Blog CMS. Handles authentication, content management, user management, and site configuration.
 
+**Live API**: [https://blogapp-eta-woad.vercel.app](https://blogapp-eta-woad.vercel.app)
+
 ## Stack
 
 - **Framework**: FastAPI
@@ -74,9 +76,14 @@ python scripts/create_admin.py
 uv run uvicorn app.main:app --reload
 ```
 
-Server runs at `http://localhost:8000`
+Server runs locally at `http://localhost:8000`
 - API Docs: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+
+**Production API**:
+- Base URL: `https://blogapp-eta-woad.vercel.app`
+- API Docs: [https://blogapp-eta-woad.vercel.app/docs](https://blogapp-eta-woad.vercel.app/docs)
+- ReDoc: [https://blogapp-eta-woad.vercel.app/redoc](https://blogapp-eta-woad.vercel.app/redoc)
 
 ## Project Structure
 
