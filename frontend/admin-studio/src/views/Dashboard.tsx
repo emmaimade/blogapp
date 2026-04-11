@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, ArrowUpRight, BarChart3, FileText, MessageSquare, TrendingUp, Users, Plus, Eye, Edit3, CheckCircle, ExternalLink } from 'lucide-react';
+import { ArrowRight, BarChart3, FileText, MessageSquare, TrendingUp, Users, Plus, Eye, Edit3, CheckCircle, ExternalLink } from 'lucide-react';
 import api from '../api/client';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';

@@ -5,7 +5,6 @@ import {
   MessageSquare,
   User,
   ExternalLink,
-  ShieldAlert,
   ChevronDown,
   ChevronRight,
   FileText,
