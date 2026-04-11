@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useEffect, useId } from 'react';
 
 export const Sidebar = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -72,14 +72,21 @@ export const Sidebar = () => {
             </div>
           </Link>
 
-          <button
-            type="button"
-            onClick={() => setIsOpen((open) => !open)}
-            className="admin-card flex h-11 w-11 items-center justify-center rounded-2xl text-slate-600 dark:text-slate-300"
-            aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
-          >
-            {isOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-sm font-bold text-white shadow-md ring-2 ring-offset-1 ring-indigo-200 dark:ring-indigo-800 dark:ring-offset-slate-900 lg:hidden">
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsOpen((open) => !open)}
+              className="admin-card flex h-11 w-11 items-center justify-center rounded-2xl text-slate-600 dark:text-slate-300"
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            >
+              {isOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
       </div>
 
