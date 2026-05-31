@@ -46,7 +46,7 @@ export const FooterSettings: React.FC = () => {
           youtube: data.social_links?.youtube || "",
           facebook: data.social_links?.facebook || ""
         },
-        copyright_text: data.copyright_text || "© {year} Inko. All rights reserved.",
+        copyright_text: data.copyright_text || "Powered by INKO",
         show_quick_links: data.show_quick_links ?? true,
         show_categories: data.show_categories ?? true
       };
@@ -187,7 +187,7 @@ export const FooterSettings: React.FC = () => {
                 type="text"
                 value={formData.copyright_text || ''}
                 onChange={(e) => handleChange('copyright_text', e.target.value)}
-                placeholder="© {year} Inko. All rights reserved."
+                placeholder="Powered by INKO"
                 disabled={subscription?.plan === 'free'}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-500"
               />

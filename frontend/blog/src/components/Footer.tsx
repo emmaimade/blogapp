@@ -6,7 +6,6 @@ import api from '../api/blogApi';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 
 export const Footer: React.FC = () => {
-  const currentYear = new Date().getFullYear();
   const { data: siteSettings } = useSiteSettings();
   const general = siteSettings?.general;
   const branding = siteSettings?.branding;
@@ -35,7 +34,7 @@ export const Footer: React.FC = () => {
             youtube: '',
             facebook: '',
           },
-          copyright_text: '© {year} Inko. All rights reserved.',
+          copyright_text: 'Powered by INKO',
           show_quick_links: true,
           show_categories: true,
         };
@@ -60,10 +59,6 @@ export const Footer: React.FC = () => {
     { key: 'youtube', href: socialLinks.youtube, icon: Youtube, label: 'YouTube' },
     { key: 'facebook', href: socialLinks.facebook, icon: Facebook, label: 'Facebook' },
   ].filter((item) => Boolean(item.href));
-
-  const copyrightText = (settings?.copyright_text || '© {year} Inko. All rights reserved.')
-    .replace('{year}', String(currentYear))
-    .replace('Â©', '©');
 
   return (
     <footer className="bg-zinc-900 text-white mt-20">
@@ -191,10 +186,14 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <p>{copyrightText}</p>
-            <span className="text-zinc-600 text-xs">• @powered by INKO</span>
-          </div>
+          <a 
+            href={import.meta.env.VITE_MARKETING_SITE_URL} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-zinc-600 text-xs hover:text-white transition-colors"
+          >
+            Powered by INKO
+          </a>
           <div className="flex gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">
               Privacy

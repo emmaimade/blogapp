@@ -48,7 +48,7 @@ class FooterSettings(BaseModel):
     newsletter_description: str = "Get the latest posts delivered to your inbox."
     show_social_links: bool = True
     social_links: SocialLinks = Field(default_factory=SocialLinks)
-    copyright_text: str = "© {year} Inko. All rights reserved."
+    copyright_text: str = "Powered by INKO"
     show_quick_links: bool = True
     show_categories: bool = True
 
