@@ -5,33 +5,33 @@
 :root {
   color-scheme: light dark;
   
-  /* ✅ INKO BRAND COLORS - Logo Gradient (Indigo → Purple → Pink) */
-  --inko-primary: #4F46E5;           /* Indigo - Main brand */
-  --inko-secondary: #7C3AED;         /* Purple - Mid gradient */
-  --inko-accent: #EC4899;            /* Pink - End gradient */
-  --inko-primary-light: #6366F1;     /* Lighter indigo */
-  --inko-primary-dark: #4338CA;      /* Darker indigo */
+  /* âœ… INKO BRAND COLORS - Logo Gradient (Zinc) */
+  --inko-primary: #18181b;
+  --inko-secondary: #9333ea;
+  --inko-accent: #a855f7;
+  --inko-primary-light: #c084fc;
+  --inko-primary-dark: #7e22ce;
   
   /* ============================================================
      LIGHT MODE - Professional & Clean
      ============================================================ */
-  --admin-bg: #f8fafc;                    /* Page background */
+  --admin-bg: #fafafa;                    /* Page background */
   --admin-panel: rgba(255, 255, 255, 0.97); /* Glass panels */
   --admin-panel-solid: #ffffff;           /* Solid panels/cards */
-  --admin-line: rgba(15, 23, 42, 0.08);  /* Borders */
+  --admin-line: rgba(24, 24, 27, 0.08);  /* Borders */
   
   /* Text Colors - Proper Hierarchy */
-  --admin-text-primary: #0f172a;      /* Main headings */
-  --admin-text-secondary: #334155;    /* Body text */
-  --admin-text-tertiary: #64748b;     /* Muted text */
-  --admin-text-quaternary: #94a3b8;   /* Disabled/placeholder */
+  --admin-text-primary: #18181b;      /* Main headings */
+  --admin-text-secondary: #3f3f46;    /* Body text */
+  --admin-text-tertiary: #71717a;     /* Muted text */
+  --admin-text-quaternary: #a1a1aa;   /* Disabled/placeholder */
   
   /* Brand Colors */
-  --admin-primary: var(--inko-primary);
-  --admin-primary-dark: var(--inko-primary-dark);
-  --admin-primary-soft: rgba(79, 70, 229, 0.12);
-  --admin-secondary: var(--inko-secondary);
-  --admin-accent: var(--inko-accent);
+  --admin-primary: #9333ea;
+  --admin-primary-dark: #7e22ce;
+  --admin-primary-soft: rgba(147, 51, 234, 0.12);
+  --admin-secondary: #27272a;
+  --admin-accent: #a855f7;
   
   --admin-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08);
   --admin-glass-shadow: 0 8px 25px rgba(15, 23, 42, 0.06);
@@ -45,25 +45,25 @@
 
 .dark {
   /* ============================================================
-     DARK MODE - Industry Standard (WordPress/Ghost/Linear)
+     DARK MODE
      ============================================================ */
-  --admin-bg: #0f172a;                    /* Dark slate background */
-  --admin-panel: rgba(30, 41, 59, 0.95);  /* Dark glass panels */
-  --admin-panel-solid: #1e293b;           /* Solid dark panels */
-  --admin-line: rgba(148, 163, 184, 0.1); /* Subtle borders */
+  --admin-bg: #09090b;
+  --admin-panel: rgba(24, 24, 27, 0.95);
+  --admin-panel-solid: #18181b;
+  --admin-line: rgba(212, 212, 216, 0.12);
   
-  /* ✅ Text Colors - Proper Dark Mode Hierarchy */
-  --admin-text-primary: #f1f5f9;      /* Main headings - brightest */
-  --admin-text-secondary: #e2e8f0;    /* Body text - slightly dimmer */
-  --admin-text-tertiary: #cbd5e1;     /* Muted text - dimmer */
-  --admin-text-quaternary: #94a3b8;   /* Disabled/placeholder - dimmest */
+  /* âœ… Text Colors - Proper Dark Mode Hierarchy */
+  --admin-text-primary: #fafafa;
+  --admin-text-secondary: #e4e4e7;
+  --admin-text-tertiary: #d4d4d8;
+  --admin-text-quaternary: #a1a1aa;
   
   /* Brand Colors - Adjusted for dark mode */
-  --admin-primary: #6366F1;           /* Lighter indigo for visibility */
-  --admin-primary-dark: #818cf8;      /* Even lighter for hover */
-  --admin-primary-soft: rgba(99, 102, 241, 0.15);
-  --admin-secondary: #A78BFA;         /* Lighter purple */
-  --admin-accent: #F472B6;            /* Lighter pink */
+  --admin-primary: #a855f7;
+  --admin-primary-dark: #c084fc;
+  --admin-primary-soft: rgba(168, 85, 247, 0.16);
+  --admin-secondary: #d4d4d8;
+  --admin-accent: #e9d5ff;
   
   --admin-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
   
@@ -100,49 +100,44 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: "Space Grotesk", "Manrope", system-ui, sans-serif;
   letter-spacing: -0.025em;
-  color: var(--admin-text-primary);
+  /* color: var(--admin-text-primary); */
 }
 
 /* ============================================================
-   ✅ PROPER TAILWIND DARK MODE OVERRIDES
+   âœ… PROPER TAILWIND DARK MODE OVERRIDES
    ============================================================ */
 
 /* Primary text (headings) */
-.dark .text-slate-900 { color: var(--admin-text-primary) !important; }
+.dark .text-zinc-900 { color: var(--admin-text-primary) !important; }
+
+/* Back to dashboard button - override dark mode text color */
+.dark .back-to-dashboard-btn.text-white { color: #0f172a !important; }
 
 /* Secondary text (body) */
-.dark .text-slate-800,
-.dark .text-slate-700 { color: var(--admin-text-secondary) !important; }
+.dark .text-zinc-800,
+.dark .text-zinc-700 { color: var(--admin-text-secondary) !important; }
 
 /* Tertiary text (muted) */
-.dark .text-slate-600,
-.dark .text-slate-500 { color: var(--admin-text-tertiary) !important; }
+.dark .text-zinc-600,
+.dark .text-zinc-500 { color: var(--admin-text-tertiary) !important; }
 
 /* Quaternary text (disabled/placeholder) */
-.dark .text-slate-400,
-.dark .text-slate-300 { color: var(--admin-text-quaternary) !important; }
+.dark .text-zinc-400,
+.dark .text-zinc-300 { color: var(--admin-text-quaternary) !important; }
 
-/* Brand colors */
-.dark .text-indigo-600,
-.dark .text-indigo-700 { color: var(--admin-primary) !important; }
 
-.dark .text-indigo-400,
-.dark .text-indigo-300 { color: var(--admin-primary-dark) !important; }
-
-.dark .text-purple-600 { color: var(--admin-secondary) !important; }
-.dark .text-pink-600 { color: var(--admin-accent) !important; }
 
 /* White text should stay white */
 .dark .text-white { color: #ffffff !important; }
 
 /* Background overrides */
 .dark .bg-white { background-color: var(--admin-panel-solid) !important; }
-.dark .bg-slate-50 { background-color: rgba(30, 41, 59, 0.5) !important; }
-.dark .bg-slate-100 { background-color: rgba(51, 65, 85, 0.5) !important; }
+.dark .bg-zinc-50 { background-color: rgba(39, 39, 42, 0.5) !important; }
+.dark .bg-zinc-100 { background-color: rgba(63, 63, 70, 0.5) !important; }
 
 /* Border overrides */
-.dark .border-slate-200 { border-color: var(--admin-line) !important; }
-.dark .border-slate-300 { border-color: rgba(148, 163, 184, 0.2) !important; }
+.dark .border-zinc-200 { border-color: var(--admin-line) !important; }
+.dark .border-zinc-300 { border-color: rgba(212, 212, 216, 0.2) !important; }
 
 /* ============================================================
    QUICK ACTIONS - Dark Mode Hover Fix
@@ -191,26 +186,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-nav-link:hover {
-  background-color: rgba(224, 232, 244, 1);
-  color: rgb(79, 70, 229);
+  background-color: rgba(147, 51, 234, 0.08);
+  color: rgb(126, 34, 206);
 }
 
 .dark .sidebar-nav-link:hover {
-  background-color: rgba(79, 70, 229, 0.15);
+  background-color: rgba(168, 85, 247, 0.16);
   color: white;
 }
 
 .sidebar-nav-link.active {
-  background-color: rgba(224, 232, 244, 1);
-  color: rgb(79, 70, 229);
+  background-color: rgba(147, 51, 234, 0.08);
+  color: rgb(126, 34, 206);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(224, 232, 244, 1);
+  border: 1px solid rgba(147, 51, 234, 0.18);
 }
 
 .dark .sidebar-nav-link.active {
-  background-color: rgba(79, 70, 229, 0.15);
-  color: rgb(165, 180, 252);
-  border-color: rgba(79, 70, 229, 0.4);
+  background-color: rgba(168, 85, 247, 0.16);
+  color: rgb(233, 213, 255);
+  border-color: rgba(168, 85, 247, 0.4);
 }
 
 /* ============================================================
@@ -223,17 +218,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-toggle-btn:hover {
-  background-color: rgb(224, 232, 244);
-  border-color: rgb(165, 180, 252);
+  background-color: rgb(250, 245, 255);
+  border-color: rgb(233, 213, 255);
 }
 
 .dark .sidebar-toggle-btn {
-  background-color: #1e293b;
+  background-color: #18181b;
   border-color: var(--admin-line);
 }
 
 .dark .sidebar-toggle-btn:hover {
-  background-color: #334155;
+  background-color: #27272a;
   border-color: var(--admin-primary) !important;
 }
 
@@ -251,7 +246,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .dark .sidebar-logout-btn {
-  background-color: #1e293b;
+  background-color: #18181b;
   border-color: rgb(153, 27, 27);
 }
 
@@ -325,7 +320,7 @@ h1, h2, h3, h4, h5, h6 {
 .admin-page {
   margin: 0 auto;
   width: 100%;
-  max-width: 80rem;
+  max-width: 72rem;
 }
 
 .admin-section {
@@ -444,7 +439,7 @@ h1, h2, h3, h4, h5, h6 {
 .admin-btn-primary {
   background: linear-gradient(135deg, var(--inko-primary), var(--inko-secondary));
   color: white;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 14px rgba(147, 51, 234, 0.25);
 }
 
 .dark .admin-btn-primary {
@@ -454,7 +449,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .admin-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 8px 20px rgba(147, 51, 234, 0.35);
 }
 
 /* ============================================================

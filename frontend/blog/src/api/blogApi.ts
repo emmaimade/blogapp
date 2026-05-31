@@ -13,6 +13,20 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  const blogId = localStorage.getItem('public_blog_id');
+  if (blogId && config.url) {
+    const isMultitenantEndpoint = 
+      config.url.startsWith('/posts') || 
+      config.url.startsWith('/tags') || 
+      config.url.startsWith('/settings') ||
+      config.url.startsWith('/comments');
+      
+    if (isMultitenantEndpoint) {
+      config.url = `/blogs/${blogId}${config.url}`;
+    }
+  }
+
   return config;
 });
 

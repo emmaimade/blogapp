@@ -94,7 +94,7 @@ backend/
 │   ├── dbConfig.py          # Database configuration
 │   ├── models/
 │   │   └── models.py        # SQLModel database models
-│   ├── routes/              # API endpoints
+│   ├── modules/             # Domain routers and feature slices
 │   │   ├── admin.py
 │   │   ├── comments.py
 │   │   ├── posts.py
@@ -103,7 +103,7 @@ backend/
 │   │   └── users.py
 │   ├── schemas/
 │   │   └── schemas.py       # Pydantic request/response schemas
-│   └── utils/
+│   └── core/                # Config, DB, auth/security
 │       └── auth.py          # Authentication utilities
 ├── alembic/                 # Database migrations
 ├── scripts/                 # Utility scripts

@@ -15,9 +15,9 @@ const InkoLogo: React.FC<{ size?: number }> = ({ size = 24 }) => (
   >
     <defs>
       <linearGradient id="inkoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#4F46E5" />
-        <stop offset="50%" stopColor="#7C3AED" />
-        <stop offset="100%" stopColor="#EC4899" />
+        <stop offset="0%" stopColor="#18181B" />
+        <stop offset="50%" stopColor="#9333EA" />
+        <stop offset="100%" stopColor="#A855F7" />
       </linearGradient>
     </defs>
     <path
@@ -37,8 +37,8 @@ export const Navbar: React.FC = () => {
   const general = siteSettings?.general;
   const branding = siteSettings?.branding;
   const siteName = general?.site_name || 'Inko';
-  const primaryColor = branding?.primary_color || '#4F46E5';
-  const secondaryColor = branding?.secondary_color || '#7C3AED';
+  const primaryColor = branding?.primary_color || '#9333EA';
+  const secondaryColor = branding?.secondary_color || '#18181B';
   const logoUrl = branding?.logo_url;
 
   const navLinks = [
@@ -71,16 +71,16 @@ export const Navbar: React.FC = () => {
     [
       'relative rounded-full px-3 py-2 text-sm font-bold transition',
       isNavItemActive(to)
-        ? 'text-slate-900 bg-slate-100'
-        : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50',
+        ? 'text-zinc-900 bg-zinc-100'
+        : 'text-zinc-600 hover:text-primary hover:bg-zinc-50',
     ].join(' ');
 
   const getMobileNavClassName = (to: string) =>
     [
       'rounded-2xl px-4 py-3 text-sm font-bold transition',
       isNavItemActive(to)
-        ? 'bg-slate-900 text-white'
-        : 'text-slate-700 hover:bg-slate-50 hover:text-indigo-600',
+        ? 'bg-zinc-900 text-white'
+        : 'text-zinc-700 hover:bg-zinc-50 hover:text-primary',
     ].join(' ');
 
   const handleLogout = () => {
@@ -90,7 +90,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2 min-w-0 group" onClick={closeMenu}>
           {logoUrl ? (
@@ -103,7 +103,7 @@ export const Navbar: React.FC = () => {
             <InkoLogo size={28} />
           )}
           <span
-            className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900 transition-colors truncate"
+            className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900 transition-colors truncate"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
             {siteName}<span style={{ color: primaryColor }}>.</span>
@@ -127,19 +127,19 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-3 sm:gap-5">
           <Link
             to="/search"
-            className="text-slate-400 hover:text-indigo-600 transition"
+            className="text-zinc-400 hover:text-primary transition"
             aria-label="Search"
             onClick={closeMenu}
           >
             <Search size={20} />
           </Link>
 
-          <div className="h-6 w-[1px] bg-slate-100 hidden sm:block"></div>
+          <div className="h-6 w-[1px] bg-zinc-100 hidden sm:block"></div>
 
           {token ? (
             <button
               onClick={handleLogout}
-              className="hidden sm:flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-indigo-600 transition"
+              className="hidden sm:flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-zinc-900 transition"
             >
               Logout
             </button>
@@ -158,7 +158,7 @@ export const Navbar: React.FC = () => {
           )}
 
           <button
-            className="md:hidden text-slate-900"
+            className="md:hidden text-zinc-900"
             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMobileMenuOpen}
             onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -169,7 +169,7 @@ export const Navbar: React.FC = () => {
       </div>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white/95 backdrop-blur-md">
+        <div className="md:hidden border-t border-zinc-100 bg-white/95 backdrop-blur-md">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2">
             {navLinks.map((link) => (
               <NavLink
@@ -186,7 +186,7 @@ export const Navbar: React.FC = () => {
             {token ? (
               <button
                 onClick={handleLogout}
-                className="mt-2 inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:bg-indigo-600 transition"
+                className="mt-2 inline-flex items-center justify-center gap-2 bg-zinc-900 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-900 transition"
               >
                 Logout
               </button>

@@ -8,13 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        inko: {
-          primary: '#4F46E5',
-          secondary: '#7C3AED',
-          accent: '#EC4899',
-          'primary-light': '#6366F1',
-          'primary-dark': '#4338CA',
-        }
+        primary: '#9333EA',
       }
     },
   },

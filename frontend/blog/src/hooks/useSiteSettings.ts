@@ -45,9 +45,9 @@ const defaultSiteSettings = {
     show_categories: true,
   },
   branding: {
-    primary_color: '#4F46E5',
-    secondary_color: '#7C3AED',
-    accent_color: '#EC4899',
+    primary_color: '#9333EA',
+    secondary_color: '#18181B',
+    accent_color: '#A855F7',
     logo_url: null,
     favicon_url: null,
     font_heading: 'Inter',
@@ -77,4 +77,3 @@ export const useSiteSettings = () =>
     },
     initialData: defaultSiteSettings,
   });
-

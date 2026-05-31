@@ -1,6 +1,18 @@
 # Blog CMS - Monorepo
 
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+
 A full-stack Content Management System built with FastAPI, PostgreSQL, and React. This monorepo contains the backend API, admin panel, and public-facing blog frontend.
+
+## Live Deployments
+
+- **Public Blog:** [https://blogapp-blog.vercel.app](https://blogapp-blog.vercel.app)
+- **Admin Studio:** [https://blogapp-admin-studio-livid.vercel.app](https://blogapp-admin-studio-livid.vercel.app)
+- **Backend API Docs:** [https://blogapp-eta-woad.vercel.app/docs](https://blogapp-eta-woad.vercel.app/docs)
 
 ## Project Architecture
 
@@ -83,7 +95,7 @@ FastAPI REST API with PostgreSQL, JWT authentication, and CMS features.
 **Key Files:**
 - `app/main.py` - FastAPI application setup
 - `app/models/` - SQLModel database models
-- `app/routes/` - API endpoints
+- `app/modules/` - domain API routers and feature logic
 - `app/schemas/` - Pydantic request/response schemas
 - `alembic/` - Database migrations
 

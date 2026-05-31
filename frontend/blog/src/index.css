@@ -34,9 +34,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: #d4d4d8;
   border-radius: 20px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366f1; /* Indigo color */
+  background: #9333ea;
 }

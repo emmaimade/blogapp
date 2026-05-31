@@ -68,8 +68,8 @@ export const Home: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
-        <p className="text-slate-400 font-medium tracking-widest uppercase text-xs">
+        <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
+        <p className="text-zinc-400 font-medium tracking-widest uppercase text-xs">
           Loading Stories
         </p>
       </div>
@@ -77,12 +77,12 @@ export const Home: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
       {featuredPost && (
-        <div className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-100">
+        <div className="bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <Link to={`/post/${featuredPost.slug}`} className="block group">
-              <article className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-lg hover:shadow-2xl transition-all duration-500">
+              <article className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-2xl transition-all duration-500">
                 <div className="relative overflow-hidden h-[440px] sm:h-[500px] md:h-[600px]">
                   <img
                     src={featuredPost.thumbnail_url || '/placeholder.jpg'}
@@ -93,7 +93,7 @@ export const Home: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
 
                   <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
-                    <span className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 bg-white/95 backdrop-blur-sm rounded-full text-xs sm:text-sm font-bold text-indigo-600 shadow-lg">
+                    <span className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 bg-white/95 backdrop-blur-sm rounded-full text-xs sm:text-sm font-bold text-zinc-900 shadow-lg">
                       <Zap size={16} />
                       Featured Story
                     </span>
@@ -117,7 +117,7 @@ export const Home: React.FC = () => {
 
                   <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 md:p-12">
                     <div className="max-w-4xl">
-                      <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 leading-tight group-hover:text-indigo-200 transition-colors">
+                      <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 leading-tight group-hover:text-zinc-500 transition-colors">
                         {featuredPost.title}
                       </h1>
 
@@ -155,32 +155,32 @@ export const Home: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <h2 className="text-2xl md:text-3xl font-black text-slate-900">
+            <h2 className="text-2xl md:text-3xl font-black text-zinc-900">
               {filter === 'all' ? 'Latest Articles' : 'Featured Projects'}
             </h2>
-            <p className="text-slate-600 mt-1">
+            <p className="text-zinc-600 mt-1">
               {filteredPosts?.length || 0} {filter === 'all' ? 'posts' : 'projects'} &bull; Updated daily
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 bg-white rounded-xl p-1.5 border border-slate-200 shadow-sm w-full md:w-auto">
+          <div className="grid grid-cols-2 gap-2 bg-white rounded-xl p-1.5 border border-zinc-200 shadow-sm w-full md:w-auto">
             <button
               onClick={() => setFilter('all')}
               className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                filter === 'all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+ filter === 'all'
+ ? 'bg-primary text-white shadow-sm'
+ : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+ }`}
             >
               All Posts
             </button>
             <button
               onClick={() => setFilter('projects')}
               className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                filter === 'projects'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+ filter === 'projects'
+ ? 'bg-primary text-white shadow-sm'
+ : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+ }`}
             >
               Projects
             </button>
@@ -191,8 +191,8 @@ export const Home: React.FC = () => {
           <div className="lg:col-span-8 space-y-12">
             {trendingPosts.length > 0 && (
               <div>
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                  <TrendingUp size={22} className="text-indigo-600" />
+                <h3 className="text-xl font-black text-zinc-900 mb-6 flex items-center gap-2">
+                  <TrendingUp size={22} className="text-zinc-900" />
                   Trending Now
                 </h3>
 
@@ -201,7 +201,7 @@ export const Home: React.FC = () => {
                     <Link
                       key={post.id}
                       to={`/post/${post.slug}`}
-                      className="group bg-white rounded-2xl overflow-hidden border border-slate-200 hover:shadow-xl hover:border-indigo-200 transition-all duration-300"
+                      className="group bg-white rounded-2xl overflow-hidden border border-zinc-200 hover:shadow-xl hover:border-zinc-200 transition-all duration-300"
                     >
                       <div className="relative h-52 overflow-hidden">
                         <img
@@ -217,27 +217,27 @@ export const Home: React.FC = () => {
                           {getVisibleTags(post, 2).map((tag: any) => (
                             <span
                               key={tag.id}
-                              className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-full font-bold"
+                              className="text-xs px-2.5 py-1 bg-zinc-50 text-zinc-900 rounded-full font-bold"
                             >
                               {tag.name}
                             </span>
                           ))}
                           {getRemainingTagCount(post, 2) > 0 && (
-                            <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full font-bold">
+                            <span className="text-xs px-2.5 py-1 bg-zinc-100 text-zinc-600 rounded-full font-bold">
                               +{getRemainingTagCount(post, 2)} more
                             </span>
                           )}
                         </div>
 
-                        <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug">
+                        <h3 className="text-lg font-bold text-zinc-900 mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
                           {post.title}
                         </h3>
 
-                        <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
+                        <p className="text-sm text-zinc-600 mb-4 line-clamp-2 leading-relaxed">
                           {getCleanExcerpt(post.content, 100)}
                         </p>
 
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
                           <span className="flex items-center gap-1.5">
                             <Clock size={14} />
                             {calculateReadingTime(post.content)} min
@@ -259,7 +259,7 @@ export const Home: React.FC = () => {
 
             {regularPosts.length > 0 && (
               <div>
-                <h3 className="text-xl font-black text-slate-900 mb-6">
+                <h3 className="text-xl font-black text-zinc-900 mb-6">
                   More Articles
                 </h3>
                 <div className="space-y-6">
@@ -271,14 +271,14 @@ export const Home: React.FC = () => {
             )}
 
             {filteredPosts?.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <TrendingUp className="text-slate-400" size={28} />
+              <div className="text-center py-20 bg-white rounded-2xl border border-zinc-200">
+                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <TrendingUp className="text-zinc-400" size={28} />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                <h3 className="text-lg font-bold text-zinc-900 mb-2">
                   {filter === 'all' ? 'No posts yet' : 'No projects yet'}
                 </h3>
-                <p className="text-slate-600">
+                <p className="text-zinc-600">
                   Check back soon for new content!
                 </p>
               </div>
@@ -286,7 +286,7 @@ export const Home: React.FC = () => {
 
             {regularPosts.length >= 8 && (
               <div className="flex justify-center pt-6">
-                <button className="px-8 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-bold hover:border-indigo-600 hover:text-indigo-600 hover:shadow-md transition-all">
+                <button className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all">
                   Load More Posts
                 </button>
               </div>

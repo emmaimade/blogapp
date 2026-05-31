@@ -35,20 +35,20 @@ export const PostCard: React.FC<PostProps> = ({ post }) => {
       <div className="md:w-2/3 flex flex-col justify-center min-w-0">
         <div className="flex flex-wrap gap-2 mb-3">
           {visibleTags.map(tag => (
-            <span key={tag.name} className="bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+            <span key={tag.name} className="bg-zinc-50 text-zinc-900 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
               {tag.name}
             </span>
           ))}
           {remainingTags > 0 && (
-            <span className="bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+            <span className="bg-zinc-100 text-zinc-600 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
               +{remainingTags} more
             </span>
           )}
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors break-words">
+        <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 mb-3 group-hover:text-primary transition-colors break-words">
           <Link to={`/post/${post.slug}`}>{post.title}</Link>
         </h2>
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-slate-500 text-sm">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-zinc-500 text-sm">
           <span className="flex items-center gap-1"><User size={14}/> Admin</span>
           <span className="flex items-center gap-1"><Calendar size={14}/> {format(new Date(post.created_at), 'MMM dd, yyyy')}</span>
         </div>

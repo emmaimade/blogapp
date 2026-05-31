@@ -83,9 +83,9 @@ function App() {
     const siteDescription =
       seo?.meta_description || general?.site_description || 'A modern blog CMS for sharing your stories and ideas';
     const metaTitle = seo?.meta_title || `${siteName} - ${siteTagline}`;
-    const primaryColor = branding?.primary_color || '#4F46E5';
-    const secondaryColor = branding?.secondary_color || '#7C3AED';
-    const accentColor = branding?.accent_color || '#EC4899';
+    const primaryColor = branding?.primary_color || '#9333EA';
+    const secondaryColor = branding?.secondary_color || '#18181B';
+    const accentColor = branding?.accent_color || '#A855F7';
     const faviconUrl = branding?.favicon_url || '/inko-logo.svg';
     const ogImage = seo?.og_image || 'https://yourdomain.com/og-image.png';
     const twitterHandle = seo?.twitter_handle
@@ -129,7 +129,7 @@ function App() {
   return (
     <Router>
       <Toaster position="top-right" />
-      <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
+      <div className="min-h-screen bg-white text-zinc-900 font-sans flex flex-col">
         <Navbar />
         <main className="flex-1">
           <Routes>

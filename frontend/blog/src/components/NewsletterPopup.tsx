@@ -65,7 +65,7 @@ export const NewsletterPopup: React.FC = () => {
         {/* Close button */}
         <button
           onClick={() => setIsVisible(false)}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors"
+          className="absolute top-4 right-4 text-zinc-500 hover:text-zinc-800 transition-colors"
           aria-label="Close popup"
         >
           <X size={24} />
@@ -73,10 +73,10 @@ export const NewsletterPopup: React.FC = () => {
 
         {/* Content */}
         <div className="p-8 pb-2">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">
+          <h2 className="text-2xl font-bold text-zinc-900 mb-3">
             Join the Inko Community
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-zinc-600 mb-6">
             Get new articles, tips and curated frontend/backend content delivered straight to your inbox.
           </p>
 
@@ -87,18 +87,18 @@ export const NewsletterPopup: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-300 focus:border-primary focus:ring-2 focus:ring-primary outline-none transition-all"
             />
 
             <button
               type="submit"
               disabled={status === 'loading'}
               className={`
-                w-full py-3 px-6 rounded-xl font-medium text-white transition-all
-                ${status === 'loading' 
-                  ? 'bg-indigo-400 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800'}
-              `}
+ w-full py-3 px-6 rounded-xl font-medium text-white transition-all
+ ${status === 'loading' 
+ ? 'bg-primary cursor-not-allowed' 
+ : 'bg-primary hover:bg-purple-700 active:bg-purple-800'}
+ `}
             >
               {status === 'loading' ? 'Subscribing...' : 'Subscribe'}
             </button>
@@ -116,7 +116,7 @@ export const NewsletterPopup: React.FC = () => {
             )}
           </form>
 
-          <p className="text-xs text-gray-500 text-center mt-6">
+          <p className="text-xs text-zinc-500 text-center mt-6">
             No spam. Unsubscribe anytime.
           </p>
         </div>

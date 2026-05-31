@@ -74,8 +74,8 @@ export const Contact: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       <div className="text-center mb-16">
-        <h1 className="text-5xl font-black text-slate-900 mb-4">Get In Touch</h1>
-        <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+        <h1 className="text-5xl font-black text-zinc-900 mb-4">Get In Touch</h1>
+        <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
           Have a question or just want to say hello? I'd love to hear from you.
         </p>
       </div>
@@ -88,8 +88,8 @@ export const Contact: React.FC = () => {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="text-green-600" size={40} />
               </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-4">Message Sent!</h3>
-              <p className="text-slate-600 mb-6">
+              <h3 className="text-2xl font-black text-zinc-900 mb-4">Message Sent!</h3>
+              <p className="text-zinc-600 mb-6">
                 Thanks for reaching out. I'll get back to you soon.
               </p>
               <button
@@ -104,7 +104,7 @@ export const Contact: React.FC = () => {
               {/* Form fields remain the same as your original */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Your Name</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2">Your Name</label>
                   <input
                     type="text"
                     name="name"
@@ -112,11 +112,11 @@ export const Contact: React.FC = () => {
                     onChange={handleChange}
                     placeholder="John Doe"
                     required
-                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2">Email Address</label>
                   <input
                     type="email"
                     name="email"
@@ -124,13 +124,13 @@ export const Contact: React.FC = () => {
                     onChange={handleChange}
                     placeholder="john@example.com"
                     required
-                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Subject</label>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Subject</label>
                 <input
                   type="text"
                   name="subject"
@@ -138,12 +138,12 @@ export const Contact: React.FC = () => {
                   onChange={handleChange}
                   placeholder="What's this about?"
                   required
-                  className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Message</label>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Message</label>
                 <textarea
                   name="message"
                   value={formData.message}
@@ -151,14 +151,14 @@ export const Contact: React.FC = () => {
                   placeholder="Tell me more..."
                   rows={8}
                   required
-                  className="w-full px-4 py-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white outline-none transition-all resize-none"
+                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all resize-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-primary text-white py-4 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -179,42 +179,42 @@ export const Contact: React.FC = () => {
         {/* Contact Info Sidebar */}
         <div className="md:col-span-2 space-y-6">
           {/* Email */}
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl p-6 border border-indigo-100">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-4">
+          <div className="bg-zinc-50 rounded-3xl p-6 border border-zinc-300">
+            <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center mb-4">
               <Mail className="text-white" size={24} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Email</h3>
-            <a href={`mailto:${settings.contact_email}`} className="text-indigo-600 hover:text-indigo-700 font-medium break-all">
+            <h3 className="text-lg font-bold text-zinc-900 mb-2">Email</h3>
+            <a href={`mailto:${settings.contact_email}`} className="text-zinc-900 hover:text-zinc-950 font-medium break-all">
               {settings.contact_email}
             </a>
           </div>
 
           {/* Response Time */}
-          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-6 border border-purple-100">
-            <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mb-4">
+          <div className="bg-gradient-to-br from-zinc-50 to-zinc-50 rounded-3xl p-6 border border-zinc-300">
+            <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center mb-4">
               <Clock className="text-white" size={24} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Response Time</h3>
-            <p className="text-slate-600">{settings.response_time}</p>
+            <h3 className="text-lg font-bold text-zinc-900 mb-2">Response Time</h3>
+            <p className="text-zinc-600">{settings.response_time}</p>
           </div>
 
           {/* Location */}
-          <div className="bg-gradient-to-br from-pink-50 to-orange-50 rounded-3xl p-6 border border-pink-100">
-            <div className="w-12 h-12 bg-pink-600 rounded-xl flex items-center justify-center mb-4">
+          <div className="bg-gradient-to-br from-zinc-50 to-purple-50 rounded-3xl p-6 border border-zinc-300">
+            <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center mb-4">
               <MapPin className="text-white" size={24} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Location</h3>
-            <p className="text-slate-600">{settings.location}</p>
+            <h3 className="text-lg font-bold text-zinc-900 mb-2">Location</h3>
+            <p className="text-zinc-600">{settings.location}</p>
           </div>
 
           {/* Phone (if provided) */}
           {settings.phone && (
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-6 border border-emerald-100">
-              <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-br from-purple-50 to-zinc-50 rounded-3xl p-6 border border-purple-100">
+              <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
                 <Phone className="text-white" size={24} />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Phone</h3>
-              <a href={`tel:${settings.phone}`} className="text-emerald-600 hover:text-emerald-700 font-medium">
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">Phone</h3>
+              <a href={`tel:${settings.phone}`} className="text-primary hover:text-purple-700 font-medium">
                 {settings.phone}
               </a>
             </div>
@@ -222,7 +222,7 @@ export const Contact: React.FC = () => {
 
           {/* Social Links */}
           {settings.show_social_links && Object.keys(settings.social_links).length > 0 && (
-            <div className="bg-slate-900 rounded-3xl p-6 text-white">
+            <div className="bg-zinc-900 rounded-3xl p-6 text-white">
               <h3 className="text-lg font-bold mb-4">Connect on Social</h3>
               <div className="space-y-3">
                 {Object.entries(settings.social_links).map(([platform, url]) => {
@@ -247,13 +247,13 @@ export const Contact: React.FC = () => {
 
           {/* Optional FAQ */}
           {settings.show_faq && settings.faqs.length > 0 && (
-            <div className="bg-white rounded-3xl p-6 border border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Questions?</h3>
+            <div className="bg-white rounded-3xl p-6 border border-zinc-100">
+              <h3 className="text-lg font-bold text-zinc-900 mb-4">Quick Questions?</h3>
               <div className="space-y-4 text-sm">
                 {settings.faqs.map((faq, i) => (
                   <div key={i}>
-                    <p className="font-bold text-slate-900 mb-1">{faq.question}</p>
-                    <p className="text-slate-600">{faq.answer}</p>
+                    <p className="font-bold text-zinc-900 mb-1">{faq.question}</p>
+                    <p className="text-zinc-600">{faq.answer}</p>
                   </div>
                 ))}
               </div>

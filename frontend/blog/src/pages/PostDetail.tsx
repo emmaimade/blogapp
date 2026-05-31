@@ -94,12 +94,12 @@ export const PostDetail = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
       <div className="lg:col-span-8">
         {/* Breadcrumbs */}
-        <nav className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 sm:mb-8">
-          <a href="/" className="hover:text-indigo-600">
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400 mb-6 sm:mb-8">
+          <a href="/" className="hover:text-primary">
             Home
           </a>
           <ChevronRight size={12} />
-          <span className="text-slate-900">{post.title}</span>
+          <span className="text-zinc-900">{post.title}</span>
         </nav>
 
         {/* Article Header */}
@@ -108,28 +108,28 @@ export const PostDetail = () => {
             {post.tags.map((tag: any) => (
               <span
                 key={tag.id}
-                className="bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full font-bold"
+                className="bg-primary text-white text-[10px] px-3 py-1 rounded-full font-bold"
               >
                 {tag.name}
               </span>
             ))}
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 leading-tight mb-6 break-words">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 leading-tight mb-6 break-words">
             {post.title}
           </h1>
 
           {/* Author & Date */}
-          <div className="flex flex-wrap items-center gap-6 text-slate-500 border-y border-slate-100 py-4">
+          <div className="flex flex-wrap items-center gap-6 text-zinc-500 border-y border-zinc-100 py-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-2xl flex items-center justify-center font-bold shadow-inner">
+              <div className="w-9 h-9 bg-primary text-white rounded-2xl flex items-center justify-center font-bold shadow-inner">
                 {authorName.charAt(0).toUpperCase()}
               </div>
               <div>
-                <span className="text-sm font-semibold text-slate-900">
+                <span className="text-sm font-semibold text-zinc-900">
                   Written by {authorName}
                 </span>
                 {post.author?.role && (
-                  <span className="ml-2 text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 px-2 py-px rounded">
+                  <span className="ml-2 text-[10px] uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-px rounded">
                     {post.author.role}
                   </span>
                 )}
@@ -147,48 +147,48 @@ export const PostDetail = () => {
         </header>
 
         {/* Article Content */}
-        <article className="prose prose-slate max-w-none prose-img:rounded-3xl prose-headings:font-black prose-a:text-indigo-600 prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto">
+        <article className="prose prose-slate max-w-none prose-img:rounded-3xl prose-headings:font-black prose-a:text-zinc-900 prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
             components={{
               h1: ({ node, ...props }) => (
                 <h1
-                  className="text-4xl font-bold mb-6 mt-8 text-slate-900"
+                  className="text-4xl font-bold mb-6 mt-8 text-zinc-900"
                   {...props}
                 />
               ),
               h2: ({ node, ...props }) => (
                 <h2
-                  className="text-3xl font-bold mb-5 mt-7 text-slate-900"
+                  className="text-3xl font-bold mb-5 mt-7 text-zinc-900"
                   {...props}
                 />
               ),
               h3: ({ node, ...props }) => (
                 <h3
-                  className="text-2xl font-bold mb-4 mt-6 text-slate-900"
+                  className="text-2xl font-bold mb-4 mt-6 text-zinc-900"
                   {...props}
                 />
               ),
               p: ({ node, ...props }) => (
-                <p className="mb-4 text-slate-700 leading-relaxed" {...props} />
+                <p className="mb-4 text-zinc-700 leading-relaxed" {...props} />
               ),
               ul: ({ node, ...props }) => (
                 <ul
-                  className="list-disc list-inside mb-4 text-slate-700 space-y-2"
+                  className="list-disc list-inside mb-4 text-zinc-700 space-y-2"
                   {...props}
                 />
               ),
               ol: ({ node, ...props }) => (
                 <ol
-                  className="list-decimal list-inside mb-4 text-slate-700 space-y-2"
+                  className="list-decimal list-inside mb-4 text-zinc-700 space-y-2"
                   {...props}
                 />
               ),
               li: ({ node, ...props }) => <li className="ml-4" {...props} />,
               blockquote: ({ node, ...props }) => (
                 <blockquote
-                  className="border-l-4 border-indigo-500 pl-4 py-2 my-4 bg-indigo-50 italic text-slate-700"
+                  className="border-l-4 border-zinc-300 pl-4 py-2 my-4 bg-zinc-50 italic text-zinc-700"
                   {...props}
                 />
               ),
@@ -197,14 +197,14 @@ export const PostDetail = () => {
 
                 return !isBlock ? (
                   <code
-                    className="bg-slate-100 px-2 py-1 rounded text-sm font-mono text-rose-600"
+                    className="bg-zinc-100 px-2 py-1 rounded text-sm font-mono text-rose-600"
                     {...props}
                   >
                     {children}
                   </code>
                 ) : (
                   <code
-                    className={`block bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto font-mono text-sm my-4 ${className || ''}`.trim()}
+                    className={`block bg-zinc-900 text-zinc-100 p-4 rounded-lg overflow-x-auto font-mono text-sm my-4 ${className || ''}`.trim()}
                     {...props}
                   >
                     {children}
@@ -213,13 +213,13 @@ export const PostDetail = () => {
               },
               pre: ({ node, ...props }) => (
                 <pre
-                  className="bg-slate-900 p-4 rounded-lg overflow-x-auto my-4"
+                  className="bg-zinc-900 p-4 rounded-lg overflow-x-auto my-4"
                   {...props}
                 />
               ),
               a: ({ node, ...props }) => (
                 <a
-                  className="text-indigo-600 hover:text-indigo-700 underline"
+                  className="text-zinc-900 hover:text-zinc-950 underline"
                   {...props}
                 />
               ),
@@ -231,21 +231,21 @@ export const PostDetail = () => {
               ),
               table: ({ node, ...props }) => (
                 <table
-                  className="w-full border-collapse border border-slate-300 my-4"
+                  className="w-full border-collapse border border-zinc-300 my-4"
                   {...props}
                 />
               ),
               thead: ({ node, ...props }) => (
-                <thead className="bg-slate-100" {...props} />
+                <thead className="bg-zinc-100" {...props} />
               ),
               th: ({ node, ...props }) => (
                 <th
-                  className="border border-slate-300 px-4 py-2 text-left font-semibold"
+                  className="border border-zinc-300 px-4 py-2 text-left font-semibold"
                   {...props}
                 />
               ),
               td: ({ node, ...props }) => (
-                <td className="border border-slate-300 px-4 py-2" {...props} />
+                <td className="border border-zinc-300 px-4 py-2" {...props} />
               ),
             }}
           >
@@ -254,11 +254,11 @@ export const PostDetail = () => {
         </article>
 
         {relatedPosts.length > 0 && (
-          <section className="mt-12 pt-8 border-t border-slate-100">
+          <section className="mt-12 pt-8 border-t border-zinc-100">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-black text-slate-900">Related Posts</h2>
-                <p className="text-sm text-slate-600 mt-1">
+                <h2 className="text-2xl font-black text-zinc-900">Related Posts</h2>
+                <p className="text-sm text-zinc-600 mt-1">
                   More stories in a similar vein.
                 </p>
               </div>
@@ -269,9 +269,9 @@ export const PostDetail = () => {
                 <Link
                   key={relatedPost.id}
                   to={`/post/${relatedPost.slug}`}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-indigo-200 hover:shadow-lg"
+                  className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-200 hover:shadow-lg"
                 >
-                  <div className="aspect-[16/10] overflow-hidden bg-slate-100">
+                  <div className="aspect-[16/10] overflow-hidden bg-zinc-100">
                     <img
                       src={relatedPost.thumbnail_url || '/placeholder.jpg'}
                       alt={relatedPost.title}
@@ -284,22 +284,22 @@ export const PostDetail = () => {
                       {relatedPost.tags?.slice(0, 2).map((tag: any) => (
                         <span
                           key={`${relatedPost.id}-${tag.id ?? tag.name}`}
-                          className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600"
+                          className="rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-bold text-zinc-900"
                         >
                           {tag.name}
                         </span>
                       ))}
                     </div>
 
-                    <h3 className="text-lg font-bold leading-snug text-slate-900 transition-colors group-hover:text-indigo-600 line-clamp-2">
+                    <h3 className="text-lg font-bold leading-snug text-zinc-900 transition-colors group-hover:text-primary line-clamp-2">
                       {relatedPost.title}
                     </h3>
 
-                    <p className="mt-3 text-sm leading-relaxed text-slate-600 line-clamp-2">
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-600 line-clamp-2">
                       {relatedPost.excerpt || 'Read this related article for more context and detail.'}
                     </p>
 
-                    <div className="mt-4 flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <div className="mt-4 flex items-center gap-2 text-xs font-medium text-zinc-500">
                       <Calendar size={13} />
                       <span>{format(new Date(relatedPost.created_at), 'MMM dd, yyyy')}</span>
                     </div>

@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
-from ..app.dbConfig import engine
-from ..app.models.models import User, UserRole
-from ..app.utils.auth import get_password_hash
+from ..app.core.db import engine
+from ..app.core.security import get_password_hash
+from ..app.models import User, UserRole
 
 def create_admin():
     with Session(engine) as session:
@@ -17,9 +17,8 @@ def create_admin():
         admin_user = User(
             username="admin",
             email="admin@cms.com",
-            hashed_password=get_password_hash("admin"), # Change this!
+            hashed_password=get_password_hash("admin"),
             role=UserRole.ADMIN,
-            is_active=True
         )
         
         session.add(admin_user)

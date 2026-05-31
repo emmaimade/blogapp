@@ -1,5 +1,7 @@
 # Blog Frontend - Public Blog
 
+**Live URL:** [https://blogapp-blog.vercel.app](https://blogapp-blog.vercel.app)
+
 React + TypeScript public-facing blog with post browsing, search, comments, and tag filtering.
 
 ## Stack
@@ -32,10 +34,14 @@ npm install
 
 2. **Configure Environment**
 
-Create `.env.local` file:
+Create `.env` file:
 
 ```env
+# Local Development
 VITE_API_BASE_URL=http://localhost:8000
+
+# Production / Live API (for reference or testing)
+# VITE_API_BASE_URL=https://blogapp-eta-woad.vercel.app
 ```
 
 3. **Run Development Server**
@@ -146,7 +152,7 @@ blog/
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` |
+| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` or `https://blogapp-eta-woad.vercel.app` |
 
 ## API Integration
 

@@ -83,27 +83,27 @@ export const About: React.FC = () => {
   } = effectiveSettings;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
       
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-b border-slate-100">
+      <div className="bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 border-b border-zinc-100">
         <div className="max-w-4xl mx-auto px-6 py-20 md:py-32">
           <div className="text-center">
             {previewDraft && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-full mb-4 border border-amber-200 text-sm font-bold">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-800 rounded-full mb-4 border border-purple-200 text-sm font-bold">
                 Previewing unsaved changes
               </div>
             )}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full mb-6 border border-indigo-100">
-              <Sparkles className="text-indigo-600" size={16} />
-              <span className="text-sm font-bold text-indigo-600">About</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full mb-6 border border-zinc-300">
+              <Sparkles className="text-zinc-900" size={16} />
+              <span className="text-sm font-bold text-zinc-900">About</span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-black text-slate-900 mb-6 leading-tight">
+            <h1 className="text-4xl md:text-6xl font-black text-zinc-900 mb-6 leading-tight">
               {bio_title || "Welcome to My Blog"}
             </h1>
             
-            <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg md:text-xl text-zinc-600 max-w-2xl mx-auto leading-relaxed">
               {bio_subtitle || "Sharing ideas, stories, and insights"}
             </p>
           </div>
@@ -115,23 +115,23 @@ export const About: React.FC = () => {
         {/* Stats - Only show if enabled */}
         {show_stats !== false && (
           <div className="grid grid-cols-3 gap-6 mb-20">
-            <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl font-black text-indigo-600 mb-2">
+            <div className="text-center p-6 bg-white rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-4xl font-black text-zinc-900 mb-2">
                 {stats.articles}
               </div>
-              <div className="text-sm text-slate-600 font-medium">Articles Published</div>
+              <div className="text-sm text-zinc-600 font-medium">Articles Published</div>
             </div>
-            <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl font-black text-purple-600 mb-2">
+            <div className="text-center p-6 bg-white rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-4xl font-black text-zinc-900 mb-2">
                 {formatNumber(stats.views)}
               </div>
-              <div className="text-sm text-slate-600 font-medium">Total Readers</div>
+              <div className="text-sm text-zinc-600 font-medium">Total Readers</div>
             </div>
-            <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl font-black text-pink-600 mb-2">
+            <div className="text-center p-6 bg-white rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-4xl font-black text-zinc-900 mb-2">
                 {stats.projects}
               </div>
-              <div className="text-sm text-slate-600 font-medium">Projects</div>
+              <div className="text-sm text-zinc-600 font-medium">Projects</div>
             </div>
           </div>
         )}
@@ -140,7 +140,7 @@ export const About: React.FC = () => {
         <div className="mb-20">
           <div className="prose prose-lg max-w-none">
             <div 
-              className="text-slate-600 leading-relaxed text-lg whitespace-pre-wrap"
+              className="text-zinc-600 leading-relaxed text-lg whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ 
                 __html: bio_content || "This is a modern blog built with React and FastAPI. Customize this content in your admin panel under Settings > About Page." 
               }}
@@ -150,9 +150,9 @@ export const About: React.FC = () => {
 
         {/* CTA - Only show if enabled */}
         {show_contact_cta !== false && (
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-12 text-center text-white">
+          <div className="bg-zinc-900 rounded-3xl p-12 text-center text-white">
             <h2 className="text-3xl font-black mb-4">Let's Connect</h2>
-            <p className="text-indigo-100 mb-8 max-w-xl mx-auto text-lg">
+            <p className="text-zinc-500 mb-8 max-w-xl mx-auto text-lg">
               Interested in collaborating or just want to say hi? I'd love to hear from you.
             </p>
             
@@ -160,7 +160,7 @@ export const About: React.FC = () => {
               {email && (
                 <a
                   href={`mailto:${email}`}
-                  className="inline-flex items-center gap-2 bg-white text-indigo-600 px-8 py-4 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-lg text-lg"
+                  className="inline-flex items-center gap-2 bg-white text-zinc-900 px-8 py-4 rounded-xl font-bold hover:bg-zinc-50 transition-all shadow-lg text-lg"
                 >
                   <Mail size={20} />
                   Get in Touch

@@ -53,3 +53,14 @@ frontend/blog/.vercel/
 Thumbs.db
 .AppleDouble
 .LSOverride
+
+# --- Temporary/Reference Files ---
+TODO.txt
+progress.md
+models_multitenant.py
+permissions.py
+schemas_multitenant.py
+fix_branding.js
+migrate_colors.js
+migrate_colors2.js
+migrate_primary.js

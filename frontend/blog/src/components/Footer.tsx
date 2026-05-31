@@ -12,7 +12,7 @@ export const Footer: React.FC = () => {
   const branding = siteSettings?.branding;
   const siteName = general?.site_name || 'Inko';
   const logoUrl = branding?.logo_url;
-  const primaryColor = branding?.primary_color || '#4F46E5';
+  const primaryColor = branding?.primary_color || '#9333EA';
 
   const { data: settings } = useQuery({
     queryKey: ['footerSettings'],
@@ -66,7 +66,7 @@ export const Footer: React.FC = () => {
     .replace('Â©', '©');
 
   return (
-    <footer className="bg-slate-900 text-white mt-20">
+    <footer className="bg-zinc-900 text-white mt-20">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -83,7 +83,7 @@ export const Footer: React.FC = () => {
                 </span>
               )}
             </Link>
-            <p className="text-slate-400 text-sm mb-4">
+            <p className="text-zinc-400 text-sm mb-4">
               {settings?.footer_text || 'Your ideas, amplified.'}
             </p>
             {settings?.show_social_links !== false && footerSocials.length > 0 && (
@@ -107,7 +107,7 @@ export const Footer: React.FC = () => {
           {settings?.show_quick_links !== false && (
             <div>
               <h3 className="font-bold text-lg mb-4">Quick Links</h3>
-              <ul className="space-y-2 text-slate-400">
+              <ul className="space-y-2 text-zinc-400">
                 <li>
                   <Link to="/" className="hover:text-white transition-colors">
                     Home
@@ -135,7 +135,7 @@ export const Footer: React.FC = () => {
           {settings?.show_categories !== false && (
             <div>
               <h3 className="font-bold text-lg mb-4">Popular Topics</h3>
-              <ul className="space-y-2 text-slate-400">
+              <ul className="space-y-2 text-zinc-400">
                 {popularTags?.length > 0 ? (
                   popularTags.map((tag: { id: number; name: string }) => (
                     <li key={tag.id}>
@@ -170,17 +170,17 @@ export const Footer: React.FC = () => {
               <h3 className="font-bold text-lg mb-4">
                 {settings?.newsletter_title || 'Newsletter'}
               </h3>
-              <p className="text-slate-400 text-sm mb-4">
+              <p className="text-zinc-400 text-sm mb-4">
                 {settings?.newsletter_description || 'Get the latest posts delivered to your inbox.'}
               </p>
               <div className="flex gap-2">
                 <input
                   type="email"
                   placeholder="Your email"
-                  className="flex-1 px-4 py-2 rounded-lg bg-white/10 border border-white/20 outline-none focus:border-indigo-400 transition-all text-sm"
+                  className="flex-1 px-4 py-2 rounded-lg bg-white/10 border border-white/20 outline-none focus:border-zinc-300 transition-all text-sm"
                 />
                 <button
-                  className="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all"
+                  className="bg-zinc-900 px-4 py-2 rounded-lg hover:bg-zinc-900 transition-all"
                   aria-label="Subscribe"
                 >
                   <Mail size={18} />
@@ -190,7 +190,7 @@ export const Footer: React.FC = () => {
           )}
         </div>
 
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400">
+        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
           <p>{copyrightText}</p>
           <div className="flex gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">
