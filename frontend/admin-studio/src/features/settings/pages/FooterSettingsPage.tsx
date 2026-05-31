@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Loader2, AlertCircle } from 'lucide-react';
+import { Save, Loader2, AlertCircle, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
@@ -8,6 +8,19 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 export const FooterSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+
+  const { data: subscription } = useQuery({
+    queryKey: ['blogSubscription', activeBlog?.id],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/blogs/subscription');
+        return res.data;
+      } catch (error) {
+        return { plan: 'free' };
+      }
+    },
+    enabled: !!activeBlog?.id,
+  });
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['footerSettings', activeBlog?.id],
@@ -163,15 +176,28 @@ export const FooterSettings: React.FC = () => {
             <div>
               <label className="block text-sm font-bold text-zinc-700 mb-2">
                 Copyright Text
+                {subscription?.plan === 'free' && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                    <Lock size={12} />
+                    Pro Feature
+                  </span>
+                )}
               </label>
               <input
                 type="text"
                 value={formData.copyright_text || ''}
                 onChange={(e) => handleChange('copyright_text', e.target.value)}
                 placeholder="© {year} Inko. All rights reserved."
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                disabled={subscription?.plan === 'free'}
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-500"
               />
-              <p className="text-xs text-zinc-500 mt-1">Use {`{year}`} for automatic current year</p>
+              {subscription?.plan === 'free' ? (
+                <p className="text-xs text-amber-600 mt-1">
+                  Upgrade to Pro or Team to customize the copyright notice and remove the INKO attribution. <a href="/pricing" className="font-semibold hover:underline">View plans</a>
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-500 mt-1">Use {`{year}`} for automatic current year</p>
+              )}
             </div>
           </div>
         </div>

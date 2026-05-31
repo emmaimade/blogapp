@@ -6,7 +6,7 @@ from typing import Any, Dict
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
 from app.core.db import get_session
@@ -130,6 +130,25 @@ def update_footer_settings(
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
+    from app.models import BlogSubscription, SubscriptionPlan
+    
+    # Check if user is trying to modify the copyright text
+    existing_settings = get_setting(session, blog_id, "footer", FooterSettings)
+    
+    if settings.copyright_text != existing_settings.get("copyright_text"):
+        # Check subscription plan - only pro/team can edit copyright
+        subscription = session.exec(
+            select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)
+        ).first()
+        
+        plan = subscription.plan if subscription else SubscriptionPlan.FREE
+        
+        if plan == SubscriptionPlan.FREE:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Editing the copyright text is only available for Pro and Team plans. Please upgrade to remove the INKO attribution."
+            )
+    
     return update_setting(session, blog_id, "footer", settings)
 
 

@@ -191,7 +191,10 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
-          <p>{copyrightText}</p>
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <p>{copyrightText}</p>
+            <span className="text-zinc-600 text-xs">• @powered by INKO</span>
+          </div>
           <div className="flex gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">
               Privacy
