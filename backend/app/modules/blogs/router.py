@@ -36,6 +36,7 @@ from app.models import (
     User,
 )
 from app.schemas import (
+    AboutPageSettings,
     BlogCreate,
     BlogDashboardSummary,
     BlogInvitationCreate,
@@ -46,7 +47,11 @@ from app.schemas import (
     BlogMemberUpdate,
     BlogRead,
     BlogUpdate,
+    BrandingSettings,
+    ContactSettings,
     DashboardRecentActivity,
+    FooterSettings,
+    GeneralSettings,
     OnboardingAboutUpdate,
     OnboardingPlanUpdate,
     OnboardingProfileUpdate,
@@ -54,6 +59,7 @@ from app.schemas import (
     OnboardingState,
     OnboardingSummary,
     OnboardingTeamComplete,
+    SEOSettings,
     SubscriptionRead,
 )
 
@@ -176,6 +182,58 @@ def _sync_onboarding_state(session: Session, blog: Blog) -> tuple[OnboardingSumm
     return summary, subscription
 
 
+def _initialize_blog_settings(session: Session, blog_id: int) -> None:
+    """Initialize all default settings for a new blog on creation."""
+    # Branding settings with default colors and fonts
+    _set_site_setting(
+        session,
+        blog_id,
+        "branding",
+        BrandingSettings().model_dump(),
+    )
+    
+    # General settings
+    _set_site_setting(
+        session,
+        blog_id,
+        "general",
+        GeneralSettings().model_dump(),
+    )
+    
+    # Footer settings
+    _set_site_setting(
+        session,
+        blog_id,
+        "footer",
+        FooterSettings().model_dump(),
+    )
+    
+    # SEO settings
+    _set_site_setting(
+        session,
+        blog_id,
+        "seo",
+        SEOSettings().model_dump(),
+    )
+    
+    # Contact settings
+    _set_site_setting(
+        session,
+        blog_id,
+        "contact",
+        ContactSettings().model_dump(),
+    )
+    
+    # About page settings
+    _set_site_setting(
+        session,
+        blog_id,
+        "about_page",
+        AboutPageSettings().model_dump(),
+    )
+    
+    session.commit()
+
 
 @router.post("/", response_model=BlogRead)
 def create_blog(
@@ -197,6 +255,9 @@ def create_blog(
     session.add(new_blog)
     session.commit()
     session.refresh(new_blog)
+    
+    # Initialize all default settings for the new blog
+    _initialize_blog_settings(session, new_blog.id)
     
     # create owner membership
     membership = BlogMember(
