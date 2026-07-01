@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Edit3, Eye, FileText, MessageSquare,
   Plus, Settings, Tag, Users, ArrowUpRight, Feather,
-  Globe, ExternalLink, Copy, CheckCircle2, Lock, Zap,
+  Globe, ExternalLink, Copy, CheckCircle2, Lock, Zap, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { formatRelative } from '../../../shared/utils/dates';
 import { useState } from 'react';
 import api from '../../../shared/api/client';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -26,6 +26,7 @@ interface DashboardSummary {
   posts: number;
   published_posts: number;
   draft_posts: number;
+  scheduled_posts: number;
   comments: number;
   tags: number;
   team_members: number;
@@ -40,10 +41,7 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
-const formatTime = (isoTime: string) => {
-  try { return formatDistanceToNow(new Date(isoTime), { addSuffix: true }); }
-  catch { return 'recently'; }
-};
+const formatTime = (isoTime: string) => formatRelative(isoTime);
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({
@@ -69,7 +67,15 @@ const StatCard = ({
 );
 
 // ─── Publish Progress ─────────────────────────────────────────────────────────
-const PublishProgress = ({ published, total }: { published: number; total: number }) => {
+const PublishProgress = ({ 
+  published, 
+  scheduled, 
+  total 
+}: { 
+  published: number; 
+  scheduled: number;
+  total: number; 
+}) => {
   const pct = total > 0 ? Math.round((published / total) * 100) : 0;
   return (
     <div className="admin-card p-5">
@@ -82,7 +88,8 @@ const PublishProgress = ({ published, total }: { published: number; total: numbe
       </div>
       <div className="mt-2 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
         <span>{published} published</span>
-        <span>{total - published} drafts</span>
+        <span>{scheduled} scheduled</span>
+        <span>{total - published - scheduled} drafts</span>
       </div>
     </div>
   );
@@ -117,13 +124,11 @@ const QuickAction = ({
 
 // ─── Site Card ────────────────────────────────────────────────────────────────
 const SiteCard = ({
-  blogName,
   subdomain,
   customDomain,
   plan,
   canManageSettings,
 }: {
-  blogName: string;
   subdomain: string;
   customDomain?: string | null;
   plan?: string;
@@ -308,27 +313,34 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-
-      {/* ─── Header greeting ─── */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white">
-            {getGreeting()}, {user?.username?.split(' ')[0]}
+      {/* ─── Optimized Header Greeting Grid Layout ─── */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+            {getGreeting()}, {user?.first_name}
           </h1>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{today} · {data.blog_name}</p>
+          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+            {today} · {data.blog_name}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-            data.role === 'owner'  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-            : data.role === 'editor' ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300'
-            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-          }`}>
+        
+        {/* Actions sub-row block: Right-aligned on mobile line 3, single row on desktop */}
+        <div className="flex items-center gap-2 self-end md:self-auto mt-1 md:mt-0">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize tracking-wide ${
+              data.role === "owner"
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                : data.role === "editor"
+                  ? "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300"
+                  : "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+            }`}
+          >
             {data.role}
           </span>
           {canManagePosts && (
             <Link
               to="/admin/posts/new"
-              className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
+              className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-violet-700 active:scale-95"
             >
               <Plus size={16} /> New post
             </Link>
@@ -337,44 +349,110 @@ export const Dashboard = () => {
       </div>
 
       {/* ─── Stat cards ─── */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard title="Total Posts"   value={data.posts}        sub={`${data.published_posts} published · ${data.draft_posts} drafts`} icon={<FileText size={16} />} accent />
-        <StatCard title="Total Views"   value={data.total_views}  sub="Across all posts"    icon={<Eye size={16} />} />
-        <StatCard title="Comments"      value={data.comments}     sub="Reader engagement"   icon={<MessageSquare size={16} />} />
-        <StatCard title="Team Members"  value={data.team_members} sub={`${data.tags} tags`} icon={<Users size={16} />} />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard
+          title="Total Posts"
+          value={data.posts}
+          sub={`${data.published_posts} live · ${data.draft_posts} drafts · ${data.scheduled_posts} scheduled`}
+          icon={<FileText size={16} />}
+          accent
+        />
+
+        <StatCard
+          title="Live Posts"
+          value={data.published_posts}
+          sub="Published & visible"
+          icon={<Globe size={16} />}
+        />
+
+        <StatCard
+          title="Scheduled"
+          value={data.scheduled_posts}
+          sub="Will publish automatically"
+          icon={<Clock size={16} />}
+        />
+
+        <StatCard
+          title="Total Views"
+          value={data.total_views}
+          sub="Across all posts"
+          icon={<Eye size={16} />}
+        />
+
+        <StatCard
+          title="Comments"
+          value={data.comments}
+          sub="Reader engagement"
+          icon={<MessageSquare size={16} />}
+        />
       </div>
 
       {/* ─── Publishing progress ─── */}
-      <PublishProgress published={data.published_posts} total={data.posts} />
+      <PublishProgress
+        published={data.published_posts}
+        scheduled={data.scheduled_posts}
+        total={data.posts}
+      />
 
       {/* ─── Main 2-col grid ─── */}
       <div className="grid gap-6 lg:grid-cols-5">
-
         {/* Left — Quick actions + Recent activity */}
         <div className="space-y-6 lg:col-span-3">
-
           {/* Quick Actions */}
           {(canManagePosts || canManageSettings) && (
             <div className="admin-card p-5">
-              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Quick actions</h3>
+              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Quick actions
+              </h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 {canManagePosts && (
-                  <QuickAction to="/admin/posts/new" icon={<Feather size={18} />} label="Write new post" desc="Start from blank slate" primary />
+                  <QuickAction
+                    to="/admin/posts/new"
+                    icon={<Feather size={18} />}
+                    label="Write new post"
+                    desc="Start from blank slate"
+                    primary
+                  />
                 )}
                 {canManagePosts && (
-                  <QuickAction to="/admin/posts" icon={<Edit3 size={18} />} label="Manage posts" desc="Edit and publish content" />
+                  <QuickAction
+                    to="/admin/posts"
+                    icon={<Edit3 size={18} />}
+                    label="Manage posts"
+                    desc="Edit and publish content"
+                  />
                 )}
                 {canManageTags && (
-                  <QuickAction to="/admin/tags" icon={<Tag size={18} />} label="Manage tags" desc={`${data.tags} tags in workspace`} />
+                  <QuickAction
+                    to="/admin/tags"
+                    icon={<Tag size={18} />}
+                    label="Manage tags"
+                    desc={`${data.tags} tags in workspace`}
+                  />
                 )}
                 {canManageComments && (
-                  <QuickAction to="/admin/comments" icon={<MessageSquare size={18} />} label="Moderate comments" desc={`${data.comments} total comments`} />
+                  <QuickAction
+                    to="/admin/comments"
+                    icon={<MessageSquare size={18} />}
+                    label="Moderate comments"
+                    desc={`${data.comments} total comments`}
+                  />
                 )}
                 {canManageUsers && (
-                  <QuickAction to="/admin/users" icon={<Users size={18} />} label="Team" desc={`${data.team_members} member${data.team_members !== 1 ? 's' : ''}`} />
+                  <QuickAction
+                    to="/admin/users"
+                    icon={<Users size={18} />}
+                    label="Team"
+                    desc={`${data.team_members} member${data.team_members !== 1 ? "s" : ""}`}
+                  />
                 )}
                 {canManageSettings && (
-                  <QuickAction to="/admin/settings/general" icon={<Settings size={18} />} label="Settings" desc="Configure your workspace" />
+                  <QuickAction
+                    to="/admin/settings/general"
+                    icon={<Settings size={18} />}
+                    label="Settings"
+                    desc="Configure your workspace"
+                  />
                 )}
               </div>
             </div>
@@ -383,9 +461,14 @@ export const Dashboard = () => {
           {/* Recent Activity */}
           <div className="admin-card p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Recent activity</h3>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                Recent activity
+              </h3>
               {canManagePosts && (
-                <Link to="/admin/posts" className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400">
+                <Link
+                  to="/admin/posts"
+                  className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                >
                   View all <ArrowUpRight size={12} />
                 </Link>
               )}
@@ -393,15 +476,27 @@ export const Dashboard = () => {
             {data.recent_activity.length > 0 ? (
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {data.recent_activity.map((item, i) => (
-                  <div key={`${item.title}-${i}`} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <div
+                    key={`${item.title}-${i}`}
+                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                  >
                     <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
-                      <FileText size={14} className="text-zinc-500 dark:text-zinc-400" />
+                      <FileText
+                        size={14}
+                        className="text-zinc-500 dark:text-zinc-400"
+                      />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{item.title}</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.description}</p>
+                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {item.description}
+                      </p>
                     </div>
-                    <span className="flex-shrink-0 text-xs text-zinc-400 dark:text-zinc-500">{formatTime(item.time)}</span>
+                    <span className="flex-shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                      {formatTime(item.time)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -410,9 +505,14 @@ export const Dashboard = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
                   <Feather size={22} className="text-zinc-400" />
                 </div>
-                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No activity yet</p>
+                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  No activity yet
+                </p>
                 {canManagePosts && (
-                  <Link to="/admin/posts/new" className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-400">
+                  <Link
+                    to="/admin/posts/new"
+                    className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-400"
+                  >
                     Write your first post →
                   </Link>
                 )}
@@ -423,11 +523,9 @@ export const Dashboard = () => {
 
         {/* Right — Site card + Stats sidebar */}
         <div className="space-y-6 lg:col-span-2">
-
           {/* Site card — only shown to owners */}
           {isOwner && activeBlog && (
             <SiteCard
-              blogName={data.blog_name}
               subdomain={activeBlog.subdomain}
               customDomain={activeBlog.custom_domain}
               plan={subscription?.plan}
@@ -438,29 +536,65 @@ export const Dashboard = () => {
           {/* Workspace overview */}
           <div className="admin-card divide-y divide-zinc-100 overflow-hidden dark:divide-zinc-800">
             <div className="p-5">
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Workspace overview</h3>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                Workspace overview
+              </h3>
             </div>
             {[
-              { label: 'Published posts', value: data.published_posts, icon: <BarChart3 size={14} /> },
-              { label: 'Draft posts',     value: data.draft_posts,     icon: <Edit3 size={14} /> },
-              { label: 'Comments',        value: data.comments,        icon: <MessageSquare size={14} /> },
-              { label: 'Tags',            value: data.tags,            icon: <Tag size={14} /> },
-              { label: 'Team members',    value: data.team_members,    icon: <Users size={14} /> },
-              { label: 'Total views',     value: data.total_views,     icon: <Eye size={14} /> },
+              {
+                label: "Published posts",
+                value: data.published_posts,
+                icon: <BarChart3 size={14} />,
+              },
+              {
+                label: "Scheduled posts",
+                value: data.scheduled_posts,
+                icon: <Clock size={14} />,
+              },
+              {
+                label: "Draft posts",
+                value: data.draft_posts,
+                icon: <Edit3 size={14} />,
+              },
+              {
+                label: "Comments",
+                value: data.comments,
+                icon: <MessageSquare size={14} />,
+              },
+              { label: "Tags", value: data.tags, icon: <Tag size={14} /> },
+              {
+                label: "Team members",
+                value: data.team_members,
+                icon: <Users size={14} />,
+              },
+              {
+                label: "Total views",
+                value: data.total_views,
+                icon: <Eye size={14} />,
+              },
             ].map(({ label, value, icon }) => (
-              <div key={label} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/60">
+              <div
+                key={label}
+                className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+              >
                 <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  <span className="text-zinc-400 dark:text-zinc-500">{icon}</span>
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    {icon}
+                  </span>
                   {label}
                 </div>
-                <span className="text-sm font-bold text-zinc-900 dark:text-white">{value.toLocaleString()}</span>
+                <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                  {value.toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
 
           {/* Workspace role card */}
           <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 p-5 text-white shadow-lg shadow-violet-500/20">
-            <div className="mb-3 text-xs font-bold uppercase tracking-wider opacity-70">Your workspace role</div>
+            <div className="mb-3 text-xs font-bold uppercase tracking-wider opacity-70">
+              Your workspace role
+            </div>
             <div className="text-2xl font-black capitalize">{data.role}</div>
             <div className="mt-1 text-sm opacity-80">{data.blog_name}</div>
             {canManageSettings && (
@@ -468,7 +602,8 @@ export const Dashboard = () => {
                 to="/admin/settings/general"
                 className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white"
               >
-                <Settings size={12} /> Workspace settings <ArrowUpRight size={12} />
+                <Settings size={12} /> Workspace settings{" "}
+                <ArrowUpRight size={12} />
               </Link>
             )}
           </div>

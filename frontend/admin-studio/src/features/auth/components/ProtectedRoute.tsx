@@ -15,9 +15,8 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
   if (isLoading || isBlogLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--admin-bg)] px-4">
-        <div className="admin-card w-full max-w-md p-8 text-center">
+        <div className="w-full max-w-md p-8 text-center">
           <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
-          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Preparing your workspace...</p>
         </div>
       </div>
     );

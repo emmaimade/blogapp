@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Search, Trash2, CheckCircle2, AlertTriangle, Eye, MoreHorizontal, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import axios from 'axios';
+import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -149,7 +150,7 @@ export const SuperAdminModerationPage = () => {
                         <span className="flex items-center gap-1">
                           <Eye size={11} /> {item.blog_name}
                         </span>
-                        <span>{item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span>
+                        <span>{formatLocalDateTime(item.created_at)}</span>
                       </div>
                     </div>
                   </div>

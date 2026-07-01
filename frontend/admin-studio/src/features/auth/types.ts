@@ -10,11 +10,18 @@ export interface MembershipBlog {
   slug: string;
   subdomain: string;
   custom_domain?: string | null;
+  description?: string | null;
+  tagline?: string | null;
+  logo_url?: string | null;
+  favicon_url?: string | null;
+  timezone?: string | null;
+  primary_language?: string | null;
+  posts_per_page?: number | null;
   is_active: boolean;
   owner_id: number;
-   onboarding_status: OnboardingStatus;
-   onboarding_step: OnboardingStep;
-   onboarding_completed_at?: string | null;
+  onboarding_status: OnboardingStatus;
+  onboarding_step: OnboardingStep;
+  onboarding_completed_at?: string | null;
 }
 
 export interface UserBlogMembership {
@@ -29,6 +36,8 @@ export interface UserBlogMembership {
 export interface AuthUser {
   id: number;
   username: string;
+  first_name: string;
+  last_name: string;
   email: string;
   platform_role: PlatformRole;
   is_super_admin: boolean;

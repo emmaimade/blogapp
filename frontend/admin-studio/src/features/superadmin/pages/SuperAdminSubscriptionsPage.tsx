@@ -3,6 +3,7 @@ import { CreditCard, CheckCircle2, Clock, XCircle, Search, ArrowRight } from 'lu
 import { useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -164,10 +165,10 @@ export const SuperAdminSubscriptionsPage = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-xs text-zinc-500">
-                        {sub.trial_ends_at ? new Date(sub.trial_ends_at).toLocaleDateString() : '—'}
+                        {formatLocalDate(sub.trial_ends_at)}
                       </td>
                       <td className="px-6 py-4 text-xs text-zinc-500">
-                        {sub.current_period_ends_at ? new Date(sub.current_period_ends_at).toLocaleDateString() : '—'}
+                        {formatLocalDate(sub.current_period_ends_at)}
                       </td>
                       <td className="px-6 py-4">
                         <Link

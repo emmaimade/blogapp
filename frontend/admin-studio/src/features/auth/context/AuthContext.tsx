@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = (token: string, userData: AuthUser) => {
     authSession.setToken(token);
     setUser(userData);
-    toast.success(`Welcome back, ${userData.username}!`);
+    toast.success(`Welcome back, ${userData.first_name}!`);
   };
 
   const logout = () => {

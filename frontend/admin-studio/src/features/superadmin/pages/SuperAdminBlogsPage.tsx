@@ -3,6 +3,7 @@ import { getBlogAnalytics } from '../api/superadminApi';
 import { Building2, Search, MoreHorizontal, CheckCircle2, XCircle, ExternalLink, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import axios from 'axios';
+import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -107,7 +108,7 @@ export const SuperAdminBlogsPage = () => {
                 filtered.map((blog) => {
                   const isActive = (blog as any).is_active !== false;
                   const plan = (blog as any).plan ?? 'FREE';
-                  const createdAt = blog.created_at ? new Date(blog.created_at).toLocaleDateString() : '—';
+                  const createdAt = formatLocalDate(blog.created_at);
                   return (
                     <tr key={blog.blog_id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                       <td className="px-6 py-4">

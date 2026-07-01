@@ -17,11 +17,13 @@ import { ContactSettings } from '../../features/settings/pages/ContactSettingsPa
 import { FooterSettings } from '../../features/settings/pages/FooterSettingsPage';
 import { GeneralSettings } from '../../features/settings/pages/GeneralSettingsPage';
 import { SEOSettings } from '../../features/settings/pages/SeoSettingsPage';
+import { ActivityLogPage } from '../../features/settings/pages/ActivityLogPage';
+import { useBlog } from '../providers/BlogProvider';
 import { TagManager } from '../../features/tags/pages/TagManagerPage';
 import { UserManager } from '../../features/users/pages/UserManagerPage';
 import { SuperAdminDashboardPage } from '../../features/superadmin/pages/SuperAdminDashboardPage';
 import { AdminLayout } from '../../layouts/AdminLayout';
-import { ComingSoon } from '../../shared/components/ComingSoon';
+import { AuthLayout } from '../../layouts/AuthLayout';
 import { SuperAdminAnalyticsPage } from '../../features/superadmin/pages/SuperAdminAnalyticsPage';
 import { SuperAdminBlogsPage } from '../../features/superadmin/pages/SuperAdminBlogsPage';
 import { SuperAdminUsersPage } from '../../features/superadmin/pages/SuperAdminUsersPage';
@@ -29,6 +31,7 @@ import { SuperAdminSubscriptionsPage } from '../../features/superadmin/pages/Sup
 import { SuperAdminModerationPage } from '../../features/superadmin/pages/SuperAdminModerationPage';
 import { SuperAdminAuditLogPage } from '../../features/superadmin/pages/SuperAdminAuditLogPage';
 import { SuperAdminPlatformSettingsPage } from '../../features/superadmin/pages/SuperAdminPlatformSettingsPage';
+import UserInfoPage from '../../features/users/pages/UserInfoPage';
 
 const DefaultAdminRedirect = () => {
   const { user } = useAuth();
@@ -49,12 +52,20 @@ const DefaultAdminRedirect = () => {
   );
 };
 
+const SettingsIndexRedirect = () => {
+  const { activeRole } = useBlog();
+  const defaultPath = activeRole === 'editor' ? 'activity' : 'general';
+  return <Navigate to={defaultPath} replace />;
+};
+
 export const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
         {/* ── Public routes ── */}
-        <Route path="/admin/login" element={<LoginView />} />
+        <Route element={<AuthLayout />}>
+          <Route path="/admin/login" element={<LoginView />} />
+        </Route>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
@@ -70,6 +81,8 @@ export const AppRouter = () => {
               <Route path="/admin/dashboard" element={<Dashboard />} />
             </Route>
 
+            <Route path="/admin/profile" element={<UserInfoPage />} />
+
             <Route element={<ProtectedRoute requiredCapability="view_platform_stats" />}>
               <Route path="/admin/superadmin"        element={<SuperAdminDashboardPage />} />
               <Route path="/admin/analytics"         element={<SuperAdminAnalyticsPage />} />
@@ -83,6 +96,7 @@ export const AppRouter = () => {
 
             <Route element={<ProtectedRoute requiredCapability="manage_users" />}>
               <Route path="/admin/users" element={<UserManager />} />
+              <Route path="/admin/users/:id" element={<UserInfoPage />} />
             </Route>
 
             <Route element={<ProtectedRoute requiredCapability="manage_posts" />}>
@@ -100,15 +114,20 @@ export const AppRouter = () => {
               <Route path="/admin/comments" element={<CommentManager />} />
             </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="manage_settings" />}>
+            <Route element={<ProtectedRoute requiredCapability="access_admin_studio" />}>
               <Route path="/admin/settings" element={<SettingsLayout />}>
-                <Route path="general"  element={<GeneralSettings />} />
-                <Route path="about"    element={<AboutPageSettings />} />
-                <Route path="footer"   element={<FooterSettings />} />
-                <Route path="branding" element={<BrandingSettings />} />
-                <Route path="seo"      element={<SEOSettings />} />
-                <Route path="contact"  element={<ContactSettings />} />
-                <Route index element={<Navigate to="general" replace />} />
+                <Route element={<ProtectedRoute requiredCapability="manage_settings" />}>
+                  <Route path="general"  element={<GeneralSettings />} />
+                  <Route path="about"    element={<AboutPageSettings />} />
+                  <Route path="footer"   element={<FooterSettings />} />
+                  <Route path="branding" element={<BrandingSettings />} />
+                  <Route path="seo"      element={<SEOSettings />} />
+                  <Route path="contact"  element={<ContactSettings />} />
+                </Route>
+                <Route element={<ProtectedRoute requiredCapability="view_audit_logs" />}>
+                  <Route path="activity" element={<ActivityLogPage />} />
+                </Route>
+                <Route index element={<SettingsIndexRedirect />} />
               </Route>
             </Route>
           </Route>

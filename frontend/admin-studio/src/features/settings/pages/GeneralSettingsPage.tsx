@@ -9,6 +9,24 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 const inputClass =
   'w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-medium text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-violet-500/10 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-violet-500';
 
+interface GeneralSettingsData {
+  site_name: string;
+  site_tagline: string;
+  site_description: string;
+  timezone: string;
+  language: string;
+  posts_per_page: number;
+}
+
+const defaultGeneralSettings: GeneralSettingsData = {
+  site_name: 'Inko',
+  site_tagline: '',
+  site_description: '',
+  timezone: 'UTC',
+  language: 'en',
+  posts_per_page: 10,
+};
+
 export const GeneralSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
@@ -25,7 +43,7 @@ export const GeneralSettings: React.FC = () => {
   const isPro = subscription?.plan === 'pro' || subscription?.plan === 'team';
 
   // ── General settings ─────────────────────────────────────────────────────
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading } = useQuery<GeneralSettingsData>({
     queryKey: ['generalSettings', activeBlog?.id],
     queryFn: async () => {
       let data: any = {};
@@ -50,7 +68,7 @@ export const GeneralSettings: React.FC = () => {
     enabled: !!activeBlog?.id,
   });
 
-  const [formData, setFormData] = useState(settings || {});
+  const [formData, setFormData] = useState<GeneralSettingsData>(defaultGeneralSettings);
 
   useEffect(() => {
     if (settings) setFormData(settings);
@@ -61,7 +79,7 @@ export const GeneralSettings: React.FC = () => {
   }, [activeBlog]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: any) => api.post('/settings/general', data),
+    mutationFn: (data: GeneralSettingsData) => api.post('/settings/general', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['generalSettings'] });
       queryClient.invalidateQueries({ queryKey: ['allSettings'] });
@@ -87,8 +105,8 @@ export const GeneralSettings: React.FC = () => {
     }
   };
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof GeneralSettingsData, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const subdomain = activeBlog?.subdomain ?? '';

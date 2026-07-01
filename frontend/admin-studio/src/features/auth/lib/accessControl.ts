@@ -9,6 +9,7 @@ export type AdminCapability =
   | 'manage_comments'
   | 'manage_users'
   | 'manage_settings'
+  | 'view_audit_logs'
   | 'view_platform_stats';
 
 const BLOG_MEMBER_CAPABILITIES: AdminCapability[] = [
@@ -23,12 +24,13 @@ const SUPER_ADMIN_CAPABILITIES: AdminCapability[] = [
   'manage_comments',
   'manage_users',
   'manage_settings',
+  'view_audit_logs',
   'view_platform_stats',
 ];
 
 const ROLE_CAPABILITIES: Record<NonNullable<BlogMembership['role']>, AdminCapability[]> = {
-  owner: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'manage_users', 'manage_settings'],
-  editor: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments'],
+  owner: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'manage_users', 'manage_settings', 'view_audit_logs'],
+  editor: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'view_audit_logs'],
   author: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts'],
 };
 

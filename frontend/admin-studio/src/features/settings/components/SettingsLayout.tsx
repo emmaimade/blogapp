@@ -1,46 +1,74 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail } from 'lucide-react';
+import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail, ScrollText } from 'lucide-react';
+import { useBlog } from '../../../app/providers/BlogProvider';
 
-const settingsSections = [
+interface SettingsSection {
+  to: string;
+  label: string;
+  description: string;
+  icon: any;
+  roles?: readonly ('owner' | 'editor')[];
+}
+
+const settingsSections: readonly SettingsSection[] = [
   {
     to: '/admin/settings/general',
     label: 'General',
     description: 'Site identity and defaults',
     icon: Globe,
+    roles: ['owner'],
   },
   {
     to: '/admin/settings/about',
     label: 'About Page',
     description: 'Bio and contact details',
     icon: UserSquare2,
+    roles: ['owner'],
   },
   {
     to: '/admin/settings/footer',
     label: 'Footer',
     description: 'Footer content and links',
     icon: PanelBottom,
+    roles: ['owner'],
   },
   {
     to: '/admin/settings/branding',
     label: 'Branding',
     description: 'Colors, logo, and fonts',
     icon: Palette,
+    roles: ['owner'],
   },
   {
     to: '/admin/settings/seo',
     label: 'SEO',
     description: 'Metadata and analytics',
     icon: Search,
+    roles: ['owner'],
   },
   {
     to: '/admin/settings/contact',
     label: 'Contact',
     description: 'Email, location, response time, social & FAQ',
     icon: Mail,
+    roles: ['owner'],
   },
-] as const;
+  {
+    to: '/admin/settings/activity',
+    label: 'Activity log',
+    description: 'Workspace audit history',
+    icon: ScrollText,
+    roles: ['owner', 'editor'],
+  },
+];
 
 export const SettingsLayout = () => {
+  const { activeRole } = useBlog();
+
+  const visibleSections = settingsSections.filter(
+    (section) => !section.roles || (activeRole && section.roles.includes(activeRole as any))
+  );
+
   return (
     <div className="space-y-6">
       {/* ─── Header ─── */}
@@ -69,7 +97,7 @@ export const SettingsLayout = () => {
           </div>
 
           <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0">
-            {settingsSections.map(({ to, label, description, icon: Icon }) => (
+            {visibleSections.map(({ to, label, description, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

@@ -1,9 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Eye, AlertCircle } from 'lucide-react';
+import { Eye, AlertCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+
+interface AboutSettingsData {
+  bio_title: string;
+  bio_subtitle: string;
+  bio_content: string;
+  show_stats: boolean;
+  show_contact_cta: boolean;
+  email: string;
+  social_links: {
+    github: string;
+    twitter: string;
+    linkedin: string;
+  };
+}
+
+const defaultAboutSettings: AboutSettingsData = {
+  bio_title: 'Welcome to My Blog',
+  bio_subtitle: 'Sharing ideas, stories, and insights',
+  bio_content: '',
+  show_stats: true,
+  show_contact_cta: true,
+  email: '',
+  social_links: {
+    github: '',
+    twitter: '',
+    linkedin: '',
+  },
+};
 
 export const AboutPageSettings: React.FC = () => {
   const queryClient = useQueryClient();
@@ -16,7 +44,7 @@ export const AboutPageSettings: React.FC = () => {
   const previewUrl = `${publicSiteOrigin}/about`;
 
   // Fetch current settings
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading } = useQuery<AboutSettingsData>({
     queryKey: ['aboutSettings', activeBlog?.id],
     queryFn: async () => {
       let data: any = {};
@@ -43,7 +71,7 @@ export const AboutPageSettings: React.FC = () => {
     enabled: !!activeBlog?.id,
   });
 
-  const [formData, setFormData] = useState(settings || {});
+  const [formData, setFormData] = useState<AboutSettingsData>(defaultAboutSettings);
 
   // Update form when settings load
   useEffect(() => {
@@ -54,7 +82,7 @@ export const AboutPageSettings: React.FC = () => {
 
   // Save settings mutation
   const saveMutation = useMutation({
-    mutationFn: (data: any) => api.post('/settings/about', data),
+    mutationFn: (data: AboutSettingsData) => api.post('/settings/about', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aboutSettings'] });
       queryClient.invalidateQueries({ queryKey: ['siteSettings'] });
@@ -89,15 +117,15 @@ export const AboutPageSettings: React.FC = () => {
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
   };
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({
+  const handleChange = (field: keyof AboutSettingsData, value: AboutSettingsData[keyof AboutSettingsData]) => {
+    setFormData((prev) => ({
       ...prev,
       [field]: value
     }));
   };
 
   const handleSocialChange = (platform: string, value: string) => {
-    setFormData((prev: any) => ({
+    setFormData((prev) => ({
       ...prev,
       social_links: {
         ...prev.social_links,

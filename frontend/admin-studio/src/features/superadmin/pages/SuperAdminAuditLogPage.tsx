@@ -1,181 +1,162 @@
 import { useQuery } from '@tanstack/react-query';
-import { Search, ShieldCheck, User, Building2, Settings, Trash2, CheckCircle2, XCircle, LogIn } from 'lucide-react';
+import { Search, ShieldCheck, User, Building2, Settings, Trash2, LogIn, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../../../shared/api/client';
+import { formatLocalDate, formatSmart } from '../../../shared/utils/dates';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-const fetchAuditLogs = async () => {
-  const res = await axios.get(`${API_URL}/superadmin/audit-logs`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  });
-  return res.data;
-};
+interface AuditLogEntry {
+  id: number;
+  actor_user_id: number | null;
+  actor_email: string | null;
+  actor: string | null;
+  action: string;
+  resource_type: string;
+  target_type: string | null;
+  resource_id: number | null;
+  blog_id: number | null;
+  details: Record<string, any> | null;
+  description: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
 
 // Action type config — icon + colour
 const actionConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   'user.login':                         { icon: <LogIn size={13} />,        color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/20' },
   'user.register':                      { icon: <User size={13} />,         color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-900/20' },
   'blog.create':                        { icon: <Building2 size={13} />,    color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-900/20' },
-  'superadmin.blog_status_update':      { icon: <CheckCircle2 size={13} />, color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-900/20' },
-  'superadmin.blog_delete':             { icon: <Trash2 size={13} />,       color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-900/20' },
-  'superadmin.user_status_update':      { icon: <XCircle size={13} />,      color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-900/20' },
-  'superadmin.platform_settings_update': { icon: <Settings size={13} />,    color: 'text-primary',    bg: 'bg-accent' },
-  'comment.delete':                     { icon: <Trash2 size={13} />,       color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-  'comment.moderator_delete':           { icon: <Trash2 size={13} />,       color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-  'moderation.remove':                  { icon: <Trash2 size={13} />,       color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-900/20' },
-  'moderation.approve':                 { icon: <CheckCircle2 size={13} />, color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-900/20' },
-  'moderation.reject':                  { icon: <XCircle size={13} />,      color: 'text-zinc-600',   bg: 'bg-zinc-100 dark:bg-zinc-700' },
+  'blog.delete':                        { icon: <Trash2 size={13} />,       color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-900/20' },
+  'platform_settings.update_general':   { icon: <Settings size={13} />,     color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
 };
 
-const defaultConfig = { icon: <ShieldCheck size={13} />, color: 'text-zinc-500', bg: 'bg-zinc-100 dark:bg-zinc-700' };
+const defaultIconConfig = { icon: <ShieldCheck size={13} />, color: 'text-zinc-600', bg: 'bg-zinc-50 dark:bg-zinc-900/20' };
 
-type FilterType = 'all' | 'blogs' | 'users' | 'settings' | 'auth';
-
-const filterMap: Record<FilterType, string[]> = {
-  all:      [],
-  blogs:    ['blog.create', 'superadmin.blog_status_update', 'superadmin.blog_delete'],
-  users:    ['user.register', 'user.update_profile', 'user.delete_account', 'superadmin.user_status_update'],
-  settings: ['superadmin.platform_settings_update', 'comment.delete', 'comment.moderator_delete', 'moderation.remove', 'moderation.approve', 'moderation.reject'],
-  auth:     ['user.login'],
-};
+const PAGE_SIZE = 50;
 
 export const SuperAdminAuditLogPage = () => {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [page, setPage] = useState(0);
+  const [resourceFilter, setResourceFilter] = useState('all');
 
-  const { data: logs, isLoading } = useQuery({
-    queryKey: ['superadmin-audit-logs'],
-    queryFn: fetchAuditLogs,
+  // Server-side audit log fetch structured query parameters setup
+  const { data: logs = [], isLoading, isFetching, refetch } = useQuery<AuditLogEntry[]>({
+    queryKey: ['superadmin-audit-logs', page, resourceFilter],
+    queryFn: async () => {
+      const res = await api.get('/superadmin/audit-logs', {
+        params: {
+          skip: page * PAGE_SIZE,
+          limit: PAGE_SIZE,
+          resource_type: resourceFilter !== 'all' ? resourceFilter : undefined,
+        },
+      });
+      return res.data;
+    },
   });
 
-  const allLogs = logs ?? [];
-
-  const filtered = allLogs.filter((log: any) => {
-    const matchesSearch =
-      log.action?.toLowerCase().includes(search.toLowerCase()) ||
-      log.actor?.toLowerCase().includes(search.toLowerCase()) ||
-      log.description?.toLowerCase().includes(search.toLowerCase());
-
-    if (!matchesSearch) return false;
-    if (filter !== 'all' && filterMap[filter].length > 0) {
-      return filterMap[filter].includes(log.action);
-    }
-    return true;
+  // Client-side quick filter text filter search string match
+  const filteredLogs = logs.filter((log) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    return (
+      log.description?.toLowerCase().includes(term) ||
+      log.actor_email?.toLowerCase().includes(term) ||
+      log.action.toLowerCase().includes(term)
+    );
   });
-
-  const filterTabs: { key: FilterType; label: string }[] = [
-    { key: 'all',      label: 'All' },
-    { key: 'blogs',    label: 'Blogs' },
-    { key: 'users',    label: 'Users' },
-    { key: 'settings', label: 'Settings' },
-    { key: 'auth',     label: 'Auth' },
-  ];
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Audit Log</h1>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-400">A chronological record of all superadmin actions on the platform.</p>
-      </div>
-
-      {/* Filters + search */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
-          {filterTabs.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                filter === key
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search logs…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-60 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 pl-10 pr-4 py-2.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
-          />
-        </div>
-      </div>
-
-      {/* Log list */}
-      <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-        {isLoading ? (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-700">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3.5 bg-zinc-100 dark:bg-zinc-700 rounded animate-pulse w-48" />
-                  <div className="h-3 bg-zinc-100 dark:bg-zinc-700 rounded animate-pulse w-72" />
-                </div>
-                <div className="h-3 bg-zinc-100 dark:bg-zinc-700 rounded animate-pulse w-24" />
-              </div>
-            ))}
+    <div className="space-y-6">
+      {/* Search and Filters Header Menu Panel */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white p-4 shadow-sm dark:bg-zinc-950">
+        <div className="flex flex-1 items-center gap-3 min-w-[300px]">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search platform logs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400 placeholder:text-zinc-400"
+            />
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="px-6 py-14 text-center">
-            <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
-            <p className="text-zinc-500 text-sm">
-              {search || filter !== 'all' ? 'No logs match your filters.' : 'No audit log entries yet.'}
-            </p>
+
+          <select
+            value={resourceFilter}
+            onChange={(e) => {
+              setResourceFilter(e.target.value);
+              setPage(0);
+            }}
+            className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none"
+          >
+            <option value="all">All Resources</option>
+            <option value="user">User Actions</option>
+            <option value="blog">Workspace Blogs</option>
+            <option value="platform_settings">Platform Settings</option>
+          </select>
+        </div>
+
+        <button
+          onClick={() => refetch()}
+          disabled={isLoading || isFetching}
+          className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 bg-white dark:bg-zinc-900 transition-all"
+        >
+          <RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {/* Main Container Ledger Block */}
+      <div className="rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white shadow-sm dark:bg-zinc-950 overflow-hidden">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-2">
+            <RefreshCw className="h-6 w-6 text-zinc-400 animate-spin" />
+            <span className="text-xs text-zinc-400">Loading system operations feed...</span>
+          </div>
+        ) : filteredLogs.length === 0 ? (
+          <div className="p-12 text-center text-zinc-400 text-sm">
+            No system administration audit entries found.
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-700">
-            {filtered.map((log: any, i: number) => {
-              const config = actionConfig[log.action] ?? defaultConfig;
-              const ts = log.created_at ? new Date(log.created_at) : null;
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+            {filteredLogs.map((log) => {
+              const config = actionConfig[log.action] || defaultIconConfig;
               return (
-                <div key={log.id ?? i} className="flex items-start gap-4 px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  {/* Action icon */}
-                  <div className={`w-8 h-8 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ${config.color}`}>
+                <div key={log.id} className="flex items-start gap-4 p-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 transition-all">
+                  <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${config.bg} ${config.color}`}>
                     {config.icon}
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                        {log.action?.replace(/[._]/g, ' ')}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        {log.action}
                       </span>
-                      {log.target_type && (
-                        <span className="text-xs text-zinc-400 bg-zinc-100 dark:bg-zinc-700 px-2 py-0.5 rounded-full">
-                          {log.target_type}
-                        </span>
-                      )}
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                        {log.resource_type}
+                      </span>
                     </div>
                     {log.description && (
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{log.description}</p>
+                      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400 truncate">{log.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400">
-                      {log.actor && (
+                      {log.actor_email && (
                         <span className="flex items-center gap-1">
-                          <User size={11} /> {log.actor}
+                          <User size={11} /> {log.actor_email}
                         </span>
                       )}
                       {log.ip_address && (
-                        <span className="font-mono">{log.ip_address}</span>
+                        <span className="font-mono bg-zinc-50 dark:bg-zinc-900 px-1 rounded text-[11px]">
+                          IP: {log.ip_address}
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Timestamp */}
+                  {/* Timestamp alignment block side container section */}
                   <div className="text-xs text-zinc-400 flex-shrink-0 text-right">
-                    {ts ? (
+                    {log.created_at ? (
                       <>
-                        <div>{ts.toLocaleDateString()}</div>
-                        <div>{ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="font-medium text-zinc-500 dark:text-zinc-400">{formatLocalDate(log.created_at)}</div>
+                        <div className="text-[11px] text-zinc-400">{formatSmart(log.created_at)}</div>
                       </>
                     ) : '—'}
                   </div>
@@ -185,13 +166,29 @@ export const SuperAdminAuditLogPage = () => {
           </div>
         )}
 
-        {/* Footer note */}
-        {!isLoading && allLogs.length > 0 && (
-          <div className="px-6 py-3 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-700">
-            <p className="text-xs text-zinc-400">Showing {filtered.length} of {allLogs.length} entries. Logs are retained for 90 days.</p>
+        {/* Dynamic Footer pagination alignment block */}
+        <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-700 flex items-center justify-between">
+          <p className="text-xs text-zinc-400">
+            Showing {filteredLogs.length} entries · Page {page + 1}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || isLoading}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 transition-all"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={logs.length < PAGE_SIZE || isLoading}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 transition-all"
+            >
+              Next
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
-};
+}

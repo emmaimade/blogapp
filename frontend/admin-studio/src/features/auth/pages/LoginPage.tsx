@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { ArrowRight, LockKeyhole, User, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { InkoLogo } from '../../../assets/inko';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, LockKeyhole, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { authSession } from '../lib/session';
 import { getCurrentUserRequest, loginRequest } from '../../../shared/api/auth';
 import { isSuperAdmin } from '../lib/accessControl';
 import { useAuth } from '../context/AuthContext';
 import type { AuthUser } from '../types';
+
+const SITE_URL = import.meta.env.VITE_SITE_URL || "http://localhost:5175";
 
 const getPostLoginPath = (user: AuthUser) => {
   if (isSuperAdmin(user)) {
@@ -24,12 +25,28 @@ const getPostLoginPath = (user: AuthUser) => {
 };
 
 export const LoginView = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Force light mode on login page
+  useEffect(() => {
+    const html = document.documentElement;
+    const wasDark = html.classList.contains('dark');
+    
+    html.classList.remove('dark');
+    
+    return () => {
+      if (wasDark) {
+        html.classList.add('dark');
+      }
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +55,7 @@ export const LoginView = () => {
 
     try {
       const formData = new URLSearchParams();
-      formData.append('username', username);
+      formData.append('username', email);
       formData.append('password', password);
 
       const loginResponse = await loginRequest(formData);
@@ -55,9 +72,9 @@ export const LoginView = () => {
       console.error('Login error:', err);
 
       if (err.response?.status === 401) {
-        setError('Invalid username or password');
+        setError('Invalid email or password');
       } else if (err.response?.status === 422) {
-        setError('Please enter both username and password');
+        setError('Please enter both email and password');
       } else if (!err.response) {
         setError('Cannot connect to server. Please check if backend is running.');
       } else {
@@ -70,136 +87,116 @@ export const LoginView = () => {
   };
 
   const handleForgotPassword = () => {
-    // TODO: Implement forgot password flow
-    alert("Forgot password flow coming soon!"); // Replace with real navigation/modal
+    alert("Forgot password flow coming soon!");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4 py-12">
-      {/* Subtle background accent */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#f3e8ff_0%,transparent_70%)]" />
-
-      <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center mb-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-600">
-              <InkoLogo color="white" size={28} />
-            </div>
-            <div>
-              <div className="text-3xl font-black tracking-tighter text-zinc-900">INKO</div>
-              <div className="text-xs font-semibold text-zinc-500 -mt-1">ADMIN STUDIO</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl shadow-zinc-200/80 border border-zinc-100 p-10">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-black tracking-tight text-zinc-900 mb-2">
-              Welcome back
-            </h1>
-            <p className="text-zinc-600">
-              Sign in to your publishing dashboard
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                Username or Email
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-4 text-zinc-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="johndoe or john@example.com"
-                  className="w-full rounded-2xl border border-zinc-200 bg-white px-5 py-4 pl-12 text-base focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 transition-all"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <LockKeyhole className="absolute left-4 top-4 text-zinc-400" size={20} />
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full rounded-2xl border border-zinc-200 bg-white px-5 py-4 pl-12 text-base focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10 transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Forgot Password */}
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-sm text-zinc-600 hover:text-violet-600 transition-colors"
-              >
-                Forgot password?
-              </button>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-violet-600 hover:bg-violet-700 active:scale-[0.985] text-white font-semibold py-4 rounded-2xl text-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-violet-500/30 disabled:opacity-70"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin" size={22} />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign in
-                  <ArrowRight size={22} />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Google Sign In (Future-ready) */}
-          <div className="mt-6">
-            <button
-              type="button"
-              disabled
-              className="w-full flex items-center justify-center gap-3 border border-zinc-200 bg-white hover:bg-zinc-50 py-4 rounded-2xl text-sm font-medium text-zinc-700 transition-all disabled:opacity-60"
-            >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              Sign in with Google
-            </button>
-            <p className="text-center text-[10px] text-zinc-400 mt-2">
-              Google sign-in coming soon
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-zinc-500 mt-8">
-          © {new Date().getFullYear()} INKO • Secure Admin Access
+    // 🧠 CLEAN STRUCTURAL ELEMENT: Fits directly into the <Outlet /> of AuthLayout[cite: 4]
+    <div className="w-full max-w-[460px] bg-white rounded-3xl shadow-xl shadow-zinc-200/80 border border-zinc-100 p-8 md:p-10 transition-all">
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-black tracking-tight text-zinc-900 mb-2">
+          Welcome back
+        </h1>
+        <p className="text-zinc-500 text-sm">
+          Sign in to your publishing dashboard
         </p>
       </div>
+
+      <form onSubmit={handleLogin} className="space-y-5">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-xs font-medium">
+            {error}
+          </div>
+        )}
+
+        {/* Email Field */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-zinc-700">
+            Email Address
+          </label>
+          <div className="relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+            <input
+              type="email"
+              placeholder="john@example.com"
+              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 pl-12 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Password Field */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-zinc-700">
+            Password
+          </label>
+          <div className="relative">
+            <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 pl-12 pr-12 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors focus:outline-none cursor-pointer"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Forgot Password Link */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            className="text-xs font-semibold text-zinc-500 hover:text-violet-600 transition-colors cursor-pointer"
+          >
+            Forgot password?
+          </button>
+        </div>
+
+        {/* Submit Form Action Button */}
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white font-semibold py-3 rounded-2xl text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-purple-900/10 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="animate-spin" size={16} />
+              Signing in...
+            </>
+          ) : (
+            <>
+              Sign in
+              <ArrowRight size={16} />
+            </>
+          )}
+        </button>
+      </form>
+
+      {/* Optional New Account Gateway Selector Link */}
+      <p className="text-center text-sm text-zinc-500 mt-8">
+        Don't have an account?{" "}
+        <Link
+          to={SITE_URL + "/signup"} 
+          className="text-violet-600 font-bold hover:underline"
+        >
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 };

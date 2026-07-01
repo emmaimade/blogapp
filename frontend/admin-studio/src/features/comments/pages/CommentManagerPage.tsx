@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { formatLocalDateTime } from '../../../shared/utils/dates';
 
 interface Comment {
   id: number;
@@ -169,7 +170,7 @@ export const CommentManager = () => {
                         <div className="flex flex-col">
                           <span className="text-sm font-bold text-zinc-900 dark:text-white">{comment.user.username}</span>
                           <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-500">
-                            <Clock size={10} /> {new Date(comment.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            <Clock size={10} /> {formatLocalDateTime(comment.created_at)}
                           </span>
                         </div>
                       </div>

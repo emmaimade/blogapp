@@ -1,9 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Loader2, AlertCircle, Lock } from 'lucide-react';
+import { Loader2, AlertCircle, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+
+interface FooterSettingsData {
+  footer_text: string;
+  show_newsletter: boolean;
+  newsletter_title: string;
+  newsletter_description: string;
+  show_social_links: boolean;
+  social_links: {
+    github: string;
+    twitter: string;
+    linkedin: string;
+    instagram: string;
+    youtube: string;
+    facebook: string;
+  };
+  copyright_text: string;
+  show_quick_links: boolean;
+  show_categories: boolean;
+}
+
+const defaultFooterSettings: FooterSettingsData = {
+  footer_text: 'Your ideas, amplified.',
+  show_newsletter: true,
+  newsletter_title: 'Newsletter',
+  newsletter_description: 'Get the latest posts delivered to your inbox.',
+  show_social_links: true,
+  social_links: {
+    github: '',
+    twitter: '',
+    linkedin: '',
+    instagram: '',
+    youtube: '',
+    facebook: '',
+  },
+  copyright_text: 'Powered by INKO',
+  show_quick_links: true,
+  show_categories: true,
+};
 
 export const FooterSettings: React.FC = () => {
   const queryClient = useQueryClient();
@@ -13,48 +51,47 @@ export const FooterSettings: React.FC = () => {
     queryKey: ['blogSubscription', activeBlog?.id],
     queryFn: async () => {
       try {
-        const res = await api.get('/blogs/subscription');
+        const res = await api.get(`/blogs/${activeBlog!.id}/subscription`);
         return res.data;
-      } catch (error) {
+      } catch {
         return { plan: 'free' };
       }
     },
     enabled: !!activeBlog?.id,
   });
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading } = useQuery<FooterSettingsData>({
     queryKey: ['footerSettings', activeBlog?.id],
     queryFn: async () => {
-      let data: any = {};
-      try {
-        const res = await api.get('/settings/footer');
-        data = res.data || {};
-      } catch (error) {
-        // Fallback
-      }
+      const res = await api.get(`/blogs/${activeBlog!.id}/settings/footer`);
+      const data = res.data || {};
+
+      // Smart default from General Settings / Onboarding
+      const defaultTagline = activeBlog?.tagline || "Your ideas, amplified.";
+
       return {
-        footer_text: data.footer_text && data.footer_text !== "Your ideas, amplified." ? data.footer_text : (activeBlog?.tagline || "Your ideas, amplified."),
+        footer_text: data.footer_text ?? defaultTagline,
         show_newsletter: data.show_newsletter ?? true,
-        newsletter_title: data.newsletter_title || "Newsletter",
-        newsletter_description: data.newsletter_description || "Get the latest posts delivered to your inbox.",
+        newsletter_title: data.newsletter_title ?? 'Newsletter',
+        newsletter_description: data.newsletter_description ?? 'Get the latest posts delivered to your inbox.',
         show_social_links: data.show_social_links ?? true,
         social_links: {
-          github: data.social_links?.github || "",
-          twitter: data.social_links?.twitter || "",
-          linkedin: data.social_links?.linkedin || "",
-          instagram: data.social_links?.instagram || "",
-          youtube: data.social_links?.youtube || "",
-          facebook: data.social_links?.facebook || ""
+          github: data.social_links?.github ?? '',
+          twitter: data.social_links?.twitter ?? '',
+          linkedin: data.social_links?.linkedin ?? '',
+          instagram: data.social_links?.instagram ?? '',
+          youtube: data.social_links?.youtube ?? '',
+          facebook: data.social_links?.facebook ?? '',
         },
-        copyright_text: data.copyright_text || "Powered by INKO",
+        copyright_text: data.copyright_text ?? 'Powered by INKO',
         show_quick_links: data.show_quick_links ?? true,
-        show_categories: data.show_categories ?? true
+        show_categories: data.show_categories ?? true,
       };
     },
     enabled: !!activeBlog?.id,
   });
 
-  const [formData, setFormData] = useState(settings || {});
+  const [formData, setFormData] = useState<FooterSettingsData>(defaultFooterSettings);
 
   useEffect(() => {
     if (settings) {
@@ -63,28 +100,30 @@ export const FooterSettings: React.FC = () => {
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: any) => api.post('/settings/footer', data),
+    mutationFn: (data: FooterSettingsData) =>
+      api.post(`/blogs/${activeBlog!.id}/settings/footer`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['footerSettings', activeBlog?.id] });
       toast.success('Footer settings saved successfully!');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to save settings');
-    }
+    },
   });
+
   const handleSave = () => {
     saveMutation.mutate(formData);
   };
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({
+  const handleChange = (field: keyof FooterSettingsData, value: FooterSettingsData[keyof FooterSettingsData]) => {
+    setFormData((prev) => ({
       ...prev,
       [field]: value
     }));
   };
 
   const handleSocialChange = (platform: string, value: string) => {
-    setFormData((prev: any) => ({
+    setFormData((prev) => ({
       ...prev,
       social_links: {
         ...prev.social_links,
@@ -96,6 +135,7 @@ export const FooterSettings: React.FC = () => {
   if (isLoading) {
     return (
       <div className="max-w-4xl animate-pulse space-y-6 pb-24">
+        {/* Your existing loading skeleton */}
         <div className="mb-8 flex items-start gap-3 p-4 bg-zinc-100 rounded-xl dark:bg-zinc-800/50">
           <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-800" />
           <div className="space-y-2 w-full">
@@ -128,6 +168,7 @@ export const FooterSettings: React.FC = () => {
 
   return (
     <div className="max-w-4xl pb-12 relative">
+      {/* Floating Save Button */}
       <div className={`fixed top-[76px] right-6 md:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
           <div className="flex items-center gap-2">
@@ -167,10 +208,13 @@ export const FooterSettings: React.FC = () => {
                 type="text"
                 value={formData.footer_text || ''}
                 onChange={(e) => handleChange('footer_text', e.target.value)}
-                placeholder="Your ideas, amplified."
+                placeholder={activeBlog?.tagline || "Your ideas, amplified."}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
               />
-              <p className="text-xs text-zinc-500 mt-1">Short text that appears under your logo in the footer</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                Short text that appears under your logo in the footer. 
+                <span className="italic"> Defaults to your site tagline from General Settings.</span>
+              </p>
             </div>
 
             <div>
@@ -193,10 +237,11 @@ export const FooterSettings: React.FC = () => {
               />
               {subscription?.plan === 'free' ? (
                 <p className="text-xs text-amber-600 mt-1">
-                  Upgrade to Pro or Team to customize the copyright notice and remove the INKO attribution. <a href="/pricing" className="font-semibold hover:underline">View plans</a>
+                  Upgrade to Pro or Team to customize the copyright notice and remove the INKO attribution.{' '}
+                  <a href="/pricing" className="font-semibold hover:underline">View plans</a>
                 </p>
               ) : (
-                <p className="text-xs text-zinc-500 mt-1">Use {`{year}`} for automatic current year</p>
+                <p className="text-xs text-zinc-500 mt-1">Use {'{year}'} for automatic current year</p>
               )}
             </div>
           </div>

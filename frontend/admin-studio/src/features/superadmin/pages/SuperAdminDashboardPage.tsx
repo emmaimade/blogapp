@@ -66,7 +66,7 @@ export const SuperAdminDashboardPage = () => {
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
               {blogs?.map((b) => (
                 <tr key={b.blog_id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-200">{b.blog_name} (ID: {b.blog_id})</td>
+                  <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-200">{b.blog_name}</td>
                   <td className="px-6 py-4">{b.total_posts}</td>
                   <td className="px-6 py-4">{b.total_views}</td>
                   <td className="px-6 py-4"><span className="inline-flex items-center rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-950 dark:bg-zinc-900/50 dark:text-zinc-500">{b.plan}</span></td>
