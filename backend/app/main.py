@@ -1,8 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.db import create_db_and_tables
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.modules import (
     auth_router,
     blog_comments_router,
@@ -14,10 +17,25 @@ from app.modules import (
     blogs_router,
     invitations_router,
     superadmin_router,
+    audit_router,
 )
 
-app = FastAPI(title="CMS Backend", version="0.1.0")
+# ── Lifespan — replaces deprecated @app.on_event ─────────────────────────────
+# FastAPI recommends using lifespan context managers over on_event handlers.
+# This runs startup logic before yield and shutdown logic after.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    create_db_and_tables()
+    start_scheduler()
+    yield
+    # Shutdown
+    stop_scheduler()
 
+
+app = FastAPI(title="CMS Backend", version="0.1.0", lifespan=lifespan)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
 origins = [
     "https://blogapp-admin-studio-livid.vercel.app",
     "https://blogapp-blog.vercel.app",
@@ -28,7 +46,7 @@ origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://127.0.0.1:5175",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(
@@ -40,12 +58,7 @@ app.add_middleware(
 )
 app.add_middleware(AuditLogMiddleware)
 
-
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-
-
+# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(posts_router)
 app.include_router(tags_router)
@@ -56,6 +69,7 @@ app.include_router(settings_router)
 app.include_router(blogs_router)
 app.include_router(invitations_router)
 app.include_router(superadmin_router)
+app.include_router(audit_router)
 
 
 @app.get("/")
