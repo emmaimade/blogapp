@@ -39,7 +39,7 @@ export const SearchResults: React.FC = () => {
       {/* Back Button */}
       <Link
         to="/"
-        className="inline-flex items-center gap-2 text-zinc-600 hover:text-primary mb-8 font-medium transition-colors"
+        className="inline-flex items-center gap-2 text-zinc-600 hover:text-purple-600 mb-8 font-medium transition-colors"
       >
         <ArrowLeft size={20} />
         Back to Home
@@ -54,11 +54,11 @@ export const SearchResults: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search for posts..."
-            className="w-full px-6 py-4 pr-32 rounded-2xl border-2 border-zinc-200 focus:border-primary outline-none transition-all text-lg"
+            className="w-full px-6 py-4 pr-32 rounded-2xl border-2 border-zinc-200 focus:border-purple-600 outline-none transition-all text-lg"
           />
           <button
             type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-700 transition-all flex items-center gap-2"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-700 transition-all flex items-center gap-2"
           >
             <Search size={20} />
             Search
@@ -114,7 +114,7 @@ export const SearchResults: React.FC = () => {
               <div className="flex gap-4 justify-center">
                 <Link
                   to="/"
-                  className="bg-primary text-white px-6 py-3 rounded-full font-bold hover:bg-purple-700 transition-all"
+                  className="bg-purple-600 text-white px-6 py-3 rounded-full font-bold hover:bg-purple-700 transition-all"
                 >
                   Browse All Posts
                 </Link>
@@ -151,7 +151,7 @@ export const SearchResults: React.FC = () => {
               <Link
                 key={term}
                 to={`/search?q=${term}`}
-                className="px-4 py-2 bg-zinc-50 hover:bg-zinc-50 hover:text-primary rounded-full text-sm font-medium transition-all"
+                className="px-4 py-2 bg-zinc-50 hover:bg-zinc-50 hover:text-purple-600 rounded-full text-sm font-medium transition-all"
               >
                 {term}
               </Link>

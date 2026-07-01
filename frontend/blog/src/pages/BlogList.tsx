@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search, Filter, Sparkles } from 'lucide-react';
+import { X, Search, Filter, ChevronDown, TrendingUp, Clock } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
+// import { formatLocalDate } from '../utils/dates';
 
 type PostTag = {
   name: string;
@@ -23,7 +24,8 @@ type Post = {
 
 export const BlogList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showFilters, setShowFilters] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const filterParam = searchParams.get('filter') || 'all';
   const tagParam = searchParams.get('tag') || '';
 
@@ -46,13 +48,21 @@ export const BlogList = () => {
   }, [posts]);
 
   // Filter posts
-  const filteredPosts = useMemo(() => {
+  let filteredPosts = useMemo(() => {
     if (!posts) return [];
     let items = posts;
     if (filterParam === 'projects') items = items.filter((post) => post.is_project);
     if (tagParam) items = items.filter((post) => post.tags?.some((tag) => tag.name === tagParam));
+    
+    // Sort posts
+    if (sortBy === 'popular') {
+      items = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
+    } else {
+      items = [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    
     return items;
-  }, [posts, filterParam, tagParam]);
+  }, [posts, filterParam, tagParam, sortBy]);
 
   const setFilter = (f: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -65,10 +75,12 @@ export const BlogList = () => {
     if (!t) next.delete('tag'); 
     else next.set('tag', t);
     setSearchParams(next);
+    setShowTagDropdown(false);
   };
 
   const clearFilters = () => {
     setSearchParams({});
+    setSortBy('latest');
   };
 
   if (isLoading) {
@@ -76,7 +88,7 @@ export const BlogList = () => {
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
           <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Sparkles className="text-zinc-900" size={24} />
+            <TrendingUp className="text-zinc-900" size={24} />
           </div>
           <p className="text-zinc-400 font-medium">Loading articles...</p>
         </div>
@@ -89,133 +101,120 @@ export const BlogList = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
       
-      {/* Hero Section - ✅ GENERIC (no niche-specific text) */}
-      <div className="bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 border-b border-zinc-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-20">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full mb-6 border border-zinc-300">
-              <Sparkles className="text-zinc-900" size={16} />
-              <span className="text-sm font-bold text-zinc-900">
-                {filteredPosts.length} {filteredPosts.length === 1 ? 'Article' : 'Articles'}
-              </span>
+      {/* Compact Header Section */}
+      <div className="border-b border-zinc-200 bg-white sticky top-20 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-zinc-900">
+                {filterParam === 'projects' ? 'Projects' : 'Articles'}
+              </h1>
+              <p className="text-sm text-zinc-600 mt-1">
+                {filteredPosts.length} {filteredPosts.length === 1 ? 'item' : 'items'} {tagParam && `tagged "${tagParam}"`}
+              </p>
             </div>
-            
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 mb-4">
-              {filterParam === 'projects' ? 'Projects & Case Studies' : 'All Articles'}
-            </h1>
-            
-            {/* ✅ Generic description - works for ANY niche */}
-            <p className="text-lg text-zinc-600">
-              {filterParam === 'projects' 
-                ? 'Explore featured projects, case studies, and technical deep-dives'
-                : tagParam 
-                  ? `Browse all articles tagged with "${tagParam}"`
-                  : 'Discover our latest articles, stories, and insights'
-              }
-            </p>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         
-        {/* Compact Filter Bar */}
-        <div className="mb-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-            {/* Type Toggle */}
-            <div className="grid grid-cols-2 gap-2 bg-white rounded-xl p-1.5 border border-zinc-200 shadow-sm w-full md:w-auto">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${
- filterParam === 'all' 
- ? 'bg-primary text-white shadow-sm' 
- : 'text-zinc-600 hover:bg-zinc-50'
- }`}
+        {/* Controls Bar */}
+        <div className="mb-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            
+            {/* Left: Type & Sorting */}
+            <div className="flex gap-3 flex-wrap">
+              {/* Type Toggle */}
+              <div className="inline-grid grid-cols-2 gap-2 bg-white rounded-lg p-1 border border-zinc-200 shadow-sm">
+                <button
+                  onClick={() => setFilter('all')}
+                  className={
+                    filterParam === 'all'
+                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-purple-600 text-white'
+                      : 'px-4 py-2 rounded-md font-bold text-sm transition-all text-zinc-600 hover:bg-zinc-50'
+                  }
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilter('projects')}
+                  className={
+                    filterParam === 'projects'
+                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-purple-600 text-white'
+                      : 'px-4 py-2 rounded-md font-bold text-sm transition-all text-zinc-600 hover:bg-zinc-50'
+                  }
+                >
+                  Projects
+                </button>
+              </div>
+
+              {/* Sort Dropdown */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'latest' | 'popular')}
+                className="px-4 py-2 bg-white border border-zinc-200 rounded-lg font-medium text-sm text-zinc-700 hover:bg-zinc-50 transition-all shadow-sm cursor-pointer"
               >
-                All Posts
-              </button>
-              <button
-                onClick={() => setFilter('projects')}
-                className={`px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${
- filterParam === 'projects' 
- ? 'bg-primary text-white shadow-sm' 
- : 'text-zinc-600 hover:bg-zinc-50'
- }`}
-              >
-                Projects
-              </button>
+                <option value="latest">Latest</option>
+                <option value="popular">Popular</option>
+              </select>
             </div>
 
-            {/* Filter Toggle Button */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-zinc-200 rounded-xl font-medium text-sm text-zinc-700 hover:bg-zinc-50 transition-all shadow-sm w-full md:w-auto"
-            >
-              <Filter size={16} />
-              Filter by Tag
-              {tagParam && (
-                <span className="w-2 h-2 bg-zinc-900 rounded-full"></span>
+            {/* Right: Tag Filter */}
+            <div className="relative">
+              <button
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-lg font-medium text-sm text-zinc-700 hover:bg-zinc-50 transition-all shadow-sm whitespace-nowrap"
+              >
+                <Filter size={16} />
+                Tags
+                {tagParam && <span className="w-2 h-2 bg-purple-600 rounded-full"></span>}
+                <ChevronDown size={16} className={`transition-transform ${showTagDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Tag Dropdown Menu */}
+              {showTagDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                  <button
+                    onClick={() => setTag('')}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
+                      !tagParam
+                        ? 'bg-purple-600 text-white'
+                        : 'text-zinc-700 hover:bg-zinc-50'
+                    }`}
+                  >
+                    All Tags
+                  </button>
+                  {tags.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTag(t)}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
+                        tagParam === t
+                          ? 'bg-purple-600 text-white'
+                          : 'text-zinc-700 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               )}
-            </button>
+            </div>
           </div>
 
-          {/* Expandable Tags Section */}
-          {showFilters && tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm mb-6">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <h3 className="font-bold text-zinc-900">Filter by Tag</h3>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setTag('')}
-                  className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
- !tagParam 
- ? 'bg-primary text-white shadow-sm' 
- : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
- }`}
-                >
-                  All Tags
-                </button>
-                {tags.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTag(t)}
-                    className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
- tagParam === t 
- ? 'bg-primary text-white shadow-sm' 
- : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
- }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Active Filter Indicator */}
-          {tagParam && (
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-zinc-50 text-zinc-950 px-4 py-2 rounded-xl text-sm font-medium border border-zinc-300">
-                <span>Showing: <strong>{tagParam}</strong></span>
-                <button
-                  onClick={() => setTag('')}
-                  className="hover:bg-zinc-100 p-1 rounded transition-colors"
-                >
-                  <X size={14} />
-                </button>
+          {/* Active Filters Indicator */}
+          {hasActiveFilters && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-200">
+                <Filter size={14} />
+                <span>Filters active</span>
               </div>
               <button
                 onClick={clearFilters}
-                className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors underline"
+                className="text-sm text-zinc-600 hover:text-zinc-900 font-medium underline transition-colors"
               >
-                Clear all filters
+                Clear all
               </button>
             </div>
           )}

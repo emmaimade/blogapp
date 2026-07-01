@@ -37,9 +37,9 @@ export const NotFound: React.FC = () => {
             <input
               type="text"
               placeholder="Search for posts..."
-              className="w-full px-6 py-4 pr-12 rounded-full border-2 border-zinc-200 focus:border-primary outline-none transition-all"
+              className="w-full px-6 py-4 pr-12 rounded-full border-2 border-zinc-200 focus:border-purple-600 outline-none transition-all"
             />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white p-3 rounded-full hover:bg-purple-700 transition-all">
+            <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 text-white p-3 rounded-full hover:bg-purple-700 transition-all">
               <Search size={20} />
             </button>
           </div>
@@ -49,7 +49,7 @@ export const NotFound: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
           <Link
             to="/"
-            className="flex items-center justify-center gap-2 bg-primary text-white px-8 py-4 rounded-full font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10"
+            className="flex items-center justify-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-full font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10"
           >
             <Home size={20} />
             Go Home
@@ -73,7 +73,7 @@ export const NotFound: React.FC = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-50 hover:text-primary rounded-xl transition-all group"
+                className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-50 hover:text-purple-600 rounded-xl transition-all group"
               >
                 <link.icon size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="font-medium">{link.title}</span>

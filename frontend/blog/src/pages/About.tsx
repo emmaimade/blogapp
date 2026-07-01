@@ -94,10 +94,7 @@ export const About: React.FC = () => {
                 Previewing unsaved changes
               </div>
             )}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full mb-6 border border-zinc-300">
-              <Sparkles className="text-zinc-900" size={16} />
-              <span className="text-sm font-bold text-zinc-900">About</span>
-            </div>
+            
             
             <h1 className="text-4xl md:text-6xl font-black text-zinc-900 mb-6 leading-tight">
               {bio_title || "Welcome to My Blog"}
@@ -150,9 +147,9 @@ export const About: React.FC = () => {
 
         {/* CTA - Only show if enabled */}
         {show_contact_cta !== false && (
-          <div className="bg-zinc-900 rounded-3xl p-12 text-center text-white">
+          <div className="bg-zinc-700 rounded-3xl p-12 text-center text-white">
             <h2 className="text-3xl font-black mb-4">Let's Connect</h2>
-            <p className="text-zinc-500 mb-8 max-w-xl mx-auto text-lg">
+            <p className="text-zinc-400 mb-8 max-w-xl mx-auto text-lg">
               Interested in collaborating or just want to say hi? I'd love to hear from you.
             </p>
             

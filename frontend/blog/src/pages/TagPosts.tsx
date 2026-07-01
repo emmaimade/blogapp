@@ -33,7 +33,7 @@ export const TagPosts: React.FC = () => {
       {/* Back Button */}
       <Link
         to="/"
-        className="inline-flex items-center gap-2 text-zinc-600 hover:text-primary mb-8 font-medium transition-colors"
+        className="inline-flex items-center gap-2 text-zinc-600 hover:text-purple-600 mb-8 font-medium transition-colors"
       >
         <ArrowLeft size={20} />
         Back to Home

@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css';
 import { Calendar, ChevronRight, Eye } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatLocalDate, formatSmart } from '../utils/dates';
 import api from '../api/blogApi';
 import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';
@@ -108,7 +108,7 @@ export const PostDetail = () => {
             {post.tags.map((tag: any) => (
               <span
                 key={tag.id}
-                className="bg-primary text-white text-[10px] px-3 py-1 rounded-full font-bold"
+                className="bg-purple-600 text-white text-[10px] px-3 py-1 rounded-full font-bold"
               >
                 {tag.name}
               </span>
@@ -121,7 +121,7 @@ export const PostDetail = () => {
           {/* Author & Date */}
           <div className="flex flex-wrap items-center gap-6 text-zinc-500 border-y border-zinc-100 py-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-primary text-white rounded-2xl flex items-center justify-center font-bold shadow-inner">
+              <div className="w-9 h-9 bg-purple-600 text-white rounded-2xl flex items-center justify-center font-bold shadow-inner">
                 {authorName.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -137,7 +137,7 @@ export const PostDetail = () => {
             </div>
             <span className="flex items-center gap-1 text-sm">
               <Calendar size={14} />{" "}
-              {format(new Date(post.created_at), "MMMM dd, yyyy")}
+              {formatLocalDate(post.created_at)}
             </span>
             <span className="flex items-center gap-1 text-sm">
               <Eye size={14} />
@@ -291,7 +291,7 @@ export const PostDetail = () => {
                       ))}
                     </div>
 
-                    <h3 className="text-lg font-bold leading-snug text-zinc-900 transition-colors group-hover:text-primary line-clamp-2">
+                    <h3 className="text-lg font-bold leading-snug text-zinc-900 transition-colors group-hover:text-purple-600 line-clamp-2">
                       {relatedPost.title}
                     </h3>
 
@@ -301,7 +301,7 @@ export const PostDetail = () => {
 
                     <div className="mt-4 flex items-center gap-2 text-xs font-medium text-zinc-500">
                       <Calendar size={13} />
-                      <span>{format(new Date(relatedPost.created_at), 'MMM dd, yyyy')}</span>
+                      <span>{formatLocalDate(relatedPost.created_at)}</span>
                     </div>
                   </div>
                 </Link>

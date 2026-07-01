@@ -5,6 +5,7 @@ import { Clock, Eye, Loader2, TrendingUp, Zap } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
+import { formatLocalDate } from '../utils/dates';
 
 export const Home: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'projects'>('all');
@@ -17,17 +18,24 @@ export const Home: React.FC = () => {
     }
   });
 
+  // Exclude sample/welcome posts from all public display.
+  // They exist to show owners the dashboard has content — readers shouldn't see them.
+  const displayPosts = React.useMemo(
+    () => (posts ?? []).filter((p: any) => !p.is_sample),
+    [posts]
+  );
+
   const tags = React.useMemo(() => {
     const set = new Set<string>();
-    posts?.forEach((p: any) => p.tags?.forEach((t: any) => set.add(t.name)));
+    displayPosts.forEach((p: any) => p.tags?.forEach((t: any) => set.add(t.name)));
     return Array.from(set).sort();
-  }, [posts]);
+  }, [displayPosts]);
 
   const popularPosts = React.useMemo(() => {
-    return [...(posts || [])]
+    return [...displayPosts]
       .sort((a: any, b: any) => (b.views || 0) - (a.views || 0))
       .slice(0, 5);
-  }, [posts]);
+  }, [displayPosts]);
 
   const calculateReadingTime = (content: string) => {
     if (!content) return 1;
@@ -58,8 +66,8 @@ export const Home: React.FC = () => {
   const getRemainingTagCount = (post: any, limit: number) => Math.max((post.tags?.length || 0) - limit, 0);
 
   const filteredPosts = filter === 'projects'
-    ? posts?.filter((p: any) => p.is_project)
-    : posts;
+    ? displayPosts.filter((p: any) => p.is_project)
+    : displayPosts;
 
   const featuredPost = filteredPosts?.[0];
   const trendingPosts = filteredPosts?.slice(1, 5) || [];
@@ -85,7 +93,7 @@ export const Home: React.FC = () => {
               <article className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-2xl transition-all duration-500">
                 <div className="relative overflow-hidden h-[440px] sm:h-[500px] md:h-[600px]">
                   <img
-                    src={featuredPost.thumbnail_url || '/placeholder.jpg'}
+                    src={featuredPost.thumbnail_url || "/placeholder.jpg"}
                     alt={featuredPost.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
@@ -128,19 +136,20 @@ export const Home: React.FC = () => {
                       <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base text-white/90">
                         <div className="flex items-center gap-2">
                           <Clock size={18} className="text-white/80" />
-                          <span className="font-medium">{calculateReadingTime(featuredPost.content)} min read</span>
+                          <span className="font-medium">
+                            {calculateReadingTime(featuredPost.content)} min
+                            read
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Eye size={18} className="text-white/80" />
-                          <span className="font-medium">{featuredPost.views || 0} views</span>
+                          <span className="font-medium">
+                            {featuredPost.views || 0} views
+                          </span>
                         </div>
                         <span className="text-white/70">&bull;</span>
                         <span className="font-medium">
-                          {new Date(featuredPost.created_at).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
+                          {formatLocalDate(featuredPost.created_at)}
                         </span>
                       </div>
                     </div>
@@ -156,31 +165,32 @@ export const Home: React.FC = () => {
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <h2 className="text-2xl md:text-3xl font-black text-zinc-900">
-              {filter === 'all' ? 'Latest Articles' : 'Featured Projects'}
+              {filter === "all" ? "Latest Articles" : "Featured Projects"}
             </h2>
             <p className="text-zinc-600 mt-1">
-              {filteredPosts?.length || 0} {filter === 'all' ? 'posts' : 'projects'} &bull; Updated daily
+              {filteredPosts?.length || 0}{" "}
+              {filter === "all" ? "posts" : "projects"} &bull; Updated daily
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 bg-white rounded-xl p-1.5 border border-zinc-200 shadow-sm w-full md:w-auto">
             <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
- filter === 'all'
- ? 'bg-primary text-white shadow-sm'
- : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
- }`}
+              onClick={() => setFilter("all")}
+              className={
+                filter === "all"
+                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-purple-600 text-white shadow-sm"
+                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-purple-600 hover:bg-zinc-50"
+              }
             >
               All Posts
             </button>
             <button
-              onClick={() => setFilter('projects')}
-              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
- filter === 'projects'
- ? 'bg-primary text-white shadow-sm'
- : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
- }`}
+              onClick={() => setFilter("projects")}
+              className={
+                filter === "projects"
+                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-purple-600 text-white shadow-sm"
+                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-purple-600 hover:bg-zinc-50"
+              }
             >
               Projects
             </button>
@@ -205,7 +215,7 @@ export const Home: React.FC = () => {
                     >
                       <div className="relative h-52 overflow-hidden">
                         <img
-                          src={post.thumbnail_url || '/placeholder.jpg'}
+                          src={post.thumbnail_url || "/placeholder.jpg"}
                           alt={post.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
@@ -244,10 +254,7 @@ export const Home: React.FC = () => {
                           </span>
                           <span>&bull;</span>
                           <span>
-                            {new Date(post.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric'
-                            })}
+                            {formatLocalDate(post.created_at)}
                           </span>
                         </div>
                       </div>

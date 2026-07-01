@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, User } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatLocalDate } from '../utils/dates';
 
 interface PostProps {
   post: {
@@ -50,7 +50,7 @@ export const PostCard: React.FC<PostProps> = ({ post }) => {
         </h2>
         <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-zinc-500 text-sm">
           <span className="flex items-center gap-1"><User size={14}/> Admin</span>
-          <span className="flex items-center gap-1"><Calendar size={14}/> {format(new Date(post.created_at), 'MMM dd, yyyy')}</span>
+          <span className="flex items-center gap-1"><Calendar size={14}/> {formatLocalDate(post.created_at)}</span>
         </div>
       </div>
     </article>

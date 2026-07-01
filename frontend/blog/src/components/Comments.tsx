@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Trash2, X, Check, MoreVertical } from 'lucide-react';
+import { formatLocalDate } from '../utils/dates';
 
 interface Comment {
   id: number;
@@ -11,6 +12,8 @@ interface Comment {
   user: {
     id: number;
     username: string;
+    first_name: string;
+    last_name: string;
   };
   created_at: string;
   is_deleted?: boolean;
@@ -194,14 +197,10 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <p className="font-bold text-zinc-900">
-                          {comment.user?.username || 'Anonymous'}
+                          {comment.user?.first_name || 'Anonymous'}
                         </p>
                         <p className="text-xs text-zinc-400">
-                          {new Date(comment.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
+                          {formatLocalDate(comment.created_at)}
                         </p>
                       </div>
 

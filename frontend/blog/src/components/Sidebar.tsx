@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, Tag, Eye } from 'lucide-react';
+import { formatLocalDate } from '../utils/dates';
 
 interface SidebarProps {
   popularPosts: Array<{
@@ -41,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {post.title}
                   </h4>
                   <div className="mt-1 flex items-center gap-2 text-[10px] uppercase text-zinc-400">
-                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span>{formatLocalDate(post.created_at)}</span>
                     <span>&bull;</span>
                     <span className="inline-flex items-center gap-1">
                       <Eye size={11} />

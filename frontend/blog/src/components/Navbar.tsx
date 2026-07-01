@@ -3,31 +3,6 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search, User, X } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 
-// Inko Logo Component
-const InkoLogo: React.FC<{ size?: number }> = ({ size = 24 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="inline-block"
-  >
-    <defs>
-      <linearGradient id="inkoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#18181B" />
-        <stop offset="50%" stopColor="#9333EA" />
-        <stop offset="100%" stopColor="#A855F7" />
-      </linearGradient>
-    </defs>
-    <path
-      d="M12 2C12 2 8 6 8 10C8 13.314 9.79 16 12 16C14.21 16 16 13.314 16 10C16 6 12 2 12 2Z"
-      fill="url(#inkoGradient)"
-    />
-    <circle cx="12" cy="19" r="2" fill="url(#inkoGradient)" opacity="0.6" />
-  </svg>
-);
-
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,7 +54,7 @@ export const Navbar: React.FC = () => {
     [
       'rounded-2xl px-4 py-3 text-sm font-bold transition',
       isNavItemActive(to)
-        ? 'bg-zinc-900 text-white'
+        ? 'text-zinc-900 bg-zinc-100'
         : 'text-zinc-700 hover:bg-zinc-50 hover:text-primary',
     ].join(' ');
 
@@ -92,7 +67,11 @@ export const Navbar: React.FC = () => {
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-2 min-w-0 group" onClick={closeMenu}>
+        <Link
+          to="/"
+          className="flex items-center gap-2 min-w-0 group"
+          onClick={closeMenu}
+        >
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -100,14 +79,14 @@ export const Navbar: React.FC = () => {
               className="h-8 w-auto object-contain"
             />
           ) : (
-            <InkoLogo size={28} />
+            <span
+              className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900 transition-colors truncate"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {siteName}
+              <span style={{ color: primaryColor }}>.</span>
+            </span>
           )}
-          <span
-            className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900 transition-colors truncate"
-            style={{ fontFamily: 'var(--font-heading)' }}
-          >
-            {siteName}<span style={{ color: primaryColor }}>.</span>
-          </span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
@@ -116,8 +95,10 @@ export const Navbar: React.FC = () => {
               key={link.to}
               to={link.to}
               className={getDesktopNavClassName(link.to)}
-              style={isNavItemActive(link.to) ? { color: primaryColor } : undefined}
-              aria-current={isNavItemActive(link.to) ? 'page' : undefined}
+              style={
+                isNavItemActive(link.to) ? { color: primaryColor } : undefined
+              }
+              aria-current={isNavItemActive(link.to) ? "page" : undefined}
             >
               {link.label}
             </NavLink>
@@ -148,7 +129,7 @@ export const Navbar: React.FC = () => {
               to="/auth"
               className="hidden sm:flex items-center gap-2 text-white px-5 py-2.5 rounded-full text-sm font-bold transition shadow-lg"
               style={{
-                background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`,
+                background: primaryColor,
                 boxShadow: `0 10px 25px -15px ${primaryColor}`,
               }}
               onClick={closeMenu}
@@ -159,7 +140,7 @@ export const Navbar: React.FC = () => {
 
           <button
             className="md:hidden text-zinc-900"
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMobileMenuOpen}
             onClick={() => setIsMobileMenuOpen((open) => !open)}
           >
@@ -176,7 +157,7 @@ export const Navbar: React.FC = () => {
                 key={link.to}
                 to={link.to}
                 className={getMobileNavClassName(link.to)}
-                aria-current={isNavItemActive(link.to) ? 'page' : undefined}
+                aria-current={isNavItemActive(link.to) ? "page" : undefined}
                 onClick={closeMenu}
               >
                 {link.label}
@@ -195,7 +176,7 @@ export const Navbar: React.FC = () => {
                 to="/auth"
                 className="mt-2 inline-flex items-center justify-center gap-2 text-white px-5 py-3 rounded-2xl text-sm font-bold transition shadow-lg"
                 style={{
-                  background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`,
+                  background: `${primaryColor}`,
                   boxShadow: `0 10px 25px -15px ${primaryColor}`,
                 }}
                 onClick={closeMenu}
@@ -209,5 +190,3 @@ export const Navbar: React.FC = () => {
     </nav>
   );
 };
-
-export { InkoLogo };

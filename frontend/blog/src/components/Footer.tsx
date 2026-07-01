@@ -61,7 +61,7 @@ export const Footer: React.FC = () => {
   ].filter((item) => Boolean(item.href));
 
   return (
-    <footer className="bg-zinc-900 text-white mt-20">
+    <footer className="bg-white border-t border-zinc-200 mt-20">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -78,7 +78,7 @@ export const Footer: React.FC = () => {
                 </span>
               )}
             </Link>
-            <p className="text-zinc-400 text-sm mb-4">
+            <p className="text-zinc-600 text-sm mb-4">
               {settings?.footer_text || 'Your ideas, amplified.'}
             </p>
             {settings?.show_social_links !== false && footerSocials.length > 0 && (
@@ -89,7 +89,7 @@ export const Footer: React.FC = () => {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-all"
+                    className="p-2 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-all text-zinc-700 hover:text-zinc-900"
                     aria-label={label}
                   >
                     <Icon size={20} />
@@ -101,25 +101,25 @@ export const Footer: React.FC = () => {
 
           {settings?.show_quick_links !== false && (
             <div>
-              <h3 className="font-bold text-lg mb-4">Quick Links</h3>
-              <ul className="space-y-2 text-zinc-400">
+              <h3 className="font-bold text-lg text-zinc-900 mb-4">Quick Links</h3>
+              <ul className="space-y-2 text-zinc-600">
                 <li>
-                  <Link to="/" className="hover:text-white transition-colors">
+                  <Link to="/" className="hover:text-zinc-900 transition-colors">
                     Home
                   </Link>
                 </li>
                 <li>
-                  <Link to="/blog" className="hover:text-white transition-colors">
+                  <Link to="/blog" className="hover:text-zinc-900 transition-colors">
                     Blog
                   </Link>
                 </li>
                 <li>
-                  <Link to="/about" className="hover:text-white transition-colors">
+                  <Link to="/about" className="hover:text-zinc-900 transition-colors">
                     About
                   </Link>
                 </li>
                 <li>
-                  <Link to="/contact" className="hover:text-white transition-colors">
+                  <Link to="/contact" className="hover:text-zinc-900 transition-colors">
                     Contact
                   </Link>
                 </li>
@@ -129,14 +129,14 @@ export const Footer: React.FC = () => {
 
           {settings?.show_categories !== false && (
             <div>
-              <h3 className="font-bold text-lg mb-4">Popular Topics</h3>
-              <ul className="space-y-2 text-zinc-400">
+              <h3 className="font-bold text-lg text-zinc-900 mb-4">Popular Topics</h3>
+              <ul className="space-y-2 text-zinc-600">
                 {popularTags?.length > 0 ? (
                   popularTags.map((tag: { id: number; name: string }) => (
                     <li key={tag.id}>
                       <Link
                         to={`/blog?tag=${tag.name}`}
-                        className="hover:text-white transition-colors"
+                        className="hover:text-zinc-900 transition-colors"
                       >
                         {tag.name}
                       </Link>
@@ -145,12 +145,12 @@ export const Footer: React.FC = () => {
                 ) : (
                   <>
                     <li>
-                      <Link to="/blog" className="hover:text-white transition-colors">
+                      <Link to="/blog" className="hover:text-zinc-900 transition-colors">
                         All Articles
                       </Link>
                     </li>
                     <li>
-                      <Link to="/blog?filter=projects" className="hover:text-white transition-colors">
+                      <Link to="/blog?filter=projects" className="hover:text-zinc-900 transition-colors">
                         Projects
                       </Link>
                     </li>
@@ -162,20 +162,20 @@ export const Footer: React.FC = () => {
 
           {settings?.show_newsletter !== false && (
             <div>
-              <h3 className="font-bold text-lg mb-4">
+              <h3 className="font-bold text-lg text-zinc-900 mb-4">
                 {settings?.newsletter_title || 'Newsletter'}
               </h3>
-              <p className="text-zinc-400 text-sm mb-4">
+              <p className="text-zinc-600 text-sm mb-4">
                 {settings?.newsletter_description || 'Get the latest posts delivered to your inbox.'}
               </p>
               <div className="flex gap-2">
                 <input
                   type="email"
                   placeholder="Your email"
-                  className="flex-1 px-4 py-2 rounded-lg bg-white/10 border border-white/20 outline-none focus:border-zinc-300 transition-all text-sm"
+                  className="flex-1 px-4 py-2 rounded-lg bg-zinc-50 border border-zinc-200 outline-none focus:border-purple-600 focus:bg-white transition-all text-sm"
                 />
                 <button
-                  className="bg-zinc-900 px-4 py-2 rounded-lg hover:bg-zinc-900 transition-all"
+                  className="bg-zinc-100 px-4 py-2 rounded-lg hover:bg-zinc-200 transition-all text-zinc-700 hover:text-zinc-900"
                   aria-label="Subscribe"
                 >
                   <Mail size={18} />
@@ -185,23 +185,23 @@ export const Footer: React.FC = () => {
           )}
         </div>
 
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
+        <div className="border-t border-zinc-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-600">
           <a 
             href={import.meta.env.VITE_MARKETING_SITE_URL} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-zinc-600 text-xs hover:text-white transition-colors"
+            className="text-zinc-500 text-xs hover:text-zinc-900 transition-colors"
           >
             Powered by INKO
           </a>
           <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-white transition-colors">
+            <Link to="/privacy" className="hover:text-zinc-900 transition-colors">
               Privacy
             </Link>
-            <Link to="/terms" className="hover:text-white transition-colors">
+            <Link to="/terms" className="hover:text-zinc-900 transition-colors">
               Terms
             </Link>
-            <Link to="/sitemap" className="hover:text-white transition-colors">
+            <Link to="/sitemap" className="hover:text-zinc-900 transition-colors">
               Sitemap
             </Link>
           </div>
