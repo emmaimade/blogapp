@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicLayout } from '../../shared/layouts/PublicLayout';
+import { AuthLayout } from '../../shared/layouts/AuthLayout';
 
 import { HomePage } from '../../pages/HomePage';
 import { PricingPage } from '../../pages/PricingPage';
@@ -20,7 +21,9 @@ export const SiteRouter = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>
-      <Route path="/signup" element={<SignupPage />} />
+      <Route element={<AuthLayout />}>
+        <Route path="/signup" element={<SignupPage />} />
+      </Route>
       <Route path="/join/:token" element={<JoinPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

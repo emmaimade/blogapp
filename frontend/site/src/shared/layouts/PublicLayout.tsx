@@ -63,7 +63,7 @@ export const PublicLayout = () => {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg">
                 <InkoLogo color="purple" size={24} />
               </div>
-              <span className="text-primary py-1 rounded-md">INKO</span>
+              <span className="py-1 rounded-md">Inko</span>
             </Link>
 
             {/* Desktop Navigation */}
