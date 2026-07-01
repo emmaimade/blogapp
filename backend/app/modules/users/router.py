@@ -1,3 +1,4 @@
+import random
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
@@ -32,20 +33,39 @@ def _generate_unique_workspace_slug(seed: str, session: Session) -> str:
 
     return unique_slug
 
+def _generate_random_handle(email: str, session: Session) -> str:
+    """
+    Takes an email like 'jane.doe@example.com', cleans the prefix to 'janedoe',
+    and appends a random 4-digit suffix to create a safe database username.
+    """
+    email_prefix = email.split("@")[0]
+    # Keep only letters, numbers, and underscores; convert to lowercase
+    base = "".join(c for c in email_prefix if c.isalnum() or c == "_").lower() or "user"
+    
+    unique_handle = f"{base}{random.randint(1000, 9999)}"
+    
+    # Loop to double-check that the random handle isn't accidentally taken
+    while session.exec(select(User).where(User.username == unique_handle)).first():
+        unique_handle = f"{base}{random.randint(1000, 9999)}"
+        
+    return unique_handle
+
 
 @router.post("/register", response_model=UserRead)
 def register(user_data: UserCreate, session: Session = Depends(get_session)):
-    existing_user = session.exec(select(User).where(User.username == user_data.username)).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User already exists")
+    # existing_user = session.exec(select(User).where(User.username == user_data.username)).first()
 
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already exists")
+    
+    random_handle = _generate_random_handle(user_data.email, session)
 
     hashed = get_password_hash(user_data.password)
     new_user = User(
-        username=user_data.username,
+        username=random_handle,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
         email=user_data.email,
         hashed_password=hashed,
     )

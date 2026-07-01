@@ -1,19 +1,22 @@
+from fastapi import Query
 from datetime import datetime
 from typing import Optional
-
 from pydantic import BaseModel, EmailStr
 
+from app.schemas.datetime_mixin import UTCDatetimeMixin
 from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep
 from app.models.user import PlatformRole
 
 class UserCreate(BaseModel):
-    username: str
+    username: Optional[str] = None
+    first_name: str
+    last_name: str
     email: EmailStr
     password: str
     workspace_name: str | None = None
     workspace_slug: str | None = None
 
-class MembershipBlogRead(BaseModel):
+class MembershipBlogRead(UTCDatetimeMixin, BaseModel):
     id: int
     name: str
     slug: str
@@ -25,11 +28,10 @@ class MembershipBlogRead(BaseModel):
     onboarding_step: OnboardingStep
     onboarding_completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
-class UserBlogMembershipRead(BaseModel):
+class UserBlogMembershipRead(UTCDatetimeMixin, BaseModel):
     id: int
     user_id: int
     blog_id: int
@@ -37,21 +39,23 @@ class UserBlogMembershipRead(BaseModel):
     invited_at: datetime
     blog: MembershipBlogRead
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
-class UserRead(BaseModel):
+class UserRead(UTCDatetimeMixin, BaseModel):
     id: int
-    username: str
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     email: EmailStr
     platform_role: PlatformRole
     is_super_admin: bool
     is_active: bool
     created_at: datetime
+    last_login: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
     blog_memberships: list[UserBlogMembershipRead] = []
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserUpdate(BaseModel):
@@ -59,5 +63,12 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+
+class SuperadminUserQueryParams(BaseModel):
+    skip: int = Query(default=0, ge=0)
+    limit: int = Query(default=100, ge=1, le=500)
+    platform_role: Optional[PlatformRole] = Query(default=None, description="Filter by platform role")
+    include_deleted: bool = Query(default=False, description="Whether to include soft-deleted accounts")
+    search: Optional[str] = Query(default=None, description="Search term for username or email fields")

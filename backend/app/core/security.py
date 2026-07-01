@@ -47,7 +47,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: Session
         raise credentials_exception
 
     user = session.exec(select(User).where(User.username == username)).first()
-    if user is None:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise credentials_exception
     return user
 
@@ -63,7 +63,10 @@ async def get_current_user_optional(
         username: str = payload.get("sub")
         if username is None:
             return None
-        return session.exec(select(User).where(User.username == username)).first()
+        user = session.exec(select(User).where(User.username == username)).first()
+        if user is None or not user.is_active or user.deleted_at is not None:
+            return None
+        return user
     except (JWTError, AttributeError):
         return None
 
