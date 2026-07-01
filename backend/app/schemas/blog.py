@@ -11,6 +11,7 @@ from app.models.blog import (
     WorkspaceOwnerRole,
     WorkspaceType,
 )
+from app.schemas.datetime_mixin import UTCDatetimeMixin
 from .users import UserRead
 
 class BlogCreate(BaseModel):
@@ -19,7 +20,7 @@ class BlogCreate(BaseModel):
     subdomain: Optional[str] = None
     description: Optional[str] = None
 
-class BlogRead(BaseModel):
+class BlogRead(UTCDatetimeMixin, BaseModel):
     id: int
     name: str
     slug: str
@@ -61,7 +62,7 @@ class BlogMemberCreate(BaseModel):
     email: EmailStr
     role: BlogRole = BlogRole.AUTHOR
 
-class BlogMemberRead(BaseModel):
+class BlogMemberRead(UTCDatetimeMixin, BaseModel):
     id: int
     user_id: int
     blog_id: int
@@ -78,7 +79,7 @@ class BlogMemberUpdate(BaseModel):
 class BlogInvitationCreate(BaseModel):
     role: BlogRole = BlogRole.AUTHOR
 
-class BlogInvitationRead(BaseModel):
+class BlogInvitationRead(UTCDatetimeMixin, BaseModel):
     id: int
     blog_id: int
     role: BlogRole
@@ -98,7 +99,7 @@ class BlogInvitationInfo(BaseModel):
     expires_at: datetime
     already_accepted: bool
 
-class DashboardRecentActivity(BaseModel):
+class DashboardRecentActivity(UTCDatetimeMixin, BaseModel):
     type: str
     title: str
     description: str
@@ -111,6 +112,7 @@ class BlogDashboardSummary(BaseModel):
     posts: int
     published_posts: int
     draft_posts: int
+    scheduled_posts: int = 0
     comments: int
     tags: int
     team_members: int
@@ -126,7 +128,7 @@ class PlatformStats(BaseModel):
     blogs_created_today: int
     users_signed_up_today: int
 
-class BlogAnalytics(BaseModel):
+class BlogAnalytics(UTCDatetimeMixin, BaseModel):
     blog_id: int
     blog_name: str
     owner_email: str
@@ -136,7 +138,7 @@ class BlogAnalytics(BaseModel):
     created_at: datetime
     last_activity: Optional[datetime] = None
 
-class SubscriptionRead(BaseModel):
+class SubscriptionRead(UTCDatetimeMixin, BaseModel):
     blog_id: int
     plan: SubscriptionPlan
     status: str
@@ -155,7 +157,7 @@ class OnboardingChecklist(BaseModel):
     plan: bool
 
 
-class OnboardingSummary(BaseModel):
+class OnboardingSummary(UTCDatetimeMixin, BaseModel):
     status: OnboardingStatus
     current_step: OnboardingStep
     completed_steps: int

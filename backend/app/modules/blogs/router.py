@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+from jinja2 import Template
 from typing import List
 import secrets
 from datetime import timedelta
@@ -7,7 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
-from datetime import datetime
+from app.models.post import PostStatus
+from app.modules.posts.service import upload_welcome_banner
+from datetime import datetime, timezone
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
@@ -68,6 +72,18 @@ invitations_router = APIRouter(prefix="/invitations", tags=["invitations"])
 
 INVITE_EXPIRY_DAYS = 7
 
+# HELPER FUNCTIONS
+def _render_welcome_template(context: dict) -> str:
+    template_path = Path(__file__).parent / "welcome-template.md"
+
+    template_content = template_path.read_text(
+        encoding="utf-8"
+    )
+
+    return Template(template_content).render(**context)
+
+
+# END
 
 def _set_site_setting(session: Session, blog_id: int, key: str, payload: dict) -> None:
     setting = session.exec(
@@ -76,7 +92,7 @@ def _set_site_setting(session: Session, blog_id: int, key: str, payload: dict) -
     value = json.dumps(payload)
     if setting:
         setting.setting_value = value
-        setting.updated_at = datetime.utcnow()
+        setting.updated_at = datetime.now(timezone.utc)
         session.add(setting)
         return
 
@@ -85,29 +101,31 @@ def _set_site_setting(session: Session, blog_id: int, key: str, payload: dict) -
             blog_id=blog_id,
             setting_key=key,
             setting_value=value,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
     )
 
 
-def _step_completion(blog: Blog, subscription: BlogSubscription | None, member_count: int) -> dict[str, bool]:
+def _step_completion(session: Session, blog: Blog, subscription: BlogSubscription | None, member_count: int) -> dict[str, bool]:
+    publication_setting = session.exec(
+        select(SiteSettings).where(SiteSettings.blog_id == blog.id, SiteSettings.setting_key == "publication")
+    ).first()
     return {
         "about": bool(blog.owner_role and blog.workspace_type and blog.team_size),
         "profile": bool(
             blog.name.strip()
             and (blog.tagline or "").strip()
-            and (blog.description or "").strip()
             and (blog.category or "").strip()
             and (blog.primary_language or "").strip()
         ),
-        "publication": bool(blog.timezone and blog.posts_per_page > 0 and blog.default_post_visibility),
+        "publication": publication_setting is not None,
         "team": member_count > 1,
-        "plan": subscription is not None and bool(subscription.plan),
+        "plan": blog.onboarding_status == OnboardingStatus.COMPLETED,
     }
 
 
-def _build_onboarding_summary(blog: Blog, subscription: BlogSubscription | None, member_count: int, team_skipped: bool = False) -> OnboardingSummary:
-    checklist = _step_completion(blog, subscription, member_count)
+def _build_onboarding_summary(session: Session, blog: Blog, subscription: BlogSubscription | None, member_count: int, team_skipped: bool = False) -> OnboardingSummary:
+    checklist = _step_completion(session, blog, subscription, member_count)
     checklist["team"] = checklist["team"] or team_skipped
     if blog.onboarding_status == OnboardingStatus.COMPLETED:
         checklist = {key: True for key in checklist}
@@ -155,13 +173,13 @@ def _sync_onboarding_state(session: Session, blog: Blog) -> tuple[OnboardingSumm
     subscription = _load_subscription(session, blog.id)
     member_count = session.exec(select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog.id)).first() or 0
     team_skipped = _load_team_step_skipped(session, blog.id)
-    summary = _build_onboarding_summary(blog, subscription, member_count, team_skipped=team_skipped)
+    summary = _build_onboarding_summary(session, blog, subscription, member_count, team_skipped=team_skipped)
 
     blog.onboarding_status = summary.status
 
     if summary.checklist.plan and summary.status == OnboardingStatus.COMPLETED:
         blog.onboarding_step = OnboardingStep.PLAN
-        blog.onboarding_completed_at = blog.onboarding_completed_at or datetime.utcnow()
+        blog.onboarding_completed_at = blog.onboarding_completed_at or datetime.now(timezone.utc)
     elif not summary.checklist.about:
         blog.onboarding_step = OnboardingStep.ABOUT
         blog.onboarding_completed_at = None
@@ -234,6 +252,84 @@ def _initialize_blog_settings(session: Session, blog_id: int) -> None:
     
     session.commit()
 
+def _create_welcome_post_on_onboarding_complete(
+    session: Session, blog: Blog, current_user: User
+) -> Post | None:
+    """
+    Create a personalised welcome post when onboarding completes.
+    Idempotent — if an is_sample post already exists, skip creation.
+    """
+    # Idempotency check
+    existing = session.exec(
+        select(Post).where(
+            Post.blog_id == blog.id,
+            Post.is_sample == True,
+        )
+    ).first()
+    if existing:
+        return existing
+
+    # Generate & upload banner
+    banner_url = upload_welcome_banner(blog.name)
+
+    # Template context
+    workspace_type_map = {
+        "personal_blog": "Personal Blog",
+        "client_blogs": "Client Blogs",
+        "company_blog": "Company Blog",
+        "developer_docs": "Developer Docs",
+    }
+
+    context = {
+        "blog_name": blog.name,
+        "tagline": blog.tagline or "",
+        "banner_url": banner_url,
+        "description": blog.description or "",
+        "category": blog.category or "",
+        "primary_language": blog.primary_language or "en",
+        "workspace_type": workspace_type_map.get(
+            getattr(blog.workspace_type, 'value', blog.workspace_type) or "", ""
+        ),
+        "team_size": getattr(blog.team_size, 'value', blog.team_size) or "",
+    }
+
+    content = _render_welcome_template(context)
+
+    welcome_slug = Post.generate_unique_slug(
+        f"welcome-to-{blog.name}", blog.id, session
+    )
+
+    welcome_post = Post(
+        title=f"Welcome to {blog.name}",
+        slug=welcome_slug,
+        content=content,
+        author_id=current_user.id,
+        blog_id=blog.id,
+        status=PostStatus.DRAFT,
+        published=False,
+        published_at=None,
+        is_project=False,
+        is_sample=True,
+        views=0,
+        thumbnail_url=banner_url,
+    )
+    session.add(welcome_post)
+    session.flush()
+
+    add_audit_log(
+        session,
+        action="post.welcome_created",
+        resource_type="post",
+        resource_id=welcome_post.id,
+        blog_id=blog.id,
+        actor=current_user,
+        details={
+            "title": welcome_post.title,
+            "source": "onboarding_complete",
+        },
+    )
+
+    return welcome_post
 
 @router.post("/", response_model=BlogRead)
 def create_blog(
@@ -241,8 +337,6 @@ def create_blog(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    # Check if user already owns a blog (maybe limit later)
-    # create the blog
     new_blog = Blog(
         name=blog_data.name,
         slug=blog_data.slug,
@@ -255,39 +349,31 @@ def create_blog(
     session.add(new_blog)
     session.commit()
     session.refresh(new_blog)
-    
-    # Initialize all default settings for the new blog
+
     _initialize_blog_settings(session, new_blog.id)
-    
-    # create owner membership
+
+    # Owner membership
     membership = BlogMember(
         user_id=current_user.id,
         blog_id=new_blog.id,
         role=BlogRole.OWNER,
-        invited_at=datetime.utcnow(),
+        invited_at=datetime.now(timezone.utc),
     )
     session.add(membership)
     session.add(BlogSubscription(blog_id=new_blog.id))
-    
-    # create default welcome post
+
+    # Basic welcome post (will be updated at end of onboarding)
     welcome_post = Post(
         title="Welcome to your new Inko blog!",
-        slug="welcome-to-inko",
-        content="""Welcome to your new workspace! We're thrilled to have you here.
-
-This is a placeholder post to show you how beautiful your writing will look on Inko. You can edit this post to learn how the editor works, or simply delete it and start fresh.
-
-### Formatting is a breeze
-You can easily add **bold text**, *italics*, and:
-- Bulleted lists
-- Numbered lists
-
-> "Inko makes sharing your ideas effortless."
-
-When you're ready, head over to your admin dashboard to write your first real story. Happy writing!""",
+        slug=Post.generate_unique_slug("welcome-to-inko", new_blog.id, session),
+        content="""Welcome! This is a placeholder post. It will be replaced with a personalized welcome message once you complete onboarding.""",
         author_id=current_user.id,
         blog_id=new_blog.id,
+        status=PostStatus.PUBLISHED,
         published=True,
+        published_at=datetime.now(timezone.utc),
+        is_sample=True,
+        is_project=False,
     )
     session.add(welcome_post)
 
@@ -301,7 +387,6 @@ When you're ready, head over to your admin dashboard to write your first real st
         details={"name": new_blog.name},
     )
     session.commit()
-    
     return new_blog
 
 
@@ -524,12 +609,14 @@ def update_onboarding_plan(
     blog_id: int,
     payload: OnboardingPlanUpdate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
 
+    # Update subscription
     subscription = _load_subscription(session, blog_id)
     if subscription:
         subscription.plan = payload.plan
@@ -538,11 +625,17 @@ def update_onboarding_plan(
         subscription = BlogSubscription(blog_id=blog_id, plan=payload.plan)
         session.add(subscription)
 
+    # Complete onboarding
     blog.onboarding_status = OnboardingStatus.COMPLETED
     blog.onboarding_step = OnboardingStep.PLAN
-    blog.onboarding_completed_at = datetime.utcnow()
+    blog.onboarding_completed_at = datetime.now(timezone.utc)
     session.add(blog)
+
     summary, subscription = _sync_onboarding_state(session, blog)
+
+    # Create personalized welcome post
+    _create_welcome_post_on_onboarding_complete(session, blog, current_user)
+
     session.commit()
     session.refresh(blog)
     return OnboardingState(
@@ -626,7 +719,7 @@ def invite_blog_member(
         user_id=user_to_invite.id,
         blog_id=blog_id,
         role=payload.role,
-        invited_at=datetime.utcnow(),
+        invited_at=datetime.now(timezone.utc),
     )
     session.add(membership)
     add_audit_log(
@@ -723,23 +816,58 @@ def get_blog_dashboard_summary(
     if not role:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this blog")
 
-    posts = session.exec(select(func.count(Post.id)).where(Post.blog_id == blog_id)).first() or 0
+    # Total posts (all statuses)
+    posts = session.exec(
+        select(func.count(Post.id)).where(Post.blog_id == blog_id)
+    ).first() or 0
+
+    # Status-aware counts
     published_posts = session.exec(
-        select(func.count(Post.id)).where(Post.blog_id == blog_id, Post.published == True)
+        select(func.count(Post.id)).where(
+            Post.blog_id == blog_id, 
+            Post.status == PostStatus.PUBLISHED
+        )
     ).first() or 0
+
     draft_posts = session.exec(
-        select(func.count(Post.id)).where(Post.blog_id == blog_id, Post.published == False)
+        select(func.count(Post.id)).where(
+            Post.blog_id == blog_id, 
+            Post.status == PostStatus.DRAFT
+        )
     ).first() or 0
+
+    scheduled_posts = session.exec(
+        select(func.count(Post.id)).where(
+            Post.blog_id == blog_id, 
+            Post.status == PostStatus.SCHEDULED
+        )
+    ).first() or 0
+
     comments = session.exec(
-        select(func.count(Comment.id)).join(Post, Comment.post_id == Post.id).where(Post.blog_id == blog_id)
+        select(func.count(Comment.id))
+        .join(Post, Comment.post_id == Post.id)
+        .where(Post.blog_id == blog_id)
     ).first() or 0
-    tags = session.exec(select(func.count(Tag.id)).where(Tag.blog_id == blog_id)).first() or 0
-    team_members = session.exec(select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog_id)).first() or 0
-    total_views = session.exec(select(func.sum(Post.views)).where(Post.blog_id == blog_id)).first() or 0
+
+    tags = session.exec(
+        select(func.count(Tag.id)).where(Tag.blog_id == blog_id)
+    ).first() or 0
+
+    team_members = session.exec(
+        select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog_id)
+    ).first() or 0
+
+    total_views = session.exec(
+        select(func.sum(Post.views)).where(Post.blog_id == blog_id)
+    ).first() or 0
 
     recent_posts = session.exec(
-        select(Post).where(Post.blog_id == blog_id).order_by(Post.updated_at.desc()).limit(5)
+        select(Post)
+        .where(Post.blog_id == blog_id)
+        .order_by(Post.updated_at.desc())
+        .limit(5)
     ).all()
+
     recent_activity = [
         DashboardRecentActivity(
             type="post",
@@ -753,16 +881,34 @@ def get_blog_dashboard_summary(
     return BlogDashboardSummary(
         blog_id=blog.id,
         blog_name=blog.name,
-        role=role,
+        role=role.value,
         posts=posts,
         published_posts=published_posts,
         draft_posts=draft_posts,
+        scheduled_posts=scheduled_posts,
         comments=comments,
         tags=tags,
         team_members=team_members,
         total_views=total_views,
         recent_activity=recent_activity,
     )
+
+
+@router.get("/{blog_id}/subscription", response_model=SubscriptionRead)
+def get_blog_subscription_endpoint(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_current_blog),
+):
+    subscription = session.exec(
+        select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)
+    ).first()
+    if not subscription:
+        subscription = BlogSubscription(blog_id=blog_id, plan=SubscriptionPlan.FREE)
+        session.add(subscription)
+        session.commit()
+        session.refresh(subscription)
+    return subscription
 
 
 # ─── Blog Invitation Routes ────────────────────────────────────────────────────
@@ -781,7 +927,7 @@ def create_invitation(
         role=payload.role,
         token=token,
         created_by=current_user.id,
-        expires_at=datetime.utcnow() + timedelta(days=INVITE_EXPIRY_DAYS),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=INVITE_EXPIRY_DAYS),
     )
     session.add(invitation)
     session.commit()
@@ -825,7 +971,7 @@ def get_invitation_info(token: str, session: Session = Depends(get_session)):
     invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
-    if invite.expires_at < datetime.utcnow() and invite.accepted_at is None:
+    if invite.expires_at < datetime.now(timezone.utc) and invite.accepted_at is None:
         raise HTTPException(status_code=410, detail="This invitation link has expired")
     blog = session.get(Blog, invite.blog_id)
     if not blog:
@@ -848,7 +994,7 @@ def accept_invitation(
     invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
-    if invite.expires_at < datetime.utcnow():
+    if invite.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="This invitation link has expired")
     if invite.accepted_at is not None:
         raise HTTPException(status_code=400, detail="This invitation has already been accepted")
@@ -864,11 +1010,11 @@ def accept_invitation(
         user_id=current_user.id,
         blog_id=invite.blog_id,
         role=invite.role,
-        invited_at=datetime.utcnow(),
+        invited_at=datetime.now(timezone.utc),
     )
     session.add(membership)
 
-    invite.accepted_at = datetime.utcnow()
+    invite.accepted_at = datetime.now(timezone.utc)
     invite.accepted_by = current_user.id
     session.add(invite)
     session.commit()

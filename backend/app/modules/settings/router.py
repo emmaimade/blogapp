@@ -118,8 +118,31 @@ def update_about_settings(
 
 
 @router.get("/footer", response_model=FooterSettingsResponse)
-def get_footer_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
-    return get_setting(session, blog_id, "footer", FooterSettings)
+def get_footer_settings(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_public_blog),
+):
+    statement = select(SiteSettings).where(
+        SiteSettings.setting_key == "footer",
+        SiteSettings.blog_id == blog_id,
+    )
+    setting = session.exec(statement).first()
+
+    if setting:
+        try:
+            data = FooterSettings.model_validate(json.loads(setting.setting_value))
+            return data.model_dump()
+        except Exception:
+            pass
+
+    # No saved footer yet — hydrate sensible defaults from the blog model
+    # so the user sees their own tagline and blog name instead of generic placeholders
+    defaults = FooterSettings(
+        footer_text=blog.tagline or f"Thoughts and ideas from {blog.name}.",
+        copyright_text=f"© {{year}} {blog.name}. Powered by INKO.",
+    )
+    return defaults.model_dump()
 
 
 @router.post("/footer", response_model=FooterSettingsResponse)

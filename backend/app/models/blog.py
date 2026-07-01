@@ -1,8 +1,11 @@
 from typing import List, Optional
 from sqlmodel import Session, select, Field, SQLModel, Relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from slugify import slugify
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 class BlogRole(str, Enum):
     OWNER = "owner"
@@ -54,10 +57,10 @@ class BlogMember(SQLModel, table=True):
     __tablename__ = "blog_members"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    blog_id: int = Field(foreign_key="blog.id")
+    user_id: int = Field(foreign_key="user.id", ondelete="CASCADE")
+    blog_id: int = Field(foreign_key="blog.id", ondelete="CASCADE")
     role: BlogRole = Field(default=BlogRole.AUTHOR)
-    invited_at: datetime = Field(default_factory=datetime.utcnow)
+    invited_at: datetime = Field(default_factory=utcnow)
     
     user: "User" = Relationship(back_populates="blog_memberships")
     blog: "Blog" = Relationship(back_populates="members")
@@ -70,7 +73,10 @@ class Blog(SQLModel, table=True):
     custom_domain: Optional[str] = Field(default=None)
     description: Optional[str] = None
     is_active: bool = Field(default=True)
-    owner_id: int = Field(foreign_key="user.id")
+    owner_id: int = Field(
+        foreign_key="user.id", 
+        ondelete="CASCADE"      
+    )
     onboarding_status: OnboardingStatus = Field(default=OnboardingStatus.NOT_STARTED)
     onboarding_step: OnboardingStep = Field(default=OnboardingStep.ABOUT)
     onboarding_completed_at: Optional[datetime] = None
@@ -87,10 +93,10 @@ class Blog(SQLModel, table=True):
     posts_per_page: int = Field(default=10)
     timezone: str = Field(default="UTC")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column_kwargs={"onupdate": datetime.utcnow}
+        default_factory=utcnow,
+        sa_column_kwargs={"onupdate": utcnow}
     )
     
     owner: "User" = Relationship(back_populates="owned_blogs")
@@ -128,7 +134,7 @@ class SubscriptionPlan(str, Enum):
 class BlogSubscription(SQLModel, table=True):
     __tablename__ = "blog_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    blog_id: int = Field(foreign_key="blog.id", unique=True)
+    blog_id: int = Field(foreign_key="blog.id", unique=True, ondelete="CASCADE")
     plan: SubscriptionPlan = Field(default=SubscriptionPlan.FREE)
     status: str = Field(default="active")
     stripe_customer_id: Optional[str] = None
@@ -136,20 +142,20 @@ class BlogSubscription(SQLModel, table=True):
     trial_ends_at: Optional[datetime] = None
     current_period_ends_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column_kwargs={"onupdate": datetime.utcnow}
+        default_factory=utcnow,
+        sa_column_kwargs={"onupdate": utcnow}
     )
 
 class BlogInvitation(SQLModel, table=True):
     __tablename__ = "blog_invitations"
     id: Optional[int] = Field(default=None, primary_key=True)
-    blog_id: int = Field(foreign_key="blog.id", index=True)
+    blog_id: int = Field(foreign_key="blog.id", index=True, ondelete="CASCADE")
     role: BlogRole = Field(default=BlogRole.AUTHOR)
     token: str = Field(unique=True, index=True)
-    created_by: int = Field(foreign_key="user.id")
-    accepted_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_by: int = Field(foreign_key="user.id", ondelete="CASCADE")
+    accepted_by: Optional[int] = Field(default=None, foreign_key="user.id", ondelete="CASCADE")
     accepted_at: Optional[datetime] = None
     expires_at: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
