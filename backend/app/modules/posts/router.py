@@ -47,6 +47,17 @@ def read_posts(
     return post_service.read_posts(blog_id, session, current_user, filter)
 
 
+@router.get("/scheduled", response_model=List[PostRead])
+def get_scheduled_posts(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all scheduled (not yet live) posts for this blog."""
+    return post_service.get_scheduled_posts(blog_id, session, current_user)
+
+
 @router.get("/search", response_model=List[PostRead])
 def search_posts(
     blog_id: int,
@@ -118,10 +129,10 @@ def flag_post_for_moderation(
 
 @router.get("/{post_id}", response_model=PostRead)
 def read_post(
-    blog_id: int, 
-    post_id: int, 
+    blog_id: int,
+    post_id: int,
     session: Session = Depends(get_session),
-    blog: Blog = Depends(get_public_blog)
+    blog: Blog = Depends(get_public_blog),
 ):
     return post_service.read_post(blog_id, post_id, session)
 

@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import List, Optional
-
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.datetime_mixin import UTCDatetimeMixin
 from .users import UserRead
 
 
-class CommentRead(BaseModel):
+class CommentRead(UTCDatetimeMixin, BaseModel):
     id: int
     content: str
     user_id: int
