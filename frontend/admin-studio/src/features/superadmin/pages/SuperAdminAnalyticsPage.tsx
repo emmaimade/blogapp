@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats, getBlogAnalytics } from '../api/superadminApi';
-import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp } from 'lucide-react';
-import { SuperAdminDashboardSkeleton } from '../components/SuperAdminDashboardSkeleton';
+import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp, Loader2 } from 'lucide-react';
 
 export const SuperAdminAnalyticsPage = () => {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -14,7 +13,11 @@ export const SuperAdminAnalyticsPage = () => {
     queryFn: getBlogAnalytics,
   });
 
-  if (statsLoading || blogsLoading) return <SuperAdminDashboardSkeleton />;
+  if (statsLoading || blogsLoading)  return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+      </div>
+    );;
 
   const topByViews = [...(blogs ?? [])].sort((a, b) => b.total_views - a.total_views).slice(0, 5);
   const topByPosts = [...(blogs ?? [])].sort((a, b) => b.total_posts - a.total_posts).slice(0, 5);

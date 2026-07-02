@@ -1,13 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail, ScrollText } from 'lucide-react';
+import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail, ScrollText, type LucideIcon } from 'lucide-react';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import type { BlogMembership } from '../../../app/providers/BlogProvider';
+
+type SettingsRole = Extract<BlogMembership['role'], 'owner' | 'editor'>;
 
 interface SettingsSection {
   to: string;
   label: string;
   description: string;
-  icon: any;
-  roles?: readonly ('owner' | 'editor')[];
+  icon: LucideIcon;
+  roles?: readonly SettingsRole[];
 }
 
 const settingsSections: readonly SettingsSection[] = [
@@ -66,7 +69,7 @@ export const SettingsLayout = () => {
   const { activeRole } = useBlog();
 
   const visibleSections = settingsSections.filter(
-    (section) => !section.roles || (activeRole && section.roles.includes(activeRole as any))
+    (section) => !section.roles || (activeRole && section.roles.includes(activeRole as SettingsRole))
   );
 
   return (

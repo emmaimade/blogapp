@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Edit3, Eye, FileText, MessageSquare,
   Plus, Settings, Tag, Users, ArrowUpRight, Feather,
-  Globe, ExternalLink, Copy, CheckCircle2, Lock, Zap, Clock,
+  Globe, ExternalLink, Copy, CheckCircle2, Lock, Zap, Clock, AlertTriangle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatRelative } from '../../../shared/utils/dates';
@@ -348,6 +348,33 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* ─── Soft-Lock System Suspension Banner ─── */}
+      {activeBlog && activeBlog.is_active === false && (
+        <div className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                Workspace Read-Only Soft-Lock Active
+              </h4>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                This publication has been systematically suspended by infrastructure administration. Reader public routing addresses are locked, and modifications are restricted until reinstated.
+              </p>
+            </div>
+          </div>
+          {isOwner && (
+            <a
+              href="mailto:support@inko.blog"
+              className="inline-flex items-center justify-center rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-amber-700 whitespace-nowrap self-start sm:self-auto"
+            >
+              Contact Administration
+            </a>
+          )}
+        </div>
+      )}
+
       {/* ─── Stat cards ─── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard
@@ -588,24 +615,6 @@ export const Dashboard = () => {
                 </span>
               </div>
             ))}
-          </div>
-
-          {/* Workspace role card */}
-          <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 p-5 text-white shadow-lg shadow-violet-500/20">
-            <div className="mb-3 text-xs font-bold uppercase tracking-wider opacity-70">
-              Your workspace role
-            </div>
-            <div className="text-2xl font-black capitalize">{data.role}</div>
-            <div className="mt-1 text-sm opacity-80">{data.blog_name}</div>
-            {canManageSettings && (
-              <Link
-                to="/admin/settings/general"
-                className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white"
-              >
-                <Settings size={12} /> Workspace settings{" "}
-                <ArrowUpRight size={12} />
-              </Link>
-            )}
           </div>
         </div>
       </div>

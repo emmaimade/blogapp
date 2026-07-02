@@ -1,28 +1,9 @@
-/**
- * SchedulePublishPanel
- *
- * Drop-in panel for the post editor sidebar.
- * Handles three states: draft, scheduled, published.
- *
- * Usage in PostEditorPage:
- *   <SchedulePublishPanel
- *     status={post.status}
- *     publishedAt={post.published_at}
- *     isSaving={isSaving}
- *     onSaveDraft={handleSaveDraft}
- *     onPublishNow={handlePublishNow}
- *     onSchedule={handleSchedule}
- *     onUnpublish={handleUnpublish}
- *   />
- */
-
 import { useState, useEffect } from 'react';
 import {
   Calendar, Clock, CheckCircle2, FileText,
-  Send, X, ChevronDown, AlertCircle, Loader2,
-  Eye, RotateCcw,
+  Send, X, ChevronDown, AlertCircle, Loader2, RotateCcw,
 } from 'lucide-react';
-import { format, formatDistanceToNow, isFuture, isPast, parseISO } from 'date-fns';
+import { format, formatDistanceToNow, isPast, parseISO } from 'date-fns';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 

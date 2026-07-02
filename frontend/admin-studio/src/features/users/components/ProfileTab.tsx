@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/context/AuthContext';
 
 interface ProfileTabProps {
-  targetUser?: any; // Receives pre-loaded user data from the parent component
+  targetUser?: any; 
 }
 
 export default function ProfileTab({ targetUser }: ProfileTabProps) {

@@ -4,8 +4,8 @@ import type { ReactNode } from 'react';
 import {
   ShieldCheck, Search, FileText, Users,
   Settings, Globe, Tag,
-  Trash2, CheckCircle2, XCircle, Edit3, UserPlus,
-  AlertTriangle, RefreshCw,
+  Trash2, Edit3, UserPlus,
+  RefreshCw,
 } from 'lucide-react';
 import { formatRelative, formatAuditTs } from '../../../shared/utils/dates';
 import api from '../../../shared/api/client';
@@ -38,12 +38,12 @@ const ACTION_CONFIG: Record<string, ActionConfig> = {
   'post.created':            { icon: <FileText size={13} />,    color: 'text-blue-600',       bg: 'bg-blue-50 dark:bg-blue-900/20',       label: 'Created Post' },
   'post.updated':            { icon: <FileText size={13} />,    color: 'text-amber-600',      bg: 'bg-amber-50 dark:bg-amber-900/20',     label: 'Updated Post' },
   'post.deleted':            { icon: <Trash2 size={13} />,      color: 'text-red-600',        bg: 'bg-red-50 dark:bg-red-900/20',         label: 'Deleted Post' },
-  'member.invited':          { icon: <UserPlus size={13} />,    color: 'text-purple-600',     bg: 'bg-purple-50 dark:bg-purple-900/20',   label: 'Invited Member' },
-  'member.joined':           { icon: <Users size={13} />,       color: 'text-green-600',      bg: 'bg-green-50 dark:bg-green-900/20',     label: 'Member Joined' },
-  'member.role_updated':     { icon: <Settings size={13} />,    color: 'text-zinc-600',       bg: 'bg-zinc-50 dark:bg-zinc-900/20',       label: 'Updated Member Role' },
-  'member.removed':          { icon: <Trash2 size={13} />,      color: 'text-red-600',        bg: 'bg-red-50 dark:bg-red-900/20',         label: 'Removed Member' },
-  'settings.general_update': { icon: <Settings size={13} />,    color: 'text-zinc-600',       bg: 'bg-zinc-50 dark:bg-zinc-900/20',       label: 'Updated General Settings' },
-  'settings.branding_update':{ icon: <Globe size={13} />,       color: 'text-indigo-600',     bg: 'bg-indigo-50 dark:bg-indigo-900/20',   label: 'Updated Branding Settings' },
+  'post.welcome_created':    { icon: <FileText size={13} />,    color: 'text-blue-600',       bg: 'bg-blue-50 dark:bg-blue-900/20',       label: 'Created Welcome Post' },
+  'blog.member_add':         { icon: <UserPlus size={13} />,    color: 'text-purple-600',     bg: 'bg-purple-50 dark:bg-purple-900/20',   label: 'Added Member' },
+  'blog.member_permissions_update': { icon: <Users size={13} />, color: 'text-zinc-600',      bg: 'bg-zinc-50 dark:bg-zinc-900/20',       label: 'Updated Member Role' },
+  'blog.member_remove':      { icon: <Trash2 size={13} />,      color: 'text-red-600',        bg: 'bg-red-50 dark:bg-red-900/20',         label: 'Removed Member' },
+  'settings.updated':        { icon: <Settings size={13} />,    color: 'text-zinc-600',       bg: 'bg-zinc-50 dark:bg-zinc-900/20',       label: 'Updated Settings' },
+  'branding.updated':        { icon: <Globe size={13} />,       color: 'text-indigo-600',     bg: 'bg-indigo-50 dark:bg-indigo-900/20',   label: 'Updated Branding' },
   'tag.created':             { icon: <Tag size={13} />,         color: 'text-teal-600',       bg: 'bg-teal-50 dark:bg-teal-900/20',       label: 'Created Tag' },
   'tag.deleted':             { icon: <Trash2 size={13} />,      color: 'text-red-600',        bg: 'bg-red-50 dark:bg-red-900/20',         label: 'Deleted Tag' },
 };
@@ -134,7 +134,7 @@ export const ActivityLogPage = () => {
           >
             <option value="all">All Resources</option>
             <option value="post">Posts</option>
-            <option value="member">Members</option>
+            <option value="blog_member">Members</option>
             <option value="settings">Settings</option>
             <option value="tag">Tags</option>
           </select>
@@ -152,9 +152,11 @@ export const ActivityLogPage = () => {
             <option value="post.created">Created</option>
             <option value="post.updated">Updated</option>
             <option value="post.deleted">Deleted</option>
-            <option value="member.invited">Invited</option>
-            <option value="member.joined">Joined</option>
-            <option value="member.removed">Removed</option>
+            <option value="blog.member_add">Member Added</option>
+            <option value="blog.member_permissions_update">Role Updated</option>
+            <option value="blog.member_remove">Member Removed</option>
+            <option value="settings.updated">Settings Updated</option>
+            <option value="branding.updated">Branding Updated</option>
           </select>
         </div>
 
@@ -262,4 +264,4 @@ export const ActivityLogPage = () => {
       </div>
     </div>
   );
-}
+};

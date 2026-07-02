@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ShieldCheck, RefreshCw, LogIn, FileText, Trash2, Edit3, Settings } from 'lucide-react';
-import { useAuth } from '../../auth/context/AuthContext';
+import { Edit3, FileText, LogIn, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import api from '../../../shared/api/client';
 import { formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
+import { useAuth } from '../../auth/context/AuthContext';
 
 interface AuditLogEntry {
   id: number;
@@ -23,7 +23,7 @@ interface ContextualActivityLogTabProps {
 
 const PAGE_SIZE = 15;
 
-export default function ContextualActivityLogTab({ targetUserId, targetUserEmail, targetUser }: ContextualActivityLogTabProps) {
+export default function ContextualActivityLogTab({ targetUserId, targetUserEmail }: ContextualActivityLogTabProps) {
   const { user: currentUser } = useAuth();
   const { activeBlog, activeRole } = useBlog();
   const [page, setPage] = useState(0);

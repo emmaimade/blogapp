@@ -36,7 +36,7 @@ export const BrandingSettings: React.FC = () => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: settings = defaultBrandingSettings, isLoading } = useQuery<BrandingSettingsData>({
+  const { data: settings = defaultBrandingSettings } = useQuery<BrandingSettingsData>({
     queryKey: ['brandingSettings', activeBlog?.id],
     queryFn: async () => {
       let data: any = {};

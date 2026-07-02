@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import {
   ArrowLeft, Edit, Calendar, Tag as TagIcon,
-  Eye, Clock, CheckCircle2, FileText, User,
+  Eye, Clock, CheckCircle2, FileText,
 } from 'lucide-react';
 import 'highlight.js/styles/atom-one-dark.css';
 import api from '../../../shared/api/client';

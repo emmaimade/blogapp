@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, CheckCircle2, Clock, XCircle, Search, ArrowRight } from 'lucide-react';
-import { useState } from 'react';
 import axios from 'axios';
+import { ArrowRight, CheckCircle2, Clock, CreditCard, Search, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
+import { formatLocalDate } from '../../../shared/utils/dates';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
