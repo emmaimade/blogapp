@@ -6,6 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/context/AuthContext';
 import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
+import { Modal } from '../../../shared/components/Modal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -21,6 +22,16 @@ export const SuperAdminUsersPage = () => {
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<{ [key: string]: boolean }>({
     "Global System Administrators": true,
   });
+
+  // Dedicated config state to drive the shared confirmation modal cleanly
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    isDanger: boolean;
+    action: () => void;
+  } | null>(null);
   
   const activeMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -86,14 +97,35 @@ export const SuperAdminUsersPage = () => {
 
   const handleToggleSuspend = (e: React.MouseEvent, targetUser: any) => {
     e.stopPropagation();
-    toggleSuspendMutation.mutate({ id: targetUser.id, is_active: !targetUser.is_active });
+    const willSuspend = targetUser.is_active;
+
+    if (willSuspend) {
+      // Industry Standard: Intercept destructive suspension workflows with a confirmation warning
+      setModalConfig({
+        isOpen: true,
+        title: "Suspend User Account",
+        message: `Are you sure you want to suspend ${targetUser.first_name} ${targetUser.last_name}? They will lose entire infrastructure access immediately.`,
+        confirmText: "Suspend Account",
+        isDanger: true,
+        action: () => toggleSuspendMutation.mutate({ id: targetUser.id, is_active: false })
+      });
+    } else {
+      // Industry Standard: Low-risk reactivation fires off cleanly without repetitive confirmations
+      toggleSuspendMutation.mutate({ id: targetUser.id, is_active: true });
+    }
   };
 
   const handleDelete = (e: React.MouseEvent, targetUser: any) => {
     e.stopPropagation();
-    if (window.confirm(`Are you absolutely sure you want to permanently delete ${targetUser.username}? This action cannot be undone.`)) {
-      deleteMutation.mutate(targetUser.id);
-    }
+    // Replaced legacy window.confirm with your custom modal[cite: 8, 10]
+    setModalConfig({
+      isOpen: true,
+      title: "Permanently Delete Account",
+      message: `Are you absolutely sure you want to permanently delete ${targetUser.first_name} ${targetUser.last_name}? This process removes them from all multi-tenancy buckets and cannot be undone.`,
+      confirmText: "Delete Account",
+      isDanger: true,
+      action: () => deleteMutation.mutate(targetUser.id)
+    });
   };
 
   // Filter users by search term
@@ -199,16 +231,13 @@ export const SuperAdminUsersPage = () => {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* INDUSTRY STANDARD MOBILE CARD VIEW CONTAINER (Hidden on Desktop) */}
-      {/* ------------------------------------------------------------- */}
+      {/* MOBILE CARD VIEW CONTAINER */}
       <div className="block md:hidden space-y-4">
         {sortedWorkspaceEntries.map(([workspaceName, tenantUsers]) => {
           const isExpanded = !!expandedWorkspaces[workspaceName];
 
           return (
             <div key={`mobile-group-${workspaceName}`} className="space-y-2">
-              {/* Workspace Mobile Accordion Title Line */}
               <div
                 onClick={() => toggleWorkspaceCollapse(workspaceName)}
                 className="flex items-center justify-between p-3 bg-zinc-50/80 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl cursor-pointer select-none text-xs font-medium text-zinc-700 dark:text-zinc-300"
@@ -224,7 +253,6 @@ export const SuperAdminUsersPage = () => {
                 />
               </div>
 
-              {/* Stacked Cards Layout */}
               {isExpanded && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {tenantUsers.map((accountRow: any) => {
@@ -243,7 +271,6 @@ export const SuperAdminUsersPage = () => {
                           isDeleted ? "border-red-200/60 bg-red-50/5 dark:border-red-900/30" : "border-zinc-200/70 dark:border-zinc-800"
                         }`}
                       >
-                        {/* Profile Header Block inside Mobile Card */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-semibold text-xs text-zinc-600 dark:text-zinc-300 uppercase flex-shrink-0">
@@ -265,7 +292,6 @@ export const SuperAdminUsersPage = () => {
                             </div>
                           </div>
 
-                          {/* Dropdown Action Portal for Mobile Card */}
                           <div className="relative" ref={openMenuKey === targetMobileKey ? activeMenuRef : null}>
                             <button
                               onClick={(e) => {
@@ -279,10 +305,7 @@ export const SuperAdminUsersPage = () => {
                             </button>
 
                             {openMenuKey === targetMobileKey && (
-                              <div 
-                                className="absolute right-0 mt-1 w-44 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-xs text-left animate-in fade-in slide-in-from-top-1 duration-100"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                              <div className="absolute right-0 mt-1 w-44 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-xs text-left animate-in fade-in slide-in-from-top-1 duration-100">
                                 <Link
                                   to={isSelf ? "/admin/profile" : `/admin/users/${accountRow.id}`}
                                   onClick={() => setOpenMenuKey(null)}
@@ -292,10 +315,7 @@ export const SuperAdminUsersPage = () => {
                                   {isSelf ? "View My Profile" : "View Detailed Info"}
                                 </Link>
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleSuspend(e, accountRow);
-                                  }}
+                                  onClick={(e) => handleToggleSuspend(e, accountRow)}
                                   disabled={isSelf || isDeleted}
                                   className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 disabled:opacity-50 text-left"
                                 >
@@ -304,10 +324,7 @@ export const SuperAdminUsersPage = () => {
                                 </button>
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(e, accountRow);
-                                  }}
+                                  onClick={(e) => handleDelete(e, accountRow)}
                                   disabled={isSelf}
                                   className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 font-medium text-left"
                                 >
@@ -320,7 +337,6 @@ export const SuperAdminUsersPage = () => {
 
                         <div className="h-px bg-zinc-100 dark:bg-zinc-800/60" />
 
-                        {/* Split Metadata Responsive Blocks Grid */}
                         <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-[11px] leading-tight">
                           <div>
                             <span className="text-zinc-400 block mb-0.5 uppercase tracking-wide text-[9px]">Workspace Role</span>
@@ -330,7 +346,7 @@ export const SuperAdminUsersPage = () => {
                                   ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/50"
                                   : accountRow.contextualRole === "editor"
                                     ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
-                                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"
+                                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 border-zinc-800"
                               }`}
                             >
                               {accountRow.contextualRole}
@@ -370,9 +386,7 @@ export const SuperAdminUsersPage = () => {
         })}
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* STANDARD DESKTOP DATA GRID VIEW (Hidden on Mobile view)       */}
-      {/* ------------------------------------------------------------- */}
+      {/* DESKTOP DATA GRID VIEW */}
       {sortedWorkspaceEntries.length > 0 && (
         <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
@@ -393,7 +407,6 @@ export const SuperAdminUsersPage = () => {
 
                   return (
                     <Fragment key={`desktop-${workspaceName}`}>
-                      {/* Visual Tenant Group Splitter Header Row */}
                       <tr 
                         onClick={() => toggleWorkspaceCollapse(workspaceName)}
                         className="bg-zinc-50/40 dark:bg-zinc-800/20 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer select-none transition-colors border-y border-zinc-100 dark:border-zinc-800/60"
@@ -407,15 +420,12 @@ export const SuperAdminUsersPage = () => {
                             </div>
                             <ChevronDown 
                               size={14} 
-                              className={`text-zinc-400 dark:text-zinc-500 transition-transform duration-200 ${
-                                !isExpanded ? '-rotate-90' : ''
-                              }`} 
+                              className={`text-zinc-400 dark:text-zinc-500 transition-transform duration-200 ${!isExpanded ? '-rotate-90' : ''}`} 
                             />
                           </div>
                         </td>
                       </tr>
 
-                      {/* Render related profile rows only if expanded */}
                       {isExpanded && tenantUsers.map((accountRow: any) => {
                         const isSelf = currentUser?.id === accountRow.id;
                         const isDeleted = !!accountRow.deleted_at;
@@ -427,11 +437,8 @@ export const SuperAdminUsersPage = () => {
                         return (
                           <tr
                             key={`row-${currentUniqueRowKey}`}
-                            className={`group border-b border-zinc-100 dark:border-zinc-800/40 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors ${
-                              isDeleted ? "bg-red-50/10 dark:bg-red-950/5" : ""
-                            }`}
+                            className={`group border-b border-zinc-100 dark:border-zinc-800/40 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors ${isDeleted ? "bg-red-50/10 dark:bg-red-950/5" : ""}`}
                           >
-                            {/* 1. User Profile */}
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-medium text-zinc-600 dark:text-zinc-300 uppercase shadow-sm flex-shrink-0">
@@ -457,7 +464,6 @@ export const SuperAdminUsersPage = () => {
                               </div>
                             </td>
 
-                            {/* 2. System Context */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border shadow-2xs capitalize ${
@@ -472,7 +478,6 @@ export const SuperAdminUsersPage = () => {
                               </span>
                             </td>
 
-                            {/* 3. Last Login */}
                             <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-600 dark:text-zinc-400 font-medium">
                               {accountRow.last_login ? (
                                 <span
@@ -487,7 +492,6 @@ export const SuperAdminUsersPage = () => {
                               )}
                             </td>
 
-                            {/* 4. Status */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               {isDeleted ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-950/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 border border-red-200/40 dark:border-red-900/30">
@@ -504,17 +508,12 @@ export const SuperAdminUsersPage = () => {
                               )}
                             </td>
 
-                            {/* 5. Date Registered */}
                             <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500">
                               {formatLocalDate(accountRow.created_at)}
                             </td>
 
-                            {/* 6. Actions Dropdown Panel */}
                             <td className="px-6 py-4 text-right whitespace-nowrap">
-                              <div
-                                className="relative inline-block text-left"
-                                ref={openMenuKey === currentUniqueRowKey ? activeMenuRef : null}
-                              >
+                              <div className="relative inline-block text-left" ref={openMenuKey === currentUniqueRowKey ? activeMenuRef : null}>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -568,6 +567,20 @@ export const SuperAdminUsersPage = () => {
           </div>
         </div>
       )}
+
+      {/* Global Confirmation Portal Insertion */}
+      <Modal
+        isOpen={!!modalConfig?.isOpen}
+        title={modalConfig?.title || ""}
+        message={modalConfig?.message || ""}
+        confirmText={modalConfig?.confirmText}
+        isDanger={modalConfig?.isDanger ?? true}
+        onClose={() => setModalConfig(null)}
+        onConfirm={() => {
+          if (modalConfig?.action) modalConfig.action();
+          setModalConfig(null);
+        }}
+      />
     </div>
   );
 };

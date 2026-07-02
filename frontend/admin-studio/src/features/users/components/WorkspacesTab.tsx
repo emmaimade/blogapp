@@ -1,80 +1,172 @@
-import { Shield, LayoutDashboard, Globe } from 'lucide-react';
-import { useAuth } from '../../auth/context/AuthContext';
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { Modal } from '../../../shared/components/Modal';
 
-interface BlogMembership {
+interface WorkspaceMembership {
   id: number;
-  role: string;
-  blog?: {
-    id: number;
-    name: string;
-    slug: string;
+  blog_id: number;
+  role: 'owner' | 'editor' | 'viewer';
+  permissions: {
+    can_publish: boolean;
+    can_delete_comments: boolean;
+    can_manage_settings: boolean;
   };
+  blog: { name: string };
 }
 
-interface WorkspacesTabProps {
-  targetUser?: any;
-}
-
-export default function WorkspacesTab({ targetUser }: WorkspacesTabProps) {
-  const { user: currentUser } = useAuth();
+export default function WorkspacesTab({ targetUser, isSuperadmin, isBlogOwner }: any) {
+  const queryClient = useQueryClient();
   
-  // Choose target user metadata scope cleanly
-  const displayUser = targetUser || currentUser;
-  const memberships = (displayUser?.blog_memberships as BlogMembership[]) || [];
+  // Clean structure to manage selection targets before saving
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    membershipId: number;
+    type: 'role' | 'permission';
+    targetField: string;
+    newValue: any;
+    currentValue: any;
+    workspaceName: string;
+  } | null>(null);
+
+  const updatePermissionMutation = useMutation({
+    mutationFn: async (payload: { membershipId: number; role?: string; permissions?: any }) => {
+      const token = localStorage.getItem('token');
+      return axios.patch(`/api/memberships/${payload.membershipId}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      toast.success('Permissions updated successfully!');
+      setConfirmModal(null);
+    },
+    onError: () => {
+      toast.error('Failed to update workspace permissions.');
+    }
+  });
+
+  const handleRoleSelectChange = (membership: WorkspaceMembership, newRole: string) => {
+    if (membership.role === newRole) return;
+    
+    setConfirmModal({
+      isOpen: true,
+      membershipId: membership.id,
+      type: 'role',
+      targetField: 'role',
+      newValue: newRole,
+      currentValue: membership.role,
+      workspaceName: membership.blog.name
+    });
+  };
+
+  const handleToggleClick = (membership: WorkspaceMembership, permissionKey: string, currentVal: boolean) => {
+    setConfirmModal({
+      isOpen: true,
+      membershipId: membership.id,
+      type: 'permission',
+      targetField: permissionKey,
+      newValue: !currentVal,
+      currentValue: currentVal,
+      workspaceName: membership.blog.name
+    });
+  };
+
+  const executeConfirmedChange = () => {
+    if (!confirmModal) return;
+
+    if (confirmModal.type === 'role') {
+      updatePermissionMutation.mutate({
+        membershipId: confirmModal.membershipId,
+        role: confirmModal.newValue
+      });
+    } else {
+      const activeMembership = targetUser.blog_memberships.find((m: any) => m.id === confirmModal.membershipId);
+      const updatedPermissions = {
+        ...activeMembership.permissions,
+        [confirmModal.targetField]: confirmModal.newValue
+      };
+
+      updatePermissionMutation.mutate({
+        membershipId: confirmModal.membershipId,
+        permissions: updatedPermissions
+      });
+    }
+  };
+
+  const canManage = isSuperadmin || isBlogOwner;
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <p className="text-xs text-zinc-400">
-          Review the operational spaces and security role assignments allocated to this account profile across the tenant platform registry.
-        </p>
-      </div>
+    <div className="space-y-6 relative">
+      {targetUser?.blog_memberships?.map((membership: WorkspaceMembership) => (
+        <div key={membership.id} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/50 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{membership.blog.name}</h4>
+              <p className="text-[11px] text-zinc-400">Workspace Tenant Scope</p>
+            </div>
 
-      {memberships.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/10 p-6 text-center">
-          <LayoutDashboard className="h-6 w-6 text-zinc-400 mb-2" />
-          <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">No active memberships</h4>
-          <p className="text-xs text-zinc-400">This account currently operates as an isolated global entity without single tenancy attachments.</p>
-        </div>
-      ) : (
-        <div className="border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800/50 shadow-xs">
-          {memberships.map((membership) => {
-            const roleColor = membership.role === 'owner' 
-              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border-amber-200/40' 
-              : membership.role === 'editor'
-              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 border-blue-200/40'
-              : 'bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 border-zinc-200';
-
-            return (
-              <div 
-                key={membership.id} 
-                className="flex items-center justify-between p-4 bg-white dark:bg-zinc-950 hover:bg-zinc-50/40 dark:hover:bg-zinc-900/10 transition-colors gap-4"
+            {canManage ? (
+              <select
+                value={membership.role}
+                onChange={(e) => handleRoleSelectChange(membership, e.target.value as any)}
+                className="text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-8 w-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 flex items-center justify-center text-zinc-400 flex-shrink-0">
-                    <Globe size={14} />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                      {membership.blog?.name || 'Unnamed Workspace'}
-                    </h4>
-                    <p className="text-[10px] text-zinc-400 font-mono mt-0.5 truncate">
-                      /{membership.blog?.slug || 'no-slug'}
-                    </p>
-                  </div>
-                </div>
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+                <option value="owner">Owner</option>
+              </select>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 capitalize">
+                {membership.role}
+              </span>
+            )}
+          </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-mono tracking-wide capitalize ${roleColor}`}>
-                    <Shield size={10} />
-                    {membership.role}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Fine-Grained Capabilities</span>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {Object.entries(membership.permissions || {}).map(([key, value]) => {
+                const formattedLabel = key.replace('can_', '').replace('_', ' ');
+                return (
+                  <label 
+                    key={key} 
+                    className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer select-none transition-colors ${!canManage ? 'opacity-60 cursor-not-allowed' : ''} ${value ? 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/20' : 'border-zinc-100 dark:border-zinc-800'}`}
+                  >
+                    <span className="capitalize text-zinc-600 dark:text-zinc-400">{formattedLabel}</span>
+                    <input
+                      type="checkbox"
+                      checked={!!value}
+                      disabled={!canManage}
+                      onChange={() => handleToggleClick(membership, key, !!value)}
+                      className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 h-3.5 w-3.5"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      )}
+      ))}
+
+      {/* Clean shared modal replacement logic[cite: 10, 11] */}
+      <Modal
+        isOpen={!!confirmModal?.isOpen}
+        title="Confirm Permission Restructure"
+        isDanger={false} // Uses clean non-destructive layout styling tokens[cite: 10]
+        confirmText={updatePermissionMutation.isPending ? "Saving..." : "Confirm Change"}
+        onClose={() => setConfirmModal(null)}
+        onConfirm={executeConfirmedChange}
+        message={
+          confirmModal?.type === 'role'
+            ? `Are you sure you want to alter this user's role in ${confirmModal.workspaceName} from "${confirmModal.currentValue}" to "${confirmModal.newValue}"? This will shift their baseline system visibility thresholds.`
+            : `Are you sure you want to change the "${confirmModal?.targetField?.replace('can_', '').replace('_', ' ')}" rule to ${confirmModal?.newValue ? 'ENABLED' : 'DISABLED'} for the ${confirmModal?.workspaceName} partition?`
+        }
+      />
     </div>
   );
 }
