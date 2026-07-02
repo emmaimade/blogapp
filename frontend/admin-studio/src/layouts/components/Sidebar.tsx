@@ -1,11 +1,11 @@
-import { LayoutDashboard, Users, FileText, Tag, MessageSquare, Settings, X, BarChart3, Building2, CreditCard, Check, ChevronDown, ScrollText, PanelLeft, Sun, Moon, Menu, User } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { BarChart3, Building2, Check, ChevronDown, CreditCard, FileText, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { useAuth } from '../../features/auth/context/AuthContext';
+import { Link, useLocation } from 'react-router-dom';
 import { useBlog } from '../../app/providers/BlogProvider';
-import { isSuperAdmin } from '../../features/auth/lib/accessControl';
 import { InkoLogo } from '../../assets/inko';
+import { useAuth } from '../../features/auth/context/AuthContext';
+import { isSuperAdmin } from '../../features/auth/lib/accessControl';
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
@@ -17,7 +17,7 @@ interface SidebarProps {
   toggleDarkMode: () => void;
 }
 
-export const Sidebar = ({ isOpen, setIsOpen, renderUserActions, darkMode, toggleDarkMode }: SidebarProps) => {
+export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: SidebarProps) => {
   const { user } = useAuth();
   const { blogs, activeBlog, activeRole, setActiveBlogId } = useBlog();
   const location = useLocation();
