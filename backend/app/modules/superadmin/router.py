@@ -95,6 +95,10 @@ def get_all_blogs_analytics(
             BlogAnalytics(
                 blog_id=blog.id,
                 blog_name=blog.name,
+                name=blog.name,
+                subdomain=blog.subdomain,
+                custom_domain=blog.custom_domain,
+                is_active=blog.is_active,
                 owner_email=blog.owner.email if blog.owner else "",
                 total_posts=posts_count,
                 total_views=views,
@@ -153,6 +157,10 @@ def update_blog_status(
     return BlogAnalytics(
         blog_id=blog.id,
         blog_name=blog.name,
+        name=blog.name,
+        subdomain=blog.subdomain,
+        custom_domain=blog.custom_domain,
+        is_active=blog.is_active,
         owner_email=blog.owner.email if blog.owner else "",
         total_posts=posts_count,
         total_views=views,

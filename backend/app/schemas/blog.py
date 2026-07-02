@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from app.models.blog import (
     BlogRole,
@@ -74,7 +74,8 @@ class BlogMemberRead(UTCDatetimeMixin, BaseModel):
         from_attributes = True
 
 class BlogMemberUpdate(BaseModel):
-    role: BlogRole
+    role: Optional[BlogRole] = None
+    permissions: Optional[Dict[str, bool]] = None
 
 class BlogInvitationCreate(BaseModel):
     role: BlogRole = BlogRole.AUTHOR
@@ -131,6 +132,10 @@ class PlatformStats(BaseModel):
 class BlogAnalytics(UTCDatetimeMixin, BaseModel):
     blog_id: int
     blog_name: str
+    name: str
+    subdomain: Optional[str] = None
+    custom_domain: Optional[str] = None
+    is_active: bool = True
     owner_email: str
     total_posts: int
     total_views: int

@@ -773,14 +773,27 @@ def remove_blog_member(
 
 
 @router.patch("/{blog_id}/members/{member_id}", response_model=BlogMemberRead)
-def update_blog_member_role(
+def update_blog_member_permissions(
     blog_id: int,
     member_id: int,
     payload: BlogMemberUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_blog_owner),
 ):
+    # Allow access if the user is a global superadmin OR a verified workspace owner
+    is_super_admin = current_user.is_super_admin or getattr(current_user, "platform_role", None) == "superadmin"
+    
+    if not is_super_admin:
+        actor_membership = session.exec(
+            select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == current_user.id)
+        ).first()
+        if not actor_membership or actor_membership.role != BlogRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. Only Blog Owners or Superadmins can modify workspace privileges."
+            )
+
+    # FETCH TARGET MEMBER RECORD
     membership = session.exec(
         select(BlogMember)
         .where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
@@ -789,16 +802,38 @@ def update_blog_member_role(
     if not membership:
         raise HTTPException(status_code=404, detail="Blog member not found")
 
-    membership.role = payload.role
+    # EXTRACT UNSET/PASSED PARAMETERS
+    update_data = payload.model_dump(exclude_unset=True)
+
+    # Safety Rule: Prevent a lone workspace owner from accidentally demoting themselves
+    if "role" in update_data and update_data["role"] != BlogRole.OWNER and membership.role == BlogRole.OWNER:
+        owner_count = session.exec(
+            select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog_id, BlogMember.role == BlogRole.OWNER)
+        ).one()
+        if owner_count <= 1 and membership.user_id == current_user.id:
+            raise HTTPException(
+                status_code=400,
+                detail="Validation Error: You are the sole owner of this blog. Appoint another owner before changing your role."
+            )
+
+    # MUTATE FIELDS DYNAMICALLY
+    for key, value in update_data.items():
+        if key == "permissions" and value is not None:
+            # Safely serialize dictionary objects to a JSON text string if stored as text
+            membership.permissions = json.dumps(value)
+        else:
+            setattr(membership, key, value)
+
+    # COMMIT CHANGES AND RUN AUDIT
     session.add(membership)
     add_audit_log(
         session,
-        action="blog.member_role_update",
+        action="blog.member_permissions_update",
         resource_type="blog_member",
         resource_id=membership.user_id,
         blog_id=blog_id,
         actor=current_user,
-        details={"role": payload.role},
+        details={"updated_fields": list(update_data.keys())},
     )
     session.commit()
     session.refresh(membership)

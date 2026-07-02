@@ -31,8 +31,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                         "path": request.url.path,
                         "status_code": status_code,
                     },
-                    ip_address=request.client.host if request.client else None,
-                    user_agent=request.headers.get("user-agent"),
+                    request=request,
                 )
                 session.commit()
         except Exception:

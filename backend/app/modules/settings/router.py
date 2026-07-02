@@ -9,8 +9,10 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
+from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.permissions import get_public_blog, require_blog_owner, require_completed_onboarding
+from app.core.security import get_current_user
 from app.models import SiteSettings, User, Blog
 from app.schemas import (
     AboutPageSettings,
@@ -52,7 +54,13 @@ def get_setting(session: Session, blog_id: int, key: str, default_model: Any) ->
         return default_model().model_dump()
 
 
-def update_setting(session: Session, blog_id: int, key: str, value_model: Any) -> Dict:
+def update_setting(
+    session: Session,
+    blog_id: int,
+    key: str,
+    value_model: Any,
+    actor: User,
+) -> Dict:
     statement = select(SiteSettings).where(SiteSettings.setting_key == key, SiteSettings.blog_id == blog_id)
     existing = session.exec(statement).first()
 
@@ -72,8 +80,17 @@ def update_setting(session: Session, blog_id: int, key: str, value_model: Any) -
             )
         )
 
+    values = value_model.model_dump()
+    add_audit_log(
+        session,
+        action="branding.updated" if key == "branding" else "settings.updated",
+        resource_type="settings",
+        blog_id=blog_id,
+        actor=actor,
+        details={"key": key, "fields": sorted(values.keys())},
+    )
     session.commit()
-    return value_model.model_dump()
+    return values
 
 
 def upload_branding_asset(file: UploadFile, folder: str, allowed_types: tuple[str, ...]) -> Dict[str, str]:
@@ -95,10 +112,11 @@ def update_general_settings(
     blog_id: int,
     settings: GeneralSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    return update_setting(session, blog_id, "general", settings)
+    return update_setting(session, blog_id, "general", settings, current_user)
 
 
 @router.get("/about", response_model=AboutPageSettingsResponse)
@@ -111,10 +129,11 @@ def update_about_settings(
     blog_id: int,
     settings: AboutPageSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    return update_setting(session, blog_id, "about_page", settings)
+    return update_setting(session, blog_id, "about_page", settings, current_user)
 
 
 @router.get("/footer", response_model=FooterSettingsResponse)
@@ -150,6 +169,7 @@ def update_footer_settings(
     blog_id: int,
     settings: FooterSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
@@ -172,7 +192,7 @@ def update_footer_settings(
                 detail="Editing the copyright text is only available for Pro and Team plans. Please upgrade to remove the INKO attribution."
             )
     
-    return update_setting(session, blog_id, "footer", settings)
+    return update_setting(session, blog_id, "footer", settings, current_user)
 
 
 @router.get("/branding", response_model=BrandingSettingsResponse)
@@ -185,10 +205,11 @@ def update_branding_settings(
     blog_id: int,
     settings: BrandingSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    return update_setting(session, blog_id, "branding", settings)
+    return update_setting(session, blog_id, "branding", settings, current_user)
 
 
 @router.post("/branding/upload-logo")
@@ -229,10 +250,11 @@ def update_seo_settings(
     blog_id: int,
     settings: SEOSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    return update_setting(session, blog_id, "seo", settings)
+    return update_setting(session, blog_id, "seo", settings, current_user)
 
 
 @router.get("/contact", response_model=ContactSettingsResponse)
@@ -245,10 +267,11 @@ def update_contact_settings(
     blog_id: int,
     settings: ContactSettings,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    return update_setting(session, blog_id, "contact", settings)
+    return update_setting(session, blog_id, "contact", settings, current_user)
 
 
 @router.get("/all", response_model=AllSiteSettings)
