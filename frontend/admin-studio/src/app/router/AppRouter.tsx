@@ -6,7 +6,7 @@ import { LoginView } from '../../features/auth/pages/LoginPage';
 import { AuthCallbackPage } from '../../features/auth/pages/AuthCallbackPage';
 import { OnboardingPage } from '../../features/onboarding/pages/OnboardingPage';
 import { CommentManager } from '../../features/comments/pages/CommentManagerPage';
-import { Dashboard } from '../../features/dashboard/pages/DashboardPage';
+import { Dashboard } from '../../features/dashboard/pages/Dashboard';
 import { PostEditor } from '../../features/posts/pages/PostEditorPage';
 import { PostList } from '../../features/posts/pages/PostListPage';
 import { PostView } from '../../features/posts/pages/PostViewPage';
