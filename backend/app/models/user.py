@@ -25,6 +25,7 @@ class User(SQLModel, table=True):
     platform_role: PlatformRole = Field(default=PlatformRole.USER)
     is_super_admin: bool = Field(default=False)
     is_active: bool = Field(default=True)
+    email_verified: bool = Field(default=False, nullable=False)
     deleted_at: Optional[datetime] = Field(default=None, nullable=True)
     
     created_at: datetime = Field(default_factory=utcnow)

@@ -50,6 +50,7 @@ class UserRead(UTCDatetimeMixin, BaseModel):
     platform_role: PlatformRole
     is_super_admin: bool
     is_active: bool
+    email_verified: bool
     created_at: datetime
     last_login: Optional[datetime] = None
     deleted_at: Optional[datetime] = None

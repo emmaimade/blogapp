@@ -13,6 +13,9 @@ def authenticate_user(identifier: str, password: str, session: Session) -> User 
         return None
     if not user.is_active or user.deleted_at is not None:
         return None
+    # Require email verification before allowing login
+    if not getattr(user, "email_verified", False):
+        return None
     return user
 
 def build_user_payload(user: User, session: Session) -> UserRead:

@@ -1,5 +1,5 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
@@ -7,6 +7,9 @@ from slugify import slugify
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.security import get_current_user, get_password_hash
+from app.services.auth_tokens import create_verification_token
+from app.core.email import dispatch_email
+from app.core.email_templates import get_verification_template
 from app.models import (
     Blog,
     BlogMember,
@@ -52,7 +55,7 @@ def _generate_random_handle(email: str, session: Session) -> str:
 
 
 @router.post("/register", response_model=UserRead)
-def register(user_data: UserCreate, session: Session = Depends(get_session)):
+def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     # existing_user = session.exec(select(User).where(User.username == user_data.username)).first()
 
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
@@ -107,6 +110,12 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
     )
     session.commit()
     session.refresh(new_user)
+
+    # Automatically fire verification email in background task
+    raw_token = create_verification_token(session, new_user.id)
+    email_content = get_verification_template(f"{new_user.first_name} {new_user.last_name}", raw_token)
+    dispatch_email(background_tasks, new_user.email, "Verify your email address", email_content)
+
     return build_user_payload(new_user, session)
 
 
