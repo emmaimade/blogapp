@@ -3,6 +3,7 @@ import { ProtectedRoute } from '../../features/auth/components/ProtectedRoute';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { isSuperAdmin } from '../../features/auth/lib/accessControl';
 import { LoginView } from '../../features/auth/pages/LoginPage';
+import { ForgotPasswordPage } from '../../features/auth/pages/ForgotPasswordPage';
 import { AuthCallbackPage } from '../../features/auth/pages/AuthCallbackPage';
 import { OnboardingPage } from '../../features/onboarding/pages/OnboardingPage';
 import { CommentManager } from '../../features/comments/pages/CommentManagerPage';
@@ -32,9 +33,16 @@ import { SuperAdminModerationPage } from '../../features/superadmin/pages/SuperA
 import { SuperAdminAuditLogPage } from '../../features/superadmin/pages/SuperAdminAuditLogPage';
 import { SuperAdminPlatformSettingsPage } from '../../features/superadmin/pages/SuperAdminPlatformSettingsPage';
 import UserInfoPage from '../../features/users/pages/UserInfoPage';
+import { ResetPasswordPage } from '../../features/auth/pages/ResetPasswordPage';
+import { VerifyQuarantinePage } from '../../features/auth/pages/VerifyQuarantinePage';
 
 const DefaultAdminRedirect = () => {
   const { user } = useAuth();
+
+  if (user && !user.email_verified) {
+    return <Navigate to="/admin/verify-quarantine" replace />;
+  }
+
   const requiresOnboarding = user?.blog_memberships?.some(
     (membership) => membership.blog.onboarding_status !== 'completed',
   );
@@ -65,10 +73,13 @@ export const AppRouter = () => {
         {/* ── Public routes ── */}
         <Route element={<AuthLayout />}>
           <Route path="/admin/login" element={<LoginView />} />
+          <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
         </Route>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/admin/verify-quarantine" element={<VerifyQuarantinePage />} />
 
           {/* ── Onboarding — protected but NO AdminLayout wrapper ── */}
           <Route path="/admin/onboarding" element={<OnboardingPage />} />

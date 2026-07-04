@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authSession } from '../lib/session';
 import { useBlog } from '../../../app/providers/BlogProvider';
@@ -11,6 +11,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: ProtectedRouteProps) => {
   const { user, isLoading } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
+  const location = useLocation(); // NEW: Hook into the active router path context
 
   if (isLoading || isBlogLoading) {
     return (
@@ -22,10 +23,27 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
     );
   }
 
+  // 1. Ensure the user is authenticated first
   if (!user) {
     return <Navigate to="/admin/login" replace />;
   }
 
+  // 2. NEW: Intercept unverified accounts and drop them behind the isolation wall
+  if (!user.email_verified) {
+    // If they are already trying to view the quarantine page, let them through!
+    if (location.pathname === '/admin/verify-quarantine') {
+      return <Outlet />;
+    }
+    // Otherwise, block access to any other layout routes and redirect them
+    return <Navigate to="/admin/verify-quarantine" replace />;
+  }
+
+  // 3. If they are verified and try to visit the quarantine route manually, bounce them to safety
+  if (location.pathname === '/admin/verify-quarantine') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  // 4. Standard capability and access controls proceed normally for verified users
   const isAllowed = canAccess(user, activeMembership, requiredCapability);
   const accessSummary = getAccessSummary(user, memberships, activeMembership);
 

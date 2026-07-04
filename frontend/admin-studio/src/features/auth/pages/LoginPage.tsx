@@ -10,6 +10,10 @@ import type { AuthUser } from '../types';
 const SITE_URL = import.meta.env.VITE_SITE_URL || "http://localhost:5175";
 
 const getPostLoginPath = (user: AuthUser) => {
+  if (!user.email_verified) {
+    return '/admin/verify-quarantine';
+  }
+
   if (isSuperAdmin(user)) {
     return '/admin/superadmin';
   }
@@ -87,9 +91,8 @@ export const LoginView = () => {
   };
 
   const handleForgotPassword = () => {
-    alert("Forgot password flow coming soon!");
+    navigate('/admin/forgot-password');
   };
-
   return (
     // 🧠 CLEAN STRUCTURAL ELEMENT: Fits directly into the <Outlet /> of AuthLayout[cite: 4]
     <div className="w-full max-w-[460px] bg-white rounded-3xl shadow-xl shadow-zinc-200/80 border border-zinc-100 p-8 md:p-10 transition-all">

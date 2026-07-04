@@ -42,5 +42,6 @@ export interface AuthUser {
   platform_role: PlatformRole;
   is_super_admin: boolean;
   is_active?: boolean;
+  email_verified: boolean;
   blog_memberships: UserBlogMembership[];
 }
