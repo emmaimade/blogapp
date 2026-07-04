@@ -10,6 +10,7 @@ import { SignupPage } from '../../pages/SignupPage';
 import { AboutPage } from '../../pages/AboutPage';
 
 import { JoinPage } from '../../pages/JoinPage';
+import { VerifyEmailPage } from '../../pages/VerifyEmailPage';
 
 export const SiteRouter = () => {
   return (
@@ -20,6 +21,7 @@ export const SiteRouter = () => {
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
       <Route element={<AuthLayout />}>
         <Route path="/signup" element={<SignupPage />} />
