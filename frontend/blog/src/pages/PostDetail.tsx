@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css';
 import { Calendar, ChevronRight, Eye } from 'lucide-react';
-import { formatLocalDate, formatSmart } from '../utils/dates';
+import { formatLocalDate } from '../utils/dates';
 import api from '../api/blogApi';
 import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';

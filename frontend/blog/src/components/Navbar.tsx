@@ -13,7 +13,6 @@ export const Navbar: React.FC = () => {
   const branding = siteSettings?.branding;
   const siteName = general?.site_name || 'Inko';
   const primaryColor = branding?.primary_color || '#9333EA';
-  const secondaryColor = branding?.secondary_color || '#18181B';
   const logoUrl = branding?.logo_url;
 
   const navLinks = [

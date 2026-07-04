@@ -6,7 +6,6 @@ import {
   Mail,
   Lock,
   User as UserIcon,
-  Sparkles,
   ArrowRight,
   ArrowLeft,
 } from "lucide-react";

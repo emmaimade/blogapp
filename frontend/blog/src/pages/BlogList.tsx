@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search, Filter, ChevronDown, TrendingUp, Clock } from 'lucide-react';
+import { X, Search, Filter, ChevronDown, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
