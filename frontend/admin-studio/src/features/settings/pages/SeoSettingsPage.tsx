@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Search, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import type { AxiosError } from 'axios';
 
 interface SEOSettingsData {
   meta_title: string;
@@ -41,15 +43,15 @@ export const SEOSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
 
-  const { data: settings = defaultSEOSettings, isLoading } = useQuery<SEOSettingsData>({
+  const { data: settings, isLoading } = useQuery<SEOSettingsData>({
     queryKey: ['seoSettings', activeBlog?.id],
     queryFn: async () => {
       let data: PartialSEOSettingsData = {};
       try {
         const res = await api.get('/settings/seo');
         data = res.data || {};
-      } catch (error) {
-        // Fallback
+      } catch {
+        // Fallback to defaults on error
       }
       
       const normalized = normalizeSEOSettings(data);
@@ -77,7 +79,7 @@ export const SEOSettings: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['allSettings'] });
       toast.success('SEO settings saved successfully!');
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<{ detail?: string }>) => {
       toast.error(error.response?.data?.detail || 'Failed to save settings');
     }
   });
@@ -94,43 +96,12 @@ export const SEOSettings: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-4xl animate-pulse space-y-6 pb-24">
-        {/* Info Banner Skeleton */}
-        <div className="mb-8 flex items-start gap-3 p-4 bg-zinc-100 rounded-xl dark:bg-zinc-800/50">
-          <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-          <div className="space-y-2 w-full">
-            <div className="h-5 w-48 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-4 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        </div>
-
-        {/* Form Sections Skeletons */}
-        {[...Array(3)].map((_, index) => (
-          <div key={index} className="bg-white rounded-xl border border-zinc-200 p-6 dark:bg-zinc-900/50 dark:border-zinc-800">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-6 w-6 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-6 w-32 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            </div>
-            <div className="space-y-6">
-              {[...Array(index === 0 ? 3 : 2)].map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-4 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                  <div className={`w-full rounded-xl bg-zinc-100 dark:bg-zinc-800/50 ${index === 0 && i === 1 ? 'h-24' : 'h-12'}`} />
-                  <div className="h-3 w-64 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <SettingsSkeleton cardsCount={3} fieldsPerCard={2} />;
   }
 
   const descriptionLength = (formData.meta_description || '').length;
-  const keywordsCount = (formData.meta_keywords || '').split(',').filter((keyword) => keyword.trim()).length;
 
-  const isDirty = settings && (
+  const isDirty = !!settings && (
     formData.meta_title !== settings.meta_title ||
     formData.meta_description !== settings.meta_description ||
     formData.meta_keywords !== settings.meta_keywords ||
@@ -141,10 +112,9 @@ export const SEOSettings: React.FC = () => {
   );
 
   return (
-    <div className="max-w-4xl pb-12 relative">
-      
-      {/* Floating Save Button */}
-      <div className={`fixed top-[76px] right-6 md:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+    <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      {/* Floating Save Button - Mobile Optimized */}
+      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
@@ -173,9 +143,8 @@ export const SEOSettings: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        
         {/* Meta Tags */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
             <Search size={20} className="text-zinc-900" />
             Meta Tags
@@ -183,14 +152,11 @@ export const SEOSettings: React.FC = () => {
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Meta Title
-              </label>
+              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Title</label>
               <input
                 type="text"
                 value={formData.meta_title || ''}
                 onChange={(e) => handleChange('meta_title', e.target.value)}
-                placeholder="My Amazing Blog - Sharing Ideas & Stories"
                 maxLength={60}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
               />
@@ -203,19 +169,16 @@ export const SEOSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Meta Description
-              </label>
+              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Description</label>
               <textarea
                 value={formData.meta_description || ''}
                 onChange={(e) => handleChange('meta_description', e.target.value)}
-                placeholder="A modern blog sharing insights on technology, creativity, and personal growth. Join our community of readers and writers."
                 maxLength={160}
                 rows={3}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
               />
               <div className="flex justify-between text-xs mt-1">
-                <p className="text-zinc-500">Shows under your title in search results (150-160 characters)</p>
+                <p className="text-zinc-500">Shows under your title in search results</p>
                 <p className={`${descriptionLength > 160 ? 'text-red-600' : 'text-zinc-500'}`}>
                   {descriptionLength}/160
                 </p>
@@ -223,26 +186,19 @@ export const SEOSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Meta Keywords
-              </label>
+              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Keywords</label>
               <input
                 type="text"
                 value={formData.meta_keywords || ''}
                 onChange={(e) => handleChange('meta_keywords', e.target.value)}
-                placeholder="blog, technology, writing, tutorials, tips"
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
               />
-              <div className="flex justify-between text-xs mt-1">
-                <p className="text-zinc-500">Comma-separated keywords (5-10 recommended)</p>
-                <p className="text-zinc-500">{keywordsCount} keywords</p>
-              </div>
             </div>
           </div>
         </div>
 
         {/* Social Media / Open Graph */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4">Social Media Sharing</h2>
           
           <div className="space-y-4">
@@ -294,7 +250,7 @@ export const SEOSettings: React.FC = () => {
         </div>
 
         {/* Analytics */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
             <BarChart3 size={20} className="text-zinc-900" />
             Analytics & Verification

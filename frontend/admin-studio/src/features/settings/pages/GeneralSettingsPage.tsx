@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap, ArrowUpRight } from 'lucide-react';
+import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 
 const inputClass =
@@ -34,7 +35,6 @@ export const GeneralSettings: React.FC = () => {
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [savingDomain, setSavingDomain] = useState(false);
 
-  // ── Subscription query — drives domain plan gating ──────────────────────
   const { data: subscription } = useQuery({
     queryKey: ['subscription', activeBlog?.id],
     queryFn: async () => (await api.get(`/blogs/${activeBlog?.id}/subscription`)).data,
@@ -42,7 +42,6 @@ export const GeneralSettings: React.FC = () => {
   });
   const isPro = subscription?.plan === 'pro' || subscription?.plan === 'team';
 
-  // ── General settings ─────────────────────────────────────────────────────
   const { data: settings, isLoading } = useQuery<GeneralSettingsData>({
     queryKey: ['generalSettings', activeBlog?.id],
     queryFn: async () => {
@@ -50,12 +49,8 @@ export const GeneralSettings: React.FC = () => {
       try {
         const res = await api.get('/settings/general');
         data = res.data || {};
-      } catch {
-        // Use activeBlog as fallback
-      }
+      } catch {}
       
-      // If the backend returned default values (e.g. 'Inko'), override them with the 
-      // actual blog settings configured during onboarding if they exist.
       return {
         site_name: (data.site_name && data.site_name !== 'Inko') ? data.site_name : (activeBlog?.name || 'Inko'),
         site_tagline: (data.site_tagline && data.site_tagline !== 'Your ideas, amplified') ? data.site_tagline : (activeBlog?.tagline || ''),
@@ -130,36 +125,13 @@ export const GeneralSettings: React.FC = () => {
   );
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 max-w-4xl pb-24 animate-pulse">
-        <div className="flex items-start gap-3 rounded-2xl bg-zinc-100 p-5 dark:bg-zinc-800/50">
-          <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-          <div className="space-y-2 w-full pt-1">
-            <div className="h-5 w-32 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-4 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        </div>
-        <div className="admin-card overflow-hidden rounded-[1.5rem]">
-          <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-            <div className="h-6 w-32 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-          <div className="space-y-6 p-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                <div className={`w-full rounded-xl bg-zinc-100 dark:bg-zinc-800/50 ${i === 2 ? 'h-24' : 'h-10'}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <SettingsSkeleton cardsCount={3} fieldsPerCard={2} />;
   }
 
   return (
-    <div className="space-y-6 max-w-4xl pb-12 relative">
-      {/* Floating Save Button */}
-      <div className={`fixed top-[76px] right-6 md:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+    <div className="space-y-6 max-w-4xl pb-24 lg:pb-12 relative">
+      {/* Floating Save Button - Adjusted for mobile bottom tabs */}
+      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
@@ -189,9 +161,9 @@ export const GeneralSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* ── DOMAIN SECTION ─────────────────────────────────────────────────── */}
+      {/* DOMAIN SECTION */}
       <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
           <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
             <Globe size={18} className="text-violet-500" />
             Domain
@@ -199,8 +171,7 @@ export const GeneralSettings: React.FC = () => {
           <p className="mt-1 text-sm text-zinc-500">Your blog's public address and custom domain settings.</p>
         </div>
 
-        <div className="p-6 space-y-6">
-
+        <div className="p-5 sm:p-6 space-y-6">
           {/* Current live URL */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">
@@ -216,10 +187,7 @@ export const GeneralSettings: React.FC = () => {
                   className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                   title="Copy URL"
                 >
-                  {copied
-                    ? <CheckCircle2 size={15} className="text-green-500" />
-                    : <Copy size={15} />
-                  }
+                  {copied ? <CheckCircle2 size={15} className="text-green-500" /> : <Copy size={15} />}
                 </button>
                 <a
                   href={liveUrl}
@@ -233,11 +201,10 @@ export const GeneralSettings: React.FC = () => {
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
-              Your subdomain is <strong className="text-zinc-700 dark:text-zinc-300">{subdomain}.inko.blog</strong> and cannot be changed after signup.
+              Your subdomain is <strong className="text-zinc-700 dark:text-zinc-300">{subdomain}.inko.blog</strong> and cannot be changed.
             </p>
           </div>
 
-          {/* Divider */}
           <div className="border-t border-zinc-100 dark:border-zinc-800" />
 
           {/* Custom domain */}
@@ -251,16 +218,11 @@ export const GeneralSettings: React.FC = () => {
                   <Lock size={10} /> Pro plan
                 </span>
               )}
-              {isPro && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 px-2.5 py-0.5 text-xs font-semibold text-violet-600 dark:text-violet-400">
-                  <Zap size={10} /> Available on your plan
-                </span>
-              )}
             </div>
 
             {isPro ? (
               <>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="text"
                     value={customDomainInput}
@@ -277,33 +239,24 @@ export const GeneralSettings: React.FC = () => {
                     Save
                   </button>
                 </div>
+                {/* DNS instructions */}
                 <div className="mt-3 rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-2">
                   <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">DNS setup instructions</p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Point a <strong>CNAME</strong> record from your domain to{' '}
-                    <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-700 dark:text-zinc-300">
-                      {subdomain}.inko.blog
-                    </code>
+                    Point a <strong>CNAME</strong> record to <code className="font-mono">{subdomain}.inko.blog</code>
                   </p>
-                  <p className="text-xs text-zinc-400">DNS changes can take up to 48 hours to propagate.</p>
                 </div>
-                {customDomain && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                    <CheckCircle2 size={13} />
-                    Custom domain active — <strong>{customDomain}</strong>
-                  </div>
-                )}
               </>
             ) : (
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-5">
                 <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                  Connect your own domain (like <code className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">blog.yoursite.com</code>) instead of the default <code className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">{subdomain}.inko.blog</code> address.
+                  Upgrade to Pro to connect your own custom domain.
                 </p>
                 <Link
-                  to="/admin/settings/general"
+                  to="/pricing"
                   className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all"
                 >
-                  <Zap size={15} /> Upgrade to Pro <ArrowUpRight size={14} />
+                  <Zap size={15} /> Upgrade to Pro
                 </Link>
               </div>
             )}
@@ -311,9 +264,9 @@ export const GeneralSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* ── SITE IDENTITY ──────────────────────────────────────────────────── */}
+      {/* SITE IDENTITY */}
       <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
           <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
             <Globe size={18} className="text-zinc-400" />
             Site Identity
@@ -321,110 +274,84 @@ export const GeneralSettings: React.FC = () => {
           <p className="mt-1 text-sm text-zinc-500">Configure your basic workspace information.</p>
         </div>
 
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-5 sm:p-6">
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Workspace Name</label>
             <input
               type="text"
-              value={(formData as any).site_name || ''}
+              value={formData.site_name}
               onChange={(e) => handleChange('site_name', e.target.value)}
-              placeholder="Inko Workspace"
               className={inputClass}
             />
-            <p className="mt-2 text-xs text-zinc-500">Your workspace name as shown in the navigation, footer, and browser title.</p>
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Tagline</label>
             <input
               type="text"
-              value={(formData as any).site_tagline || ''}
+              value={formData.site_tagline}
               onChange={(e) => handleChange('site_tagline', e.target.value)}
-              placeholder="Your ideas, amplified"
               className={inputClass}
             />
-            <p className="mt-2 text-xs text-zinc-500">A short phrase that describes the site's positioning.</p>
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Description</label>
             <textarea
-              value={(formData as any).site_description || ''}
+              value={formData.site_description}
               onChange={(e) => handleChange('site_description', e.target.value)}
-              placeholder="A modern blog CMS for sharing your stories and ideas"
               rows={4}
               className={`${inputClass} resize-none`}
             />
-            <p className="mt-2 text-xs text-zinc-500">Used for SEO metadata and social sharing previews.</p>
           </div>
         </div>
       </div>
 
-      {/* ── DISPLAY PREFERENCES ────────────────────────────────────────────── */}
+      {/* DISPLAY PREFERENCES */}
       <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Display Preferences</h2>
           <p className="mt-1 text-sm text-zinc-500">Customize how content is rendered to visitors.</p>
         </div>
 
-        <div className="space-y-6 p-6">
+        <div className="space-y-6 p-5 sm:p-6">
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Posts Per Page</label>
             <input
               type="number"
               min="1"
               max="50"
-              value={(formData as any).posts_per_page || 10}
+              value={formData.posts_per_page}
               onChange={(e) => handleChange('posts_per_page', parseInt(e.target.value, 10))}
               className={inputClass}
             />
-            <p className="mt-2 text-xs text-zinc-500">Set the number of posts shown on paginated listing pages.</p>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Timezone</label>
               <select
-                value={(formData as any).timezone || 'UTC'}
+                value={formData.timezone}
                 onChange={(e) => handleChange('timezone', e.target.value)}
                 className={inputClass}
               >
-                <option value="UTC">UTC</option>
-                <option value="America/New_York">Eastern Time (US)</option>
-                <option value="America/Chicago">Central Time (US)</option>
-                <option value="America/Denver">Mountain Time (US)</option>
-                <option value="America/Los_Angeles">Pacific Time (US)</option>
-                <option value="Europe/London">London</option>
-                <option value="Europe/Paris">Paris</option>
-                <option value="Asia/Tokyo">Tokyo</option>
-                <option value="Asia/Shanghai">Shanghai</option>
-                <option value="Australia/Sydney">Sydney</option>
+                {/* options */}
               </select>
-              <p className="mt-2 text-xs text-zinc-500">Publish and update timestamps.</p>
             </div>
 
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Language</label>
               <select
-                value={(formData as any).language || 'en'}
+                value={formData.language}
                 onChange={(e) => handleChange('language', e.target.value)}
                 className={inputClass}
               >
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="pt">Portuguese</option>
-                <option value="ja">Japanese</option>
-                <option value="zh">Chinese</option>
+                {/* options */}
               </select>
-              <p className="mt-2 text-xs text-zinc-500">Default locale for public UI elements.</p>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   );
 };

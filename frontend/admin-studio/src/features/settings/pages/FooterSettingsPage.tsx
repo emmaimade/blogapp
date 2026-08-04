@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 
 interface FooterSettingsData {
@@ -66,7 +67,6 @@ export const FooterSettings: React.FC = () => {
       const res = await api.get(`/blogs/${activeBlog!.id}/settings/footer`);
       const data = res.data || {};
 
-      // Smart default from General Settings / Onboarding
       const defaultTagline = activeBlog?.tagline || "Your ideas, amplified.";
 
       return {
@@ -133,43 +133,15 @@ export const FooterSettings: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-4xl animate-pulse space-y-6 pb-24">
-        {/* Your existing loading skeleton */}
-        <div className="mb-8 flex items-start gap-3 p-4 bg-zinc-100 rounded-xl dark:bg-zinc-800/50">
-          <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-          <div className="space-y-2 w-full">
-            <div className="h-5 w-48 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-4 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        </div>
-
-        {[...Array(4)].map((_, index) => (
-          <div key={index} className="bg-white rounded-xl border border-zinc-200 p-6 dark:bg-zinc-900/50 dark:border-zinc-800">
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-6 w-48 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-              {index > 0 && <div className="h-5 w-32 rounded-md bg-zinc-200 dark:bg-zinc-800" />}
-            </div>
-            <div className={index === 2 ? 'grid md:grid-cols-2 gap-4' : 'space-y-4'}>
-              {[...Array(index === 2 ? 6 : 2)].map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-4 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                  <div className={`w-full rounded-xl bg-zinc-100 dark:bg-zinc-800/50 ${index === 1 && i === 1 ? 'h-20' : 'h-12'}`} />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
   }
 
   const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
 
   return (
-    <div className="max-w-4xl pb-12 relative">
-      {/* Floating Save Button */}
-      <div className={`fixed top-[76px] right-6 md:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+    <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      {/* Floating Save Button - Mobile Optimized */}
+      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
@@ -196,7 +168,7 @@ export const FooterSettings: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4">Footer Branding</h2>
           
           <div className="space-y-4">
@@ -211,10 +183,6 @@ export const FooterSettings: React.FC = () => {
                 placeholder={activeBlog?.tagline || "Your ideas, amplified."}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
               />
-              <p className="text-xs text-zinc-500 mt-1">
-                Short text that appears under your logo in the footer. 
-                <span className="italic"> Defaults to your site tagline from General Settings.</span>
-              </p>
             </div>
 
             <div>
@@ -235,14 +203,6 @@ export const FooterSettings: React.FC = () => {
                 disabled={subscription?.plan === 'free'}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-500"
               />
-              {subscription?.plan === 'free' ? (
-                <p className="text-xs text-amber-600 mt-1">
-                  Upgrade to Pro or Team to customize the copyright notice and remove the INKO attribution.{' '}
-                  <a href="/pricing" className="font-semibold hover:underline">View plans</a>
-                </p>
-              ) : (
-                <p className="text-xs text-zinc-500 mt-1">Use {'{year}'} for automatic current year</p>
-              )}
             </div>
           </div>
         </div>

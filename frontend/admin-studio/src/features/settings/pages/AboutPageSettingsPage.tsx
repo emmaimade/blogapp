@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Eye, AlertCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 
 interface AboutSettingsData {
@@ -43,7 +44,6 @@ export const AboutPageSettings: React.FC = () => {
       : window.location.origin);
   const previewUrl = `${publicSiteOrigin}/about`;
 
-  // Fetch current settings
   const { data: settings, isLoading } = useQuery<AboutSettingsData>({
     queryKey: ['aboutSettings', activeBlog?.id],
     queryFn: async () => {
@@ -51,13 +51,13 @@ export const AboutPageSettings: React.FC = () => {
       try {
         const res = await api.get('/settings/about');
         data = res.data || {};
-      } catch (error) {
-        // Fallback
-      }
+      } catch (error) {}
       return {
         bio_title: data.bio_title || "Welcome to My Blog",
         bio_subtitle: data.bio_subtitle || "Sharing ideas, stories, and insights",
-        bio_content: data.bio_content && data.bio_content !== "This is a modern blog CMS. Customize this in your admin panel." ? data.bio_content : (activeBlog?.description || "This is where you tell your story. Share what makes your blog unique, what topics you cover, and why readers should follow along.\n\nWrite naturally and authentically - this content appears directly on your About page."),
+        bio_content: data.bio_content && data.bio_content !== "This is a modern blog CMS. Customize this in your admin panel." 
+          ? data.bio_content 
+          : (activeBlog?.description || "This is where you tell your story..."),
         show_stats: data.show_stats ?? true,
         show_contact_cta: data.show_contact_cta ?? true,
         email: data.email || "",
@@ -73,14 +73,12 @@ export const AboutPageSettings: React.FC = () => {
 
   const [formData, setFormData] = useState<AboutSettingsData>(defaultAboutSettings);
 
-  // Update form when settings load
   useEffect(() => {
     if (settings) {
       setFormData(settings);
     }
   }, [settings]);
 
-  // Save settings mutation
   const saveMutation = useMutation({
     mutationFn: (data: AboutSettingsData) => api.post('/settings/about', data),
     onSuccess: () => {
@@ -98,20 +96,7 @@ export const AboutPageSettings: React.FC = () => {
   };
 
   const handlePreview = () => {
-    const draft = {
-      bio_title: formData.bio_title || '',
-      bio_subtitle: formData.bio_subtitle || '',
-      bio_content: formData.bio_content || '',
-      show_stats: formData.show_stats !== false,
-      show_contact_cta: formData.show_contact_cta !== false,
-      email: formData.email || '',
-      social_links: {
-        github: formData.social_links?.github || '',
-        twitter: formData.social_links?.twitter || '',
-        linkedin: formData.social_links?.linkedin || ''
-      }
-    };
-
+    const draft = { ...formData };
     const url = new URL(previewUrl);
     url.searchParams.set('draft', JSON.stringify(draft));
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
@@ -135,34 +120,7 @@ export const AboutPageSettings: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-4xl animate-pulse space-y-6 pb-24">
-        {/* Info Banner Skeleton */}
-        <div className="mb-8 flex items-start gap-3 p-4 bg-zinc-100 rounded-xl dark:bg-zinc-800/50">
-          <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-          <div className="space-y-2 w-full">
-            <div className="h-5 w-48 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-4 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        </div>
-
-        {/* Form Sections Skeletons */}
-        {[...Array(4)].map((_, index) => (
-          <div key={index} className="bg-white rounded-xl border border-zinc-200 p-6 dark:bg-zinc-900/50 dark:border-zinc-800">
-            <div className="h-6 w-32 rounded-md bg-zinc-200 dark:bg-zinc-800 mb-4" />
-            <div className="space-y-4">
-              {[...Array(index === 1 ? 1 : 2)].map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-4 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                  <div className={"w-full rounded-xl bg-zinc-100 dark:bg-zinc-800/50 " + (index === 1 ? 'h-32' : 'h-12')} />
-                  <div className="h-3 w-48 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
   }
 
   const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
@@ -170,7 +128,7 @@ export const AboutPageSettings: React.FC = () => {
   return (
     <div className="max-w-4xl pb-12 relative">
       {/* Floating Action Bar */}
-      <div className={`fixed top-[76px] right-6 md:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
           <div className="flex items-center gap-2 pr-2">
             <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
@@ -204,15 +162,13 @@ export const AboutPageSettings: React.FC = () => {
         <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
         <div className="text-sm text-zinc-700 dark:text-zinc-200">
           <p className="font-bold mb-1">💡 Tip: Make it personal!</p>
-          <p>Share your unique story, what makes your blog special, and why readers should follow along. This content appears on your public About page.</p>
+          <p>Share your unique story, what makes your blog special, and why readers should follow along.</p>
         </div>
       </div>
 
-      {/* Form */}
       <div className="space-y-6">
-        
         {/* Hero Section */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4">Hero Section</h2>
           
           <div className="space-y-4">
@@ -247,24 +203,14 @@ export const AboutPageSettings: React.FC = () => {
         </div>
 
         {/* Bio Content */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4">Your Story</h2>
-          
-          <div>
-            <label className="block text-sm font-bold text-zinc-700 mb-2">
-              Bio Content
-            </label>
-            <textarea
-              value={formData.bio_content || ''}
-              onChange={(e) => handleChange('bio_content', e.target.value)}
-              placeholder="Share your story here. What makes your blog unique? What topics do you cover? Why should readers follow along?"
-              rows={12}
-              className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm leading-relaxed"
-            />
-            <p className="text-xs text-zinc-500 mt-1">
-              Write naturally - use line breaks to create paragraphs. Your content will be displayed exactly as you type it.
-            </p>
-          </div>
+          <textarea
+            value={formData.bio_content || ''}
+            onChange={(e) => handleChange('bio_content', e.target.value)}
+            rows={12}
+            className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm leading-relaxed"
+          />
         </div>
 
         {/* Display Options */}

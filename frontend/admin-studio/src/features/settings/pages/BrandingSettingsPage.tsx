@@ -4,6 +4,7 @@ import { Loader2, AlertCircle, Upload, X, Palette, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton'; // Adjust path as needed
 
 interface BrandingSettingsData {
   primary_color: string;
@@ -36,7 +37,8 @@ export const BrandingSettings: React.FC = () => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: settings = defaultBrandingSettings } = useQuery<BrandingSettingsData>({
+  // Destructured isLoading from useQuery
+  const { data: settings = defaultBrandingSettings, isLoading } = useQuery<BrandingSettingsData>({
     queryKey: ['brandingSettings', activeBlog?.id],
     queryFn: async () => {
       let data: any = {};
@@ -119,7 +121,6 @@ export const BrandingSettings: React.FC = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Computed safe colors for preview
   const primaryColor = getSafeHexColor(formData.primary_color, defaultBrandingSettings.primary_color);
   const secondaryColor = getSafeHexColor(formData.secondary_color, defaultBrandingSettings.secondary_color);
   const accentColor = getSafeHexColor(formData.accent_color, defaultBrandingSettings.accent_color);
@@ -134,11 +135,16 @@ export const BrandingSettings: React.FC = () => {
     formData.font_body !== settings.font_body
   );
 
+  // Render the skeleton loader if the settings query is still loading
+  if (isLoading) {
+    return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
+  }
+
   return (
-    <div className="max-w-4xl pb-12 relative">
-      {/* Floating Save Button */}
+    <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      {/* Floating Save Button - Mobile Optimized */}
       {isDirty && (
-        <div className="fixed top-[76px] right-6 md:right-10 z-50">
+        <div className="fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50">
           <button
             onClick={handleSave}
             disabled={saveMutation.isPending}
@@ -160,15 +166,15 @@ export const BrandingSettings: React.FC = () => {
 
       <div className="space-y-8">
         {/* Logo Section */}
-        <div className="bg-white rounded-2xl border border-zinc-200 p-8">
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-8">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
             <Image size={22} /> Logo
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Upload Area */}
             <div
-              className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all cursor-pointer hover:border-violet-400 ${isDraggingLogo ? 'border-violet-500 bg-violet-50' : 'border-zinc-300'}`}
+              className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer hover:border-violet-400 ${isDraggingLogo ? 'border-violet-500 bg-violet-50' : 'border-zinc-300'}`}
               onDragOver={(e) => { e.preventDefault(); setIsDraggingLogo(true); }}
               onDragLeave={() => setIsDraggingLogo(false)}
               onDrop={(e) => {
@@ -227,19 +233,9 @@ export const BrandingSettings: React.FC = () => {
         </div>
 
         {/* Favicon */}
-        <div className="bg-white rounded-2xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold mb-4">Favicon</h2>
-          <div className="flex gap-4">
-            <input
-              ref={faviconInputRef}
-              type="file"
-              accept=".ico,.png,.jpg,.jpeg,.webp,.svg"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file, 'favicon');
-              }}
-            />
+          <div className="flex flex-wrap gap-4">
             <button
               onClick={() => faviconInputRef.current?.click()}
               className="flex items-center gap-2 px-5 py-3 rounded-xl border border-zinc-300 hover:bg-zinc-50"
@@ -260,6 +256,16 @@ export const BrandingSettings: React.FC = () => {
             )}
           </div>
           <p className="text-xs text-zinc-500 mt-2">Recommended: 512×512px or .ico format</p>
+          <input
+            ref={faviconInputRef}
+            type="file"
+            accept=".ico,.png,.jpg,.jpeg,.webp,.svg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileUpload(file, 'favicon');
+            }}
+          />
         </div>
 
         {/* Color Scheme */}

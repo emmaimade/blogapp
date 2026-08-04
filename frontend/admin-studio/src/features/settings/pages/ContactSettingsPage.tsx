@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
+import { Mail, Plus, Trash2, AlertCircle, Loader2,  } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 
 interface FAQItem {
   question: string;
@@ -74,8 +75,7 @@ export const ContactSettings = () => {
     onError: () => toast.error('Failed to save contact settings'),
   });
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     mutation.mutate(formData);
   };
 
@@ -108,12 +108,35 @@ export const ContactSettings = () => {
     }));
   };
 
-  if (isLoading) {
-    return <div className="py-12 text-center text-zinc-500">Loading contact settings...</div>;
-  }
+if (isLoading) {
+  return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
+}
+
+  const isDirty = JSON.stringify(formData) !== JSON.stringify(settings);
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      {/* Floating Action Bar - Matching AboutPage style */}
+      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
+          <div className="flex items-center gap-2 pr-2">
+            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
+            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+              Unsaved changes
+            </span>
+          </div>
+          
+          <button
+            onClick={handleSave}
+            disabled={mutation.isPending}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
+          >
+            {mutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
+            Save
+          </button>
+        </div>
+      </div>
+
       <div className="admin-note mb-8 flex items-start gap-3 p-4">
         <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
         <div className="text-sm text-zinc-700 dark:text-zinc-200">
@@ -122,13 +145,13 @@ export const ContactSettings = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-6">
         {/* Basic Contact Info */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
             <Mail size={20} className="text-zinc-900" /> Contact Information
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-zinc-700 mb-2">Contact Email</label>
               <input
@@ -175,7 +198,7 @@ export const ContactSettings = () => {
         </div>
 
         {/* Social Links */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-zinc-900">Social Links</h2>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -206,8 +229,8 @@ export const ContactSettings = () => {
           )}
         </div>
 
-        {/* FAQ Section (Optional) */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
+        {/* FAQ Section */}
+        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-zinc-900">FAQ Section</h2>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -263,18 +286,6 @@ export const ContactSettings = () => {
             </>
           )}
         </div>
-
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="sticky bottom-0 w-full flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {mutation.isPending ? 'Saving...' : (
-            <>
-              <Save size={20} /> Save Changes
-            </>
-          )}
-        </button>
       </form>
     </div>
   );
