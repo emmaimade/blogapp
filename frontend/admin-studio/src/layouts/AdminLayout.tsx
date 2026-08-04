@@ -1,5 +1,4 @@
 import {
-    Bell,
     Check,
     CheckCircle2,
     ChevronDown,
@@ -25,6 +24,139 @@ import {
     isSuperAdmin
 } from "../features/auth/lib/accessControl";
 import { Sidebar } from "./components/Sidebar";
+import { SupportModal } from "../features/support/components/SupportModal";
+import { NotificationBell } from "../features/notifications/components/NotificationBell";
+
+interface UserMenuProps {
+  user: ReturnType<typeof useAuth>["user"];
+  logout: ReturnType<typeof useAuth>["logout"];
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+  accountMeta: string;
+  showSettingsLink: boolean;
+}
+
+// Self-contained user avatar + dropdown menu. Deliberately its own component
+// (not a helper function reusing outer state) because it's rendered from
+// several places that can be mounted simultaneously (mobile topbar, desktop
+// header, sidebar). Each mount needs its own open/close state and its own
+// ref - sharing a single ref across multiple mounted copies meant the
+// mousedown outside-click listener could check the wrong DOM node and close
+// the dropdown before a tap's click event ever reached the Profile/Settings/
+// Logout targets. The support modal toggle follows the same rule for the
+// same reason - each mounted UserMenu owns its own showSupportModal state.
+const UserMenu: React.FC<UserMenuProps> = ({
+  user,
+  logout,
+  darkMode,
+  toggleDarkMode,
+  accountMeta,
+  showSettingsLink,
+}) => {
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    if (showUserDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showUserDropdown]);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={toggleDarkMode}
+        className="hidden lg:flex rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+        aria-label="Toggle theme mode"
+      >
+        {darkMode ? <Moon size={18} /> : <Sun size={18} />}
+      </button>
+
+      <NotificationBell />
+
+      <button
+        onClick={() => setShowSupportModal(true)}
+        className="hidden lg:block rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+        aria-label="Contact support"
+      >
+        <HelpCircle size={18} />
+      </button>
+
+      <div className="relative" ref={userDropdownRef}>
+        <button
+          onClick={() => setShowUserDropdown(!showUserDropdown)}
+          className="flex items-center gap-2 rounded-lg border border-transparent py-1.5 pl-1.5 pr-2 transition hover:border-violet-200 hover:bg-zinc-50 dark:hover:border-violet-800/50 dark:hover:bg-zinc-900"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-base font-semibold text-white shadow-md ring-2 ring-white/80 dark:ring-zinc-900">
+            {user?.first_name?.charAt(0).toUpperCase()}
+            {user?.last_name?.charAt(0).toUpperCase()}
+          </div>
+        </button>
+
+        {showUserDropdown && (
+          /* Changes implemented: Added pointer-events-auto and viewport-safe alignment offset for mobile header dropdown context */
+          <div className="absolute right-0 lg:right-0 -mr-14 lg:mr-0 z-50 mt-2 w-60 rounded-xl border border-zinc-200 bg-white py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 pointer-events-auto">
+            <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-700">
+              <div className="font-medium text-zinc-900 dark:text-white">
+                {user?.first_name} {user?.last_name}
+              </div>
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {user?.email}
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+                {accountMeta}
+              </div>
+            </div>
+
+            <div className="py-1">
+              <Link
+                to="/admin/profile"
+                className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                onClick={() => setShowUserDropdown(false)}
+              >
+                <User size={18} /> Profile
+              </Link>
+              {showSettingsLink && (
+                <Link
+                  to="/admin/settings/general"
+                  className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  onClick={() => setShowUserDropdown(false)}
+                >
+                  <Settings size={18} /> Settings
+                </Link>
+              )}
+            </div>
+
+            <div className="mt-1 border-t border-zinc-100 pt-1 dark:border-zinc-700">
+              <button
+                onClick={() => {
+                  logout();
+                  setShowUserDropdown(false);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                <LogOut size={18} /> Logout
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <SupportModal open={showSupportModal} onClose={() => setShowSupportModal(false)} />
+    </div>
+  );
+};
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -32,11 +164,9 @@ export const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showMobileWorkspaceMenu, setShowMobileWorkspaceMenu] = useState(false);
   
-  const userDropdownRef = useRef<HTMLDivElement>(null);
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const userIsSuperAdmin = isSuperAdmin(user);
 
@@ -62,11 +192,17 @@ export const AdminLayout: React.FC = () => {
     localStorage.setItem("darkMode", String(newMode));
   };
 
-  useEffect(() => {
-    if (requiresOnboarding && !userIsSuperAdmin && location.pathname !== "/admin/onboarding") {
-      navigate("/admin/onboarding", { replace: true });
-    }
-  }, [requiresOnboarding, user, location.pathname, navigate, userIsSuperAdmin]);
+useEffect(() => {
+  if (user?.must_change_password && location.pathname !== "/admin/force-password-change") {
+    navigate("/admin/force-password-change", { replace: true });
+    return;
+  }
+  const needsGate =
+    (requiresOnboarding || !user?.email_verified) && !userIsSuperAdmin;
+  if (needsGate && location.pathname !== "/admin/onboarding") {
+    navigate("/admin/onboarding", { replace: true });
+  }
+}, [requiresOnboarding, user, location.pathname, navigate, userIsSuperAdmin]);
 
   // Close menus on page navigation changes
   useEffect(() => {
@@ -89,22 +225,6 @@ export const AdminLayout: React.FC = () => {
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMobileWorkspaceMenu]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        userDropdownRef.current &&
-        !userDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowUserDropdown(false);
-      }
-    };
-
-    if (showUserDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showUserDropdown]);
 
   const roleLabel = userIsSuperAdmin
     ? "Super admin"
@@ -161,6 +281,7 @@ export const AdminLayout: React.FC = () => {
     comments: "Comments",
     settings: "Settings",
     onboarding: "Onboarding",
+    profile: "Profile",
   };
 
   const pathSegments = location.pathname.split("/").filter(Boolean);
@@ -173,7 +294,7 @@ export const AdminLayout: React.FC = () => {
     location.pathname === "/admin/dashboard" ||
     location.pathname === "/admin/superadmin";
   const showOnboardingLock =
-    requiresOnboarding &&
+    (requiresOnboarding || !user?.email_verified) &&
     !userIsSuperAdmin &&
     location.pathname !== "/admin/onboarding";
   const onboardingStepOrder = ["about", "profile", "publication", "team", "plan"];
@@ -191,88 +312,28 @@ export const AdminLayout: React.FC = () => {
     pageBreadcrumbs.push(pageTitle);
   }
 
-  // Shared User Action Stack UI markup block
+  // Shared User Action Stack UI markup block.
+  // NOTE: this is called from multiple places (mobile topbar, desktop header,
+  // and passed down to Sidebar) which can be mounted at the same time. UserMenu
+  // owns its own open/close state and ref internally so each call site is a fully
+  // independent instance - no shared ref/state collisions between mounted copies.
   const renderUserActions = () => (
-    <div className="flex items-center gap-1.5">
-      <button 
-        onClick={toggleDarkMode}
-        className="hidden lg:flex rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-        aria-label="Toggle theme mode"
-      >
-        {darkMode ? <Moon size={18} /> : <Sun size={18} />}
-      </button>
-
-      <button className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
-        <Bell size={18} />
-      </button>
-
-      <button className="hidden lg:block rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
-        <HelpCircle size={18} />
-      </button>
-
-      <div className="relative" ref={userDropdownRef}>
-        <button
-          onClick={() => setShowUserDropdown(!showUserDropdown)}
-          className="flex items-center gap-2 rounded-lg border border-transparent py-1.5 pl-1.5 pr-2 transition hover:border-violet-200 hover:bg-zinc-50 dark:hover:border-violet-800/50 dark:hover:bg-zinc-900"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-base font-semibold text-white shadow-md ring-2 ring-white/80 dark:ring-zinc-900">
-            {user?.first_name?.charAt(0).toUpperCase()}
-            {user?.last_name?.charAt(0).toUpperCase()}
-          </div>
-        </button>
-
-        {showUserDropdown && (
-          <div className="absolute right-0 z-50 mt-2 w-60 rounded-xl border border-zinc-200 bg-white py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-700">
-              <div className="font-medium text-zinc-900 dark:text-white">
-                {user?.first_name} {user?.last_name}
-              </div>
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                {user?.email}
-              </div>
-              <div className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
-                {accountMeta}
-              </div>
-            </div>
-
-            <div className="py-1">
-              <Link
-                to={`/admin/users/${user?.id}`}
-                className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-                onClick={() => setShowUserDropdown(false)}
-              >
-                <User size={18} /> Profile
-              </Link>
-              <Link
-                to="/admin/settings/general"
-                className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-              >
-                <Settings size={18} /> Settings
-              </Link>
-            </div>
-
-            <div className="mt-1 border-t border-zinc-100 pt-1 dark:border-zinc-700">
-              <button
-                onClick={() => {
-                  logout();
-                  setShowUserDropdown(false);
-                }}
-                className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-              >
-                <LogOut size={18} /> Logout
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <UserMenu
+      user={user}
+      logout={logout}
+      darkMode={darkMode}
+      toggleDarkMode={toggleDarkMode}
+      accountMeta={accountMeta}
+      showSettingsLink={userIsSuperAdmin || activeRole === "owner"}
+    />
   );
 
   return (
     <div className="min-h-screen bg-[var(--admin-bg)]">
       
       {/* NEW: Integrated Mobile Topbar Sticky Navigation Header */}
-      <div className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-lg dark:bg-zinc-950/95 dark:border-zinc-800 px-4 h-14 flex items-center justify-between lg:hidden">
+      {/* Changes implemented: Explicitly added pointer-events-auto to ensure the sticky header handles clicks cleanly above overlays */}
+      <div className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-lg dark:bg-zinc-950/95 dark:border-zinc-800 px-4 h-14 flex items-center justify-between lg:hidden pointer-events-auto">
         <div className="flex items-center min-w-0 gap-1.5">
           <Link to={userIsSuperAdmin ? '/admin/superadmin' : '/admin/dashboard'} className="flex-shrink-0">
             <div className="flex h-9 w-9 items-center justify-center">

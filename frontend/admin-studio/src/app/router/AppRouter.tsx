@@ -1,7 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { ProtectedRoute } from '../../features/auth/components/ProtectedRoute';
 import { useAuth } from '../../features/auth/context/AuthContext';
-import { isSuperAdmin } from '../../features/auth/lib/accessControl';
+import { getPostLoginPath } from '../../features/auth/lib/accessControl';
 import { LoginView } from '../../features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '../../features/auth/pages/ForgotPasswordPage';
 import { AuthCallbackPage } from '../../features/auth/pages/AuthCallbackPage';
@@ -18,8 +18,7 @@ import { ContactSettings } from '../../features/settings/pages/ContactSettingsPa
 import { FooterSettings } from '../../features/settings/pages/FooterSettingsPage';
 import { GeneralSettings } from '../../features/settings/pages/GeneralSettingsPage';
 import { SEOSettings } from '../../features/settings/pages/SeoSettingsPage';
-import { ActivityLogPage } from '../../features/settings/pages/ActivityLogPage';
-import { useBlog } from '../providers/BlogProvider';
+import { ActivityLogPage } from '../../features/audit-log/pages/ActivityLogPage';
 import { TagManager } from '../../features/tags/pages/TagManagerPage';
 import { UserManager } from '../../features/users/pages/UserManagerPage';
 import { SuperAdminDashboardPage } from '../../features/superadmin/pages/SuperAdminDashboardPage';
@@ -34,118 +33,159 @@ import { SuperAdminAuditLogPage } from '../../features/superadmin/pages/SuperAdm
 import { SuperAdminPlatformSettingsPage } from '../../features/superadmin/pages/SuperAdminPlatformSettingsPage';
 import UserInfoPage from '../../features/users/pages/UserInfoPage';
 import { ResetPasswordPage } from '../../features/auth/pages/ResetPasswordPage';
-import { VerifyQuarantinePage } from '../../features/auth/pages/VerifyQuarantinePage';
+import { ForcePasswordChangePage } from '../../features/auth/pages/ForcePasswordChangePage';
+import { MyTicketsPage } from '../../features/support/pages/MyTicketsPage';
+import { SuperAdminSupportPage } from '../../features/superadmin/pages/SuperAdminSupportPage';
+import { SuperAdminBlogDetailPage } from '../../features/superadmin/pages/SuperAdminBlogDetailPage';
+import { JoinInvitationPage } from '../../features/users/pages/JoinInvitationPage';
 
 const DefaultAdminRedirect = () => {
   const { user } = useAuth();
-
-  if (user && !user.email_verified) {
-    return <Navigate to="/admin/verify-quarantine" replace />;
-  }
-
-  const requiresOnboarding = user?.blog_memberships?.some(
-    (membership) => membership.blog.onboarding_status !== 'completed',
-  );
-  return (
-    <Navigate
-      to={
-        isSuperAdmin(user)
-          ? '/admin/superadmin'
-          : requiresOnboarding
-          ? '/admin/onboarding'
-          : '/admin/dashboard'
-      }
-      replace
-    />
-  );
+  if (!user) return null;
+  return <Navigate to={getPostLoginPath(user)} replace />;
 };
 
-const SettingsIndexRedirect = () => {
-  const { activeRole } = useBlog();
-  const defaultPath = activeRole === 'editor' ? 'activity' : 'general';
-  return <Navigate to={defaultPath} replace />;
-};
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+    {/* ── Public routes ── */}
+      <Route element={<AuthLayout />}>
+        <Route path="/admin/login" element={<LoginView />} />
+        <Route
+          path="/admin/forgot-password"
+          element={<ForgotPasswordPage />}
+        />
+        <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+      </Route>
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/join/:token" element={<JoinInvitationPage />} />
 
-export const AppRouter = () => {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* ── Public routes ── */}
-        <Route element={<AuthLayout />}>
-          <Route path="/admin/login" element={<LoginView />} />
-          <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
-        </Route>
-        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route
+          path="/admin/force-password-change"
+          element={<ForcePasswordChangePage />}
+        />
+        <Route path="/admin/onboarding" element={<OnboardingPage />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/admin/verify-quarantine" element={<VerifyQuarantinePage />} />
+        {/* ── All other admin routes — inside AdminLayout ── */}
+        <Route element={<AdminLayout />}>
+          <Route path="/admin" element={<DefaultAdminRedirect />} />
 
-          {/* ── Onboarding — protected but NO AdminLayout wrapper ── */}
-          <Route path="/admin/onboarding" element={<OnboardingPage />} />
+          <Route
+            element={<ProtectedRoute requiredCapability="view_dashboard" />}
+          >
+            <Route path="/admin/dashboard" element={<Dashboard />} />
+          </Route>
 
-          {/* ── All other admin routes — inside AdminLayout ── */}
-          <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<DefaultAdminRedirect />} />
+          <Route path="/admin/profile" element={<UserInfoPage />} />
 
-            <Route element={<ProtectedRoute requiredCapability="view_dashboard" />}>
-              <Route path="/admin/dashboard" element={<Dashboard />} />
-            </Route>
+          {/* ======================== */}
 
-            <Route path="/admin/profile" element={<UserInfoPage />} />
+          <Route
+            element={
+              <ProtectedRoute requiredCapability="view_platform_stats" />
+            }
+          >
+            <Route
+              path="/admin/superadmin"
+              element={<SuperAdminDashboardPage />}
+            />
+            <Route
+              path="/admin/analytics"
+              element={<SuperAdminAnalyticsPage />}
+            />
+            <Route path="/admin/blogs" element={<SuperAdminBlogsPage />} />
+            <Route path="/admin/blogs/:blogId" element={<SuperAdminBlogDetailPage />} />
+            <Route
+              path="/admin/platform-users"
+              element={<SuperAdminUsersPage />}
+            />
+            <Route
+              path="/admin/subscriptions"
+              element={<SuperAdminSubscriptionsPage />}
+            />
+            <Route
+              path="/admin/moderation"
+              element={<SuperAdminModerationPage />}
+            />
+            <Route
+              path="/admin/audit-log"
+              element={<SuperAdminAuditLogPage />}
+            />
+            <Route
+              path="/admin/platform-settings"
+              element={<SuperAdminPlatformSettingsPage />}
+            />
+            <Route
+              path="/admin/support"
+              element={<SuperAdminSupportPage />}
+            />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="view_platform_stats" />}>
-              <Route path="/admin/superadmin"        element={<SuperAdminDashboardPage />} />
-              <Route path="/admin/analytics"         element={<SuperAdminAnalyticsPage />} />
-              <Route path="/admin/blogs"             element={<SuperAdminBlogsPage />} />
-              <Route path="/admin/platform-users"    element={<SuperAdminUsersPage />} />
-              <Route path="/admin/subscriptions"     element={<SuperAdminSubscriptionsPage />} />
-              <Route path="/admin/moderation"        element={<SuperAdminModerationPage />} />
-              <Route path="/admin/audit-log"         element={<SuperAdminAuditLogPage />} />
-              <Route path="/admin/platform-settings" element={<SuperAdminPlatformSettingsPage />} />
-            </Route>
+          <Route
+            element={<ProtectedRoute requiredCapability="manage_users" />}
+          >
+            <Route path="/admin/users" element={<UserManager />} />
+            <Route path="/admin/users/:id" element={<UserInfoPage />} />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="manage_users" />}>
-              <Route path="/admin/users" element={<UserManager />} />
-              <Route path="/admin/users/:id" element={<UserInfoPage />} />
-            </Route>
+          <Route
+            element={<ProtectedRoute requiredCapability="manage_posts" />}
+          >
+            <Route path="/admin/posts" element={<PostList />} />
+            <Route path="/admin/posts/new" element={<PostEditor />} />
+            <Route path="/admin/posts/edit/:id" element={<PostEditor />} />
+            <Route path="/admin/posts/view/:id" element={<PostView />} />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="manage_posts" />}>
-              <Route path="/admin/posts"            element={<PostList />} />
-              <Route path="/admin/posts/new"        element={<PostEditor />} />
-              <Route path="/admin/posts/edit/:id"   element={<PostEditor />} />
-              <Route path="/admin/posts/view/:id"   element={<PostView />} />
-            </Route>
+          <Route
+            element={<ProtectedRoute requiredCapability="manage_tags" />}
+          >
+            <Route path="/admin/tags" element={<TagManager />} />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="manage_tags" />}>
-              <Route path="/admin/tags" element={<TagManager />} />
-            </Route>
+          <Route
+            element={<ProtectedRoute requiredCapability="manage_comments" />}
+          >
+            <Route path="/admin/comments" element={<CommentManager />} />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="manage_comments" />}>
-              <Route path="/admin/comments" element={<CommentManager />} />
-            </Route>
+          <Route
+            element={<ProtectedRoute requiredCapability="view_audit_logs" />}
+          >
+            <Route path="/admin/activity" element={<ActivityLogPage />} />
+          </Route>
 
-            <Route element={<ProtectedRoute requiredCapability="access_admin_studio" />}>
-              <Route path="/admin/settings" element={<SettingsLayout />}>
-                <Route element={<ProtectedRoute requiredCapability="manage_settings" />}>
-                  <Route path="general"  element={<GeneralSettings />} />
-                  <Route path="about"    element={<AboutPageSettings />} />
-                  <Route path="footer"   element={<FooterSettings />} />
-                  <Route path="branding" element={<BrandingSettings />} />
-                  <Route path="seo"      element={<SEOSettings />} />
-                  <Route path="contact"  element={<ContactSettings />} />
-                </Route>
-                <Route element={<ProtectedRoute requiredCapability="view_audit_logs" />}>
-                  <Route path="activity" element={<ActivityLogPage />} />
-                </Route>
-                <Route index element={<SettingsIndexRedirect />} />
+          <Route
+            element={
+              <ProtectedRoute requiredCapability="access_admin_studio" />
+            }
+          >
+            <Route path="/admin/support-tickets" element={<MyTicketsPage />} />
+            <Route path="/admin/settings" element={<SettingsLayout />}>
+              <Route
+                element={
+                  <ProtectedRoute requiredCapability="manage_settings" />
+                }
+              >
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="about" element={<AboutPageSettings />} />
+                <Route path="footer" element={<FooterSettings />} />
+                <Route path="branding" element={<BrandingSettings />} />
+                <Route path="seo" element={<SEOSettings />} />
+                <Route path="contact" element={<ContactSettings />} />
               </Route>
+              <Route index element={<Navigate to="general" replace />} />
             </Route>
           </Route>
         </Route>
+      </Route>
 
-        <Route path="*" element={<Navigate to="/admin/login" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+      <Route path="*" element={<Navigate to="/admin/login" replace />} />
+    </>
+  )
+);
+
+export const AppRouter = () => {
+  return <RouterProvider router={router} />;
 };

@@ -1,4 +1,4 @@
-import { BarChart3, Building2, Check, ChevronDown, CreditCard, FileText, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users } from 'lucide-react';
+import { BarChart3, Building2, Check, ChevronDown, CreditCard, FileText, HelpCircle, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users, LifeBuoy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { useBlog } from '../../app/providers/BlogProvider';
 import { InkoLogo } from '../../assets/inko';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { isSuperAdmin } from '../../features/auth/lib/accessControl';
+import { SupportModal } from '../../features/support/components/SupportModal';
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
@@ -21,6 +22,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
   const { user } = useAuth();
   const { blogs, activeBlog, activeRole, setActiveBlogId } = useBlog();
   const location = useLocation();
+  const [showSupportModal, setShowSupportModal] = useState(false);
   
   const userIsSuperAdmin = isSuperAdmin(user);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
@@ -160,7 +162,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
 
       {/* Mobile Drawer Overlay Backdrop */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs lg:hidden"
           onClick={() => setIsOpen(false)}
         />
@@ -168,27 +170,32 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
 
       {/* Primary Sidebar Container */}
       {/* FIXED: Removed pt-14 on mobile viewports so layout starts flush at the top */}
-      <aside 
+      <aside
         className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-zinc-200 bg-white dark:bg-[#141414] dark:border-zinc-800/50 shadow-xl lg:shadow-none transition-all duration-300 lg:translate-x-0 pt-4 lg:pt-0 ${
-          isOpen ? 'translate-x-0 w-[248px]' : '-translate-x-full'
-        } lg:flex ${isExpanded ? 'lg:w-[248px]' : 'lg:w-14'}`}
-        onMouseEnter={() => sidebarMode === 'hover' && setIsHovering(true)}
-        onMouseLeave={() => sidebarMode === 'hover' && setIsHovering(false)}
+          isOpen ? "translate-x-0 w-[248px]" : "-translate-x-full"
+        } lg:flex ${isExpanded ? "lg:w-[248px]" : "lg:w-14"}`}
+        onMouseEnter={() => sidebarMode === "hover" && setIsHovering(true)}
+        onMouseLeave={() => sidebarMode === "hover" && setIsHovering(false)}
       >
-        
         {/* Desktop Brand Header */}
-        <div className={`hidden lg:flex shrink-0 items-center px-3 pt-6 transition-all duration-300 ${isExpanded ? 'mb-6' : 'mb-4 justify-center'}`}>
-          <Link 
-            to={userIsSuperAdmin ? '/admin/superadmin' : '/admin/dashboard'}
-            className={`flex items-center gap-3 ${!isExpanded && 'justify-center w-10'}`}
+        <div
+          className={`hidden lg:flex shrink-0 items-center px-3 pt-6 transition-all duration-300 ${isExpanded ? "mb-6" : "mb-4 justify-center"}`}
+        >
+          <Link
+            to={userIsSuperAdmin ? "/admin/superadmin" : "/admin/dashboard"}
+            className={`flex items-center gap-3 ${!isExpanded && "justify-center w-10"}`}
           >
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center">
               <InkoLogo color="purple" size={25} />
             </div>
             {isExpanded && (
               <div>
-                <div className="text-xl font-bold tracking-tight text-purple-600">Inko</div>
-                <div className="-mt-0.5 text-[10px] font-mono tracking-[0.22em] text-zinc-500 dark:text-zinc-400">ADMIN STUDIO</div>
+                <div className="text-xl font-bold tracking-tight text-purple-600">
+                  Inko
+                </div>
+                <div className="-mt-0.5 text-[10px] font-mono tracking-[0.22em] text-zinc-500 dark:text-zinc-400">
+                  ADMIN STUDIO
+                </div>
               </div>
             )}
           </Link>
@@ -196,47 +203,71 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
 
         {/* Workspace Dropper Selector Menu - DESKTOP ONLY */}
         {blogs.length > 0 && !userIsSuperAdmin && (
-          <div ref={workspaceMenuRef} className="hidden lg:block relative mx-2 mb-4 transition-all duration-300">
+          <div
+            ref={workspaceMenuRef}
+            className="hidden lg:block relative mx-2 mb-4 transition-all duration-300"
+          >
             <button
               onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-              className={`flex w-full items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 transition-all hover:bg-white hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${isExpanded ? 'px-3 py-2.5' : 'h-10 w-10 justify-center p-0'}`}
+              className={`flex w-full items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 transition-all hover:bg-white hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${isExpanded ? "px-3 py-2.5" : "h-10 w-10 justify-center p-0"}`}
               aria-label="Switch workspace"
             >
               <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
-                {activeBlog?.name?.charAt(0).toUpperCase() ?? 'W'}
+                {activeBlog?.name?.charAt(0).toUpperCase() ?? "W"}
               </div>
               {isExpanded && (
                 <>
                   <div className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-[13px] font-semibold text-zinc-900 dark:text-white">{activeBlog?.name ?? 'Select workspace'}</div>
+                    <div className="truncate text-[13px] font-semibold text-zinc-900 dark:text-white">
+                      {activeBlog?.name ?? "Select workspace"}
+                    </div>
                     {activeRole && (
-                      <div className="text-[10px] font-medium capitalize text-zinc-500 dark:text-zinc-400">{activeRole}</div>
+                      <div className="text-[10px] font-medium capitalize text-zinc-500 dark:text-zinc-400">
+                        {activeRole}
+                      </div>
                     )}
                   </div>
-                  <ChevronDown size={14} className={`flex-shrink-0 text-zinc-400 transition-transform duration-200 ${showWorkspaceMenu ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    size={14}
+                    className={`flex-shrink-0 text-zinc-400 transition-transform duration-200 ${showWorkspaceMenu ? "rotate-180" : ""}`}
+                  />
                 </>
               )}
             </button>
 
             {showWorkspaceMenu && (
-              <div className={`absolute z-50 mt-1.5 rounded-xl border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${isExpanded ? 'left-0 right-0' : 'left-full ml-2 w-52'}`}>
+              <div
+                className={`absolute z-50 mt-1.5 rounded-xl border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${isExpanded ? "left-0 right-0" : "left-full ml-2 w-52"}`}
+              >
                 <div className="border-b border-zinc-100 px-3.5 pb-2 pt-1.5 dark:border-zinc-800">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Workspaces</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                    Workspaces
+                  </div>
                 </div>
                 <div className="py-1 max-h-60 overflow-y-auto scrollbar-thin">
                   {blogs.map((blog) => (
                     <button
                       key={blog.id}
-                      onClick={() => { setActiveBlogId(blog.id); setShowWorkspaceMenu(false); }}
+                      onClick={() => {
+                        setActiveBlogId(blog.id);
+                        setShowWorkspaceMenu(false);
+                      }}
                       className="flex w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     >
                       <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
                         {blog.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">{blog.name}</div>
+                        <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">
+                          {blog.name}
+                        </div>
                       </div>
-                      {activeBlog?.id === blog.id && <Check size={14} className="flex-shrink-0 text-violet-600" />}
+                      {activeBlog?.id === blog.id && (
+                        <Check
+                          size={14}
+                          className="flex-shrink-0 text-violet-600"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -246,76 +277,166 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
         )}
 
         {/* Scrollable Navigation Area Links list */}
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden pb-6 transition-all duration-300 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full ${isExpanded || window.innerWidth < 1024 ? 'space-y-2 px-2.5' : 'space-y-0 px-1.5'}`}>
+        <nav
+          className={`flex-1 overflow-y-auto overflow-x-hidden pb-6 transition-all duration-300 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full ${isExpanded || window.innerWidth < 1024 ? "space-y-2 px-2.5" : "space-y-0 px-1.5"}`}
+        >
           {userIsSuperAdmin ? (
             <>
               <div>
-                {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Overview</div>}
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Overview</div>
+                )}
                 <div className="space-y-1">
-                  <NavLink to="/admin/superadmin" icon={LayoutDashboard} label="Dashboard" />
-                  <NavLink to="/admin/analytics" icon={BarChart3} label="Analytics" />
+                  <NavLink
+                    to="/admin/superadmin"
+                    icon={LayoutDashboard}
+                    label="Dashboard"
+                  />
+                  <NavLink
+                    to="/admin/analytics"
+                    icon={BarChart3}
+                    label="Analytics"
+                  />
                 </div>
               </div>
               <div className="pt-4">
-                {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Management</div>}
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Management</div>
+                )}
                 <div className="space-y-1">
                   <NavLink to="/admin/blogs" icon={Building2} label="Blogs" />
-                  <NavLink to="/admin/platform-users" icon={Users} label="Users" />
-                  <NavLink to="/admin/subscriptions" icon={CreditCard} label="Subscriptions" />
+                  <NavLink
+                    to="/admin/platform-users"
+                    icon={Users}
+                    label="Users"
+                  />
+                  <NavLink
+                    to="/admin/subscriptions"
+                    icon={CreditCard}
+                    label="Subscriptions"
+                  />
                 </div>
               </div>
               <div className="pt-4">
-                {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Configuration</div>}
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Configuration</div>
+                )}
                 <div className="space-y-1">
-                  <NavLink to="/admin/moderation" icon={MessageSquare} label="Moderation" />
-                  <NavLink to="/admin/audit-log" icon={ScrollText} label="Audit Log" />
-                  <NavLink to="/admin/platform-settings" icon={Settings} label="Settings" />
+                  <NavLink
+                    to="/admin/moderation"
+                    icon={MessageSquare}
+                    label="Moderation"
+                  />
+                  <NavLink
+                    to="/admin/support"
+                    icon={LifeBuoy}
+                    label="Support Tickets"
+                  />
+                  <NavLink
+                    to="/admin/audit-log"
+                    icon={ScrollText}
+                    label="Audit Log"
+                  />
+                  <NavLink
+                    to="/admin/platform-settings"
+                    icon={Settings}
+                    label="Settings"
+                  />
                 </div>
               </div>
             </>
           ) : (
             <>
               <div>
-                {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Overview</div>}
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Overview</div>
+                )}
                 <div className="space-y-1">
-                  <NavLink to="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
+                  <NavLink
+                    to="/admin/dashboard"
+                    icon={LayoutDashboard}
+                    label="Dashboard"
+                  />
                 </div>
               </div>
               <div className="pt-4">
-                {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Content</div>}
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Content</div>
+                )}
                 <div className="space-y-1">
                   <NavLink to="/admin/posts" icon={FileText} label="Posts" />
-                  <NavLink to="/admin/tags" icon={Tag} label="Tags" />
-                  <NavLink to="/admin/comments" icon={MessageSquare} label="Comments" />
+                  {(activeRole === "owner" || activeRole === "editor") && (
+                    <>
+                      <NavLink to="/admin/tags" icon={Tag} label="Tags" />
+                      <NavLink
+                        to="/admin/comments"
+                        icon={MessageSquare}
+                        label="Comments"
+                      />
+                    </>
+                  )}
                 </div>
               </div>
-              {(activeRole === 'owner' || activeRole === 'editor') && (
+              {(activeRole === "owner" || activeRole === "editor") && (
                 <div className="pt-4">
-                  {(isExpanded || window.innerWidth < 1024) && <div className={sectionHeaderClass}>Management</div>}
+                  {(isExpanded || window.innerWidth < 1024) && (
+                    <div className={sectionHeaderClass}>Management</div>
+                  )}
                   <div className="space-y-1">
-                    {activeRole === 'owner' && (
+                    {activeRole === "owner" && (
                       <NavLink to="/admin/users" icon={Users} label="Team" />
                     )}
                     <NavLink
-                      to={activeRole === 'editor' ? '/admin/settings/activity' : '/admin/settings/general'}
-                      icon={Settings}
-                      label="Settings"
+                      to="/admin/activity"
+                      icon={ScrollText}
+                      label="Activity Log"
                     />
+                    {activeRole === "owner" && (
+                      <NavLink
+                        to="/admin/settings"
+                        icon={Settings}
+                        label="Settings"
+                      />
+                    )}
                   </div>
                 </div>
               )}
+              <div className="pt-4">
+                {(isExpanded || window.innerWidth < 1024) && (
+                  <div className={sectionHeaderClass}>Help</div>
+                )}
+                <div className="space-y-1">
+                  <NavLink
+                    to="/admin/support-tickets"
+                    icon={LifeBuoy}
+                    label="Support Tickets"
+                  />
+                </div>
+              </div>
             </>
           )}
 
           {/* Mobile-Only Personal Profile Navigation Link */}
           <div className="block lg:hidden pt-4 mt-2 border-t border-zinc-100 dark:border-zinc-800/60">
-            <NavLink 
-              to={`/admin/users/${user?.id}`} 
-              icon={User} 
-              label="My Profile" 
+            <NavLink
+              to={`/admin/users/${user?.id}`}
+              icon={User}
+              label="My Profile"
             />
+            <button
+              onClick={() => setShowSupportModal(true)}
+              className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/60 transition-all"
+            >
+              <HelpCircle size={18} className="flex-shrink-0" />
+              <span>Help &amp; Support</span>
+            </button>
           </div>
         </nav>
+
+        <SupportModal
+          open={showSupportModal}
+          onClose={() => setShowSupportModal(false)}
+        />
 
         {/* Combined Footer Deck */}
         <div className="border-t border-zinc-200 dark:border-[#2e2e2e] bg-white dark:bg-[#141414] p-2 shrink-0">
@@ -326,11 +447,19 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
               className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/60 transition-all"
             >
               <div className="flex items-center gap-3">
-                {darkMode ? <Moon size={18} className="text-violet-400" /> : <Sun size={18} className="text-amber-500" />}
+                {darkMode ? (
+                  <Moon size={18} className="text-violet-400" />
+                ) : (
+                  <Sun size={18} className="text-amber-500" />
+                )}
                 <span>Dark Mode</span>
               </div>
-              <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${darkMode ? 'bg-violet-600' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${darkMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              <div
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${darkMode ? "bg-violet-600" : "bg-zinc-200 dark:bg-zinc-700"}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${darkMode ? "translate-x-4" : "translate-x-0"}`}
+                />
               </div>
             </button>
           </div>
@@ -348,24 +477,41 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
 
               {showSidebarControl && (
                 <div className="absolute bottom-full left-0 mb-2 z-50 w-56 rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-[#2e2e2e] dark:bg-[#1c1c1c]">
-                  <div className="px-3 py-1.5 text-xs text-zinc-400 dark:text-[#888888] font-medium">Sidebar control</div>
+                  <div className="px-3 py-1.5 text-xs text-zinc-400 dark:text-[#888888] font-medium">
+                    Sidebar control
+                  </div>
                   <div className="my-1 border-t border-zinc-100 dark:border-[#2e2e2e]" />
                   <div className="space-y-0.5">
-                    <button onClick={() => setMode('expanded')} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]">
+                    <button
+                      onClick={() => setMode("expanded")}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]"
+                    >
                       <span className="w-4 flex items-center justify-center">
-                        {sidebarMode === 'expanded' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />}
+                        {sidebarMode === "expanded" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />
+                        )}
                       </span>
                       <span>Expanded</span>
                     </button>
-                    <button onClick={() => setMode('collapsed')} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]">
+                    <button
+                      onClick={() => setMode("collapsed")}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]"
+                    >
                       <span className="w-4 flex items-center justify-center">
-                        {sidebarMode === 'collapsed' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />}
+                        {sidebarMode === "collapsed" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />
+                        )}
                       </span>
                       <span>Collapsed</span>
                     </button>
-                    <button onClick={() => setMode('hover')} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]">
+                    <button
+                      onClick={() => setMode("hover")}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-zinc-700 dark:text-[#ededed] transition-colors hover:bg-zinc-50 dark:hover:bg-[#222222]"
+                    >
                       <span className="w-4 flex items-center justify-center">
-                        {sidebarMode === 'hover' && <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />}
+                        {sidebarMode === "hover" && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-[#ededed]" />
+                        )}
                       </span>
                       <span>Expand on hover</span>
                     </button>
