@@ -4,6 +4,9 @@ from .moderation import ModerationAction, ModerationItem
 from .post import Post, PostTagLink, ProjectMetadata, Tag
 from .settings import SiteSettings, PlatformSettings
 from .user import User, PlatformRole
+from .auth_tokens import EmailVerification, PasswordResetToken
+from .support import SupportTicket, SupportMessage, TicketStatus
+from .notification import Notification
 from .blog import (
     Blog,
     BlogInvitation,
@@ -26,6 +29,8 @@ __all__ = [
     "ModerationAction",
     "ModerationItem",
     "PlatformRole",
+    "EmailVerification",
+    "PasswordResetToken",
     "Blog",
     "BlogMember",
     "BlogRole",
@@ -46,4 +51,8 @@ __all__ = [
     "ProjectMetadata",
     "SiteSettings",
     "PlatformSettings",
+    "SupportTicket",
+    "SupportMessage",
+    "TicketStatus",
+    "Notification",
 ]
