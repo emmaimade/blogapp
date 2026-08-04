@@ -51,7 +51,7 @@ export const SuperAdminSubscriptionsPage = () => {
   const expiredCount = (subscriptions ?? []).filter((s: any) => s.status === 'expired' || s.status === 'canceled').length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Subscriptions</h1>
@@ -95,7 +95,7 @@ export const SuperAdminSubscriptionsPage = () => {
       )}
 
       {/* Search */}
-      <div className="relative max-w-sm">
+      <div className="relative max-w-full sm:max-w-sm">
         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
         <input
           type="text"
@@ -107,8 +107,32 @@ export const SuperAdminSubscriptionsPage = () => {
       </div>
 
       {/* Table */}
+      <div className="block md:hidden">
+        {filtered.length === 0 ? (
+          <div className="p-4 text-center text-sm text-zinc-500">No subscriptions found.</div>
+        ) : (
+          (filtered.map((sub: any) => (
+            <div key={`mobile-sub-${sub.blog_id}`} className="p-4 mb-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                  <CreditCard size={13} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold truncate text-sm text-zinc-900 dark:text-white">{sub.blog_name ?? `Blog #${sub.blog_id}`}</p>
+                  <p className="text-xs text-zinc-500">ID: {sub.blog_id}</p>
+                </div>
+                <div className="ml-auto text-right text-xs text-zinc-500">
+                  <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${planColors[sub.plan] ?? planColors.FREE}`}>{sub.plan}</div>
+                  <div className="mt-2 text-xs text-zinc-500">{formatLocalDate(sub.current_period_ends_at)}</div>
+                </div>
+              </div>
+            </div>
+          )) as any)
+        )}
+      </div>
+
       <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
@@ -145,7 +169,7 @@ export const SuperAdminSubscriptionsPage = () => {
                     <tr key={sub.blog_id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
+                          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
                             <CreditCard size={13} className="text-primary" />
                           </div>
                           <div>

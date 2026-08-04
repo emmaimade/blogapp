@@ -60,7 +60,7 @@ export const SuperAdminAnalyticsPage = () => {
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Analytics</h1>
@@ -163,7 +163,7 @@ export const SuperAdminAnalyticsPage = () => {
               <div key={blog.blog_id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-black text-zinc-400 w-4">{i + 1}</span>
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate max-w-[160px]">{blog.blog_name}</span>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate max-w-40">{blog.blog_name}</span>
                 </div>
                 <span className="text-sm font-bold text-primary">{blog.total_views.toLocaleString()}</span>
               </div>
@@ -183,7 +183,7 @@ export const SuperAdminAnalyticsPage = () => {
               <div key={blog.blog_id} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-black text-zinc-400 w-4">{i + 1}</span>
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate max-w-[160px]">{blog.blog_name}</span>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate max-w-40">{blog.blog_name}</span>
                 </div>
                 <span className="text-sm font-bold text-primary">{blog.total_posts.toLocaleString()}</span>
               </div>

@@ -196,7 +196,7 @@ export const SuperAdminUsersPage = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
       {/* Header View */}
       <div>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -208,7 +208,7 @@ export const SuperAdminUsersPage = () => {
       </div>
 
       {/* Control Actions & Searching */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/20 p-4 rounded-xl border border-zinc-200/60 dark:border-zinc-800/50">
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/20 p-4 rounded-xl border border-zinc-200/60 dark:border-zinc-800/50 w-full">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" size={16} />
           <input
@@ -232,7 +232,7 @@ export const SuperAdminUsersPage = () => {
       )}
 
       {/* MOBILE CARD VIEW CONTAINER */}
-      <div className="block md:hidden space-y-4">
+      <div className="block md:hidden space-y-4 px-0">
         {sortedWorkspaceEntries.map(([workspaceName, tenantUsers]) => {
           const isExpanded = !!expandedWorkspaces[workspaceName];
 
@@ -243,13 +243,13 @@ export const SuperAdminUsersPage = () => {
                 className="flex items-center justify-between p-3 bg-zinc-50/80 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl cursor-pointer select-none text-xs font-medium text-zinc-700 dark:text-zinc-300"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Layers size={13} className="text-zinc-400 flex-shrink-0" />
+                  <Layers size={13} className="text-zinc-400 shrink-0" />
                   <span className="truncate">{workspaceName}</span>
-                  <span className="text-zinc-400 dark:text-zinc-500 font-normal flex-shrink-0">({tenantUsers.length})</span>
+                  <span className="text-zinc-400 dark:text-zinc-500 font-normal shrink-0">({tenantUsers.length})</span>
                 </div>
                 <ChevronDown
                   size={14}
-                  className={`text-zinc-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`}
+                  className={`text-zinc-400 transition-transform duration-200 shrink-0 ${isExpanded ? '' : '-rotate-90'}`}
                 />
               </div>
 
@@ -273,7 +273,7 @@ export const SuperAdminUsersPage = () => {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-semibold text-xs text-zinc-600 dark:text-zinc-300 uppercase flex-shrink-0">
+                            <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-semibold text-xs text-zinc-600 dark:text-zinc-300 uppercase shrink-0">
                               {firstInitial || lastInitial ? `${firstInitial}${lastInitial}` : "U"}
                             </div>
                             <div className="flex flex-col min-w-0">
@@ -346,7 +346,7 @@ export const SuperAdminUsersPage = () => {
                                   ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/50"
                                   : accountRow.contextualRole === "editor"
                                     ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
-                                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 border-zinc-800"
+                                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800"
                               }`}
                             >
                               {accountRow.contextualRole}
@@ -441,7 +441,7 @@ export const SuperAdminUsersPage = () => {
                           >
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-medium text-zinc-600 dark:text-zinc-300 uppercase shadow-sm flex-shrink-0">
+                                <div className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-medium text-zinc-600 dark:text-zinc-300 uppercase shadow-sm shrink-0">
                                   {firstInitial || lastInitial ? `${firstInitial}${lastInitial}` : "U"}
                                 </div>
                                 <div className="flex flex-col min-w-0">

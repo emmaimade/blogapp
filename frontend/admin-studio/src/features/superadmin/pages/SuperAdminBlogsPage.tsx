@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-    Ban, CheckCircle,
-    Globe,
-    Loader2,
-    Search,
-    Trash2
+  Ban,
+  CheckCircle,
+  Eye,
+  Globe,
+  Loader2,
+  Search,
+  Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 
@@ -26,7 +29,7 @@ interface BlogTenantItem {
 export const SuperAdminBlogsPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Track modal open state
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -42,8 +45,15 @@ export const SuperAdminBlogsPage = () => {
 
   // Toggle suspension state status mutation
   const toggleActiveMutation = useMutation({
-    mutationFn: async ({ blog_id, is_active }: { blog_id: number; is_active: boolean }) => {
-      return (await api.patch(`/superadmin/blogs/${blog_id}`, { is_active })).data;
+    mutationFn: async ({
+      blog_id,
+      is_active,
+    }: {
+      blog_id: number;
+      is_active: boolean;
+    }) => {
+      return (await api.patch(`/superadmin/blogs/${blog_id}`, { is_active }))
+        .data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadminBlogs'] });
@@ -62,7 +72,10 @@ export const SuperAdminBlogsPage = () => {
     },
   });
 
-  const openModal = (type: 'suspend' | 'activate' | 'delete', blog: BlogTenantItem) => {
+  const openModal = (
+    type: 'suspend' | 'activate' | 'delete',
+    blog: BlogTenantItem
+  ) => {
     setConfirmModal({ isOpen: true, type, blog });
   };
 
@@ -71,11 +84,18 @@ export const SuperAdminBlogsPage = () => {
   };
 
   // Filter rows cleanly checked for potential undefined string fields
-  const filteredBlogs = blogs?.filter(blog => 
-    (blog.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (blog.blog_name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (blog.subdomain ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (blog.owner_email ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBlogs = blogs?.filter(
+    (blog) =>
+      (blog.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (blog.blog_name ?? '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (blog.subdomain ?? '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (blog.owner_email ?? '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
   );
 
   if (isLoading) {
@@ -87,12 +107,19 @@ export const SuperAdminBlogsPage = () => {
   }
 
   if (error) {
-    return <div className="p-5 text-center text-red-500">Error loading tenant configurations.</div>;
+    return (
+      <div className="p-5 text-center text-red-500">
+        Error loading tenant configurations.
+      </div>
+    );
   }
 
   const getModalProps = () => {
     if (!confirmModal.blog || !confirmModal.type) return null;
-    const blogName = confirmModal.blog.name ?? confirmModal.blog.blog_name ?? 'this workspace';
+    const blogName =
+      confirmModal.blog.name ??
+      confirmModal.blog.blog_name ??
+      'this workspace';
 
     switch (confirmModal.type) {
       case 'suspend':
@@ -146,8 +173,43 @@ export const SuperAdminBlogsPage = () => {
         />
       </div>
 
-      <div className="overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
-        <table className="w-full text-left border-collapse">
+      <div className="block md:hidden space-y-3">
+        {filteredBlogs && filteredBlogs.length > 0 ? (
+          filteredBlogs.map((blog) => {
+            const blogName = blog.name ?? blog.blog_name ?? 'Untitled workspace';
+            const blogSubdomain = blog.subdomain ?? 'workspace';
+            const blogPostsCount = blog.posts_count ?? blog.total_posts ?? 0;
+            const isBlogActive = blog.is_active ?? true;
+            return (
+              <div key={`mobile-${blog.blog_id}`} className="p-4 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link to={`/admin/blogs/${blog.blog_id}`} className="font-bold text-zinc-900 dark:text-white truncate block">{blogName}</Link>
+                    <div className="text-xs text-zinc-500 mt-1 font-mono">{blog.custom_domain ? blog.custom_domain : `${blogSubdomain}.inko.blog`}</div>
+                    <div className="text-xs text-zinc-500 mt-1">{blog.owner_email}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-white">{blogPostsCount} posts</div>
+                    <div className="mt-2">
+                      {isBlogActive ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">Active</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Suspended</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="p-4 text-center text-sm text-zinc-500">No workspaces found.</div>
+        )}
+      </div>
+
+      <div className="hidden md:block overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               <th className="p-4">Blog Name</th>
@@ -161,9 +223,11 @@ export const SuperAdminBlogsPage = () => {
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
             {filteredBlogs?.map((blog) => {
               const rowKey = `blog-id-${blog.blog_id}`;
-              const blogName = blog.name ?? blog.blog_name ?? "Untitled workspace";
-              const blogSubdomain = blog.subdomain ?? "workspace";
-              const blogPostsCount = blog.posts_count ?? blog.total_posts ?? 0;
+              const blogName =
+                blog.name ?? blog.blog_name ?? 'Untitled workspace';
+              const blogSubdomain = blog.subdomain ?? 'workspace';
+              const blogPostsCount =
+                blog.posts_count ?? blog.total_posts ?? 0;
               const isBlogActive = blog.is_active ?? true;
 
               return (
@@ -171,13 +235,20 @@ export const SuperAdminBlogsPage = () => {
                   key={rowKey}
                   className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
                 >
-                  <td className="p-4 font-bold text-zinc-900 dark:text-white">
-                    {blogName}
+                  <td className="p-4">
+                    <Link
+                      to={`/admin/blogs/${blog.blog_id}`}
+                      className="font-bold text-zinc-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                    >
+                      {blogName}
+                    </Link>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
                       <Globe size={12} className="text-zinc-400" />
-                      {blog.custom_domain ? blog.custom_domain : `${blogSubdomain}.inko.blog`}
+                      {blog.custom_domain
+                        ? blog.custom_domain
+                        : `${blogSubdomain}.inko.blog`}
                     </div>
                   </td>
                   <td className="p-4 text-zinc-600 dark:text-zinc-300">
@@ -198,9 +269,18 @@ export const SuperAdminBlogsPage = () => {
                     )}
                   </td>
                   <td className="p-4 text-right space-x-1">
+                    {/* Open workspace detail */}
+                    <Link
+                      to={`/admin/blogs/${blog.blog_id}`}
+                      className="inline-flex p-2 rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+                      title="Open workspace"
+                    >
+                      <Eye size={16} />
+                    </Link>
+
                     {isBlogActive ? (
                       <button
-                        onClick={() => openModal("suspend", blog)}
+                        onClick={() => openModal('suspend', blog)}
                         className="inline-flex p-2 rounded-xl text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors"
                         title="Suspend Publication"
                       >
@@ -208,15 +288,16 @@ export const SuperAdminBlogsPage = () => {
                       </button>
                     ) : (
                       <button
-                        onClick={() => openModal("activate", blog)}
+                        onClick={() => openModal('activate', blog)}
                         className="inline-flex p-2 rounded-xl text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors"
                         title="Activate Publication"
                       >
                         <CheckCircle size={16} />
                       </button>
                     )}
+
                     <button
-                      onClick={() => openModal("delete", blog)}
+                      onClick={() => openModal('delete', blog)}
                       className="inline-flex p-2 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                       title="Purge Workspace Cascade"
                     >
@@ -228,6 +309,7 @@ export const SuperAdminBlogsPage = () => {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {confirmModal.isOpen && activeModalProps && (
@@ -239,14 +321,14 @@ export const SuperAdminBlogsPage = () => {
           isDanger={activeModalProps.isDanger}
           onConfirm={() => {
             if (!confirmModal.blog?.blog_id) return;
-            if (confirmModal.type === "delete") {
+            if (confirmModal.type === 'delete') {
               deleteBlogMutation.mutate(confirmModal.blog.blog_id);
-            } else if (confirmModal.type === "suspend") {
+            } else if (confirmModal.type === 'suspend') {
               toggleActiveMutation.mutate({
                 blog_id: confirmModal.blog.blog_id,
                 is_active: false,
               });
-            } else if (confirmModal.type === "activate") {
+            } else if (confirmModal.type === 'activate') {
               toggleActiveMutation.mutate({
                 blog_id: confirmModal.blog.blog_id,
                 is_active: true,
@@ -255,8 +337,8 @@ export const SuperAdminBlogsPage = () => {
           }}
           message={activeModalProps.message}
           validationMatch={
-            confirmModal.type === "delete"
-              ? (confirmModal.blog?.subdomain ?? "")
+            confirmModal.type === 'delete'
+              ? (confirmModal.blog?.subdomain ?? '')
               : undefined
           }
         />

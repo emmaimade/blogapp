@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2 } from 'lucide-react';
+import { useBlocker } from 'react-router-dom';
+import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -28,6 +29,30 @@ interface PlatformSettingsForm {
   feature_comments: boolean;
   feature_newsletters: boolean;
 }
+
+const defaultPlatformSettings: PlatformSettingsForm = {
+  platform_name: 'INKO',
+  platform_url: 'https://inko.blog',
+  support_email: 'support@inko.blog',
+  max_blogs_per_user: 5,
+  max_members_per_blog: 20,
+  allow_public_signup: true,
+  require_email_verification: true,
+  smtp_host: '',
+  smtp_port: 587,
+  smtp_user: '',
+  smtp_from: 'noreply@inko.blog',
+  enable_google_auth: true,
+  enable_github_auth: false,
+  session_timeout_hours: 24,
+  enforce_2fa_superadmin: true,
+  feature_custom_domains: true,
+  feature_api_access: true,
+  feature_analytics: true,
+  feature_sso: false,
+  feature_comments: true,
+  feature_newsletters: false,
+};
 
 const fetchPlatformSettings = async () => {
   const res = await axios.get(`${API_URL}/superadmin/platform-settings`, {
@@ -68,29 +93,42 @@ export const SuperAdminPlatformSettingsPage = () => {
   });
 
   const [form, setForm] = useState<PlatformSettingsForm>({
-    platform_name: 'INKO',
-    platform_url: 'https://inko.blog',
-    support_email: 'support@inko.blog',
-    max_blogs_per_user: 5,
-    max_members_per_blog: 20,
-    allow_public_signup: true,
-    require_email_verification: true,
-    smtp_host: '',
-    smtp_port: 587,
-    smtp_user: '',
-    smtp_from: 'noreply@inko.blog',
-    enable_google_auth: true,
-    enable_github_auth: false,
-    session_timeout_hours: 24,
-    enforce_2fa_superadmin: true,
-    feature_custom_domains: true,
-    feature_api_access: true,
-    feature_analytics: true,
-    feature_sso: false,
-    feature_comments: true,
-    feature_newsletters: false,
+    ...defaultPlatformSettings,
     ...settings,
   });
+  const [savedForm, setSavedForm] = useState<PlatformSettingsForm>({
+    ...defaultPlatformSettings,
+    ...settings,
+  });
+
+  // Settings load asynchronously; sync form + baseline once the real data arrives
+  // instead of only reading it on the very first (pre-fetch) render.
+  useEffect(() => {
+    if (!settings) return;
+    const merged = { ...defaultPlatformSettings, ...settings };
+    setForm(merged);
+    setSavedForm(merged);
+  }, [settings]);
+
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm);
+
+  // Browser-level guard: refresh, close tab, or navigate to another site.
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // In-app guard: navigating to another route within the app.
+  // NOTE: useBlocker only works with a data router (createBrowserRouter /
+  // createRoutesFromElements). It throws if the app still uses <BrowserRouter>.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => isDirty && currentLocation.pathname !== nextLocation.pathname
+  );
 
   const set = <K extends keyof PlatformSettingsForm>(key: K, value: PlatformSettingsForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -98,7 +136,8 @@ export const SuperAdminPlatformSettingsPage = () => {
 
   const mutation = useMutation({
     mutationFn: savePlatformSettings,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      setSavedForm(variables);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     },
@@ -117,7 +156,7 @@ export const SuperAdminPlatformSettingsPage = () => {
         <p className="text-sm font-semibold text-zinc-900 dark:text-white">{label}</p>
         {description && <p className="text-xs text-zinc-500 mt-0.5">{description}</p>}
       </div>
-      <div className="flex-shrink-0">{children}</div>
+      <div className="shrink-0">{children}</div>
     </div>
   );
 
@@ -130,17 +169,18 @@ export const SuperAdminPlatformSettingsPage = () => {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <>
+    <div className={`p-4 sm:p-8 max-w-full sm:max-w-4xl mx-auto space-y-6 ${isDirty ? 'pb-28 sm:pb-8' : ''}`}>
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Platform Settings</h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">Configure global platform behaviour and feature availability.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Platform Settings</h1>
+          <p className="mt-2 text-sm sm:text-base text-zinc-600 dark:text-zinc-400">Configure global platform behaviour and feature availability.</p>
         </div>
         <button
           onClick={() => mutation.mutate(form)}
           disabled={mutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 bg-purple-500 text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+          className="hidden sm:flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all shadow-md shadow-primary/20 disabled:opacity-50"
         >
           {mutation.isPending ? (
             <><Loader2 size={15} className="animate-spin" /> Saving…</>
@@ -153,12 +193,12 @@ export const SuperAdminPlatformSettingsPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-fit">
+      <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-full sm:w-fit overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center gap-2 shrink-0 whitespace-nowrap px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === key
                 ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -170,7 +210,7 @@ export const SuperAdminPlatformSettingsPage = () => {
       </div>
 
       {/* Panel */}
-      <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6">
+      <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 sm:p-6">
 
         {activeTab === 'general' && (
           <div className="space-y-5">
@@ -282,5 +322,67 @@ export const SuperAdminPlatformSettingsPage = () => {
         )}
       </div>
     </div>
+
+    {/* Mobile dirty-state bottom bar */}
+    {isDirty && (
+      <div
+        className="sm:hidden fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-3 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 shadow-lg"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">Unsaved changes</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setForm(savedForm)}
+            disabled={mutation.isPending}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50"
+          >
+            Discard
+          </button>
+          <button
+            onClick={() => mutation.mutate(form)}
+            disabled={mutation.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all disabled:opacity-50"
+          >
+            {mutation.isPending ? (
+              <><Loader2 size={15} className="animate-spin" /> Saving…</>
+            ) : (
+              <><Save size={15} /> Save</>
+            )}
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* In-app navigation guard modal */}
+    {blocker.state === 'blocked' && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-full bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0">
+              <AlertTriangle size={16} className="text-yellow-700 dark:text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white">Leave without saving?</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">You have unsaved changes to platform settings. They'll be lost if you leave this page.</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => blocker.reset?.()}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+            >
+              Stay on page
+            </button>
+            <button
+              onClick={() => blocker.proceed?.()}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+            >
+              Leave without saving
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };

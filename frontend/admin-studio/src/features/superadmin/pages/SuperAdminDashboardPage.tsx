@@ -17,7 +17,7 @@ export const SuperAdminDashboardPage = () => {
   if (statsLoading || blogsLoading) return <SuperAdminDashboardSkeleton />;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Overview</h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">Global metrics across all tenants.</p>
@@ -53,7 +53,27 @@ export const SuperAdminDashboardPage = () => {
         <div className="p-6 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Active Tenants</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="block md:hidden">
+          {(!blogs || blogs.length === 0) ? (
+            <div className="p-4 text-center text-zinc-500">No tenants active.</div>
+          ) : (
+            blogs.map((b) => (
+              <div key={`mobile-b-${b.blog_id}`} className="p-4 mb-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm text-zinc-900 dark:text-zinc-200 truncate">{b.blog_name}</div>
+                    <div className="text-xs text-zinc-500">{b.total_posts} posts · {b.total_views} views</div>
+                  </div>
+                  <div className="shrink-0">
+                    <span className="inline-flex items-center rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-950 dark:bg-zinc-900/50 dark:text-zinc-500">{b.plan}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
             <thead className="bg-zinc-50 font-semibold text-zinc-900 dark:bg-zinc-800/50 dark:text-zinc-200">
               <tr>
