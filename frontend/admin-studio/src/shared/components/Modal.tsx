@@ -10,10 +10,11 @@ interface ModalProps {
   confirmText?: string;
   isDanger?: boolean;
   validationMatch?: string;
+  autoClose?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", isDanger = true, validationMatch 
+  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", isDanger = true, validationMatch, autoClose = true 
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   
@@ -81,7 +82,9 @@ export const Modal: React.FC<ModalProps> = ({
             onClick={() => {
               if (!isLocked) {
                 onConfirm();
-                onClose();
+                if (autoClose) {
+                  onClose();
+                }
               }
             }}
             disabled={isLocked}
@@ -90,7 +93,7 @@ export const Modal: React.FC<ModalProps> = ({
                 ? "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed opacity-60"
                 : isDanger
                   ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500"
+                  : "bg-violet-600 text-white hover:bg-violet-700 focus:ring-2 focus:ring-violet-500"
             }`}
           >
             {confirmText}
