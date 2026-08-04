@@ -5,10 +5,11 @@ import {
   Eye,
   Globe,
   Loader2,
+  MoreHorizontal,
   Search,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
@@ -25,6 +26,91 @@ interface BlogTenantItem {
   posts_count?: number;
   total_posts?: number;
 }
+
+interface RowActionsProps {
+  blog: BlogTenantItem;
+  onOpenModal: (type: 'suspend' | 'activate' | 'delete', blog: BlogTenantItem) => void;
+}
+
+const RowActionsMenu = ({ blog, onOpenModal }: RowActionsProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isBlogActive = blog.is_active ?? true;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+        aria-label="Actions menu"
+      >
+        <MoreHorizontal size={16} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-1 w-48 origin-top-right rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 animate-in fade-in zoom-in-95 duration-100">
+          <Link
+            to={`/admin/blogs/${blog.blog_id}`}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+            onClick={() => setIsOpen(false)}
+          >
+            <Eye size={14} /> View Workspace
+          </Link>
+
+          {isBlogActive ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenModal('suspend', blog);
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+            >
+              <Ban size={14} /> Suspend Workspace
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenModal('activate', blog);
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 transition-colors"
+            >
+              <CheckCircle size={14} /> Activate Workspace
+            </button>
+          )}
+
+          <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onOpenModal('delete', blog);
+            }}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          >
+            <Trash2 size={14} /> Delete Workspace
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SuperAdminBlogsPage = () => {
   const queryClient = useQueryClient();
@@ -173,6 +259,7 @@ export const SuperAdminBlogsPage = () => {
         />
       </div>
 
+      {/* Mobile Card Layout View */}
       <div className="block md:hidden space-y-3">
         {filteredBlogs && filteredBlogs.length > 0 ? (
           filteredBlogs.map((blog) => {
@@ -188,15 +275,18 @@ export const SuperAdminBlogsPage = () => {
                     <div className="text-xs text-zinc-500 mt-1 font-mono">{blog.custom_domain ? blog.custom_domain : `${blogSubdomain}.inko.blog`}</div>
                     <div className="text-xs text-zinc-500 mt-1">{blog.owner_email}</div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm font-medium text-zinc-900 dark:text-white">{blogPostsCount} posts</div>
-                    <div className="mt-2">
-                      {isBlogActive ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">Active</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Suspended</span>
-                      )}
+                  <div className="shrink-0 text-right flex items-center gap-2">
+                    <div>
+                      <div className="text-sm font-medium text-zinc-900 dark:text-white">{blogPostsCount} posts</div>
+                      <div className="mt-1">
+                        {isBlogActive ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">Active</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Suspended</span>
+                        )}
+                      </div>
                     </div>
+                    <RowActionsMenu blog={blog} onOpenModal={openModal} />
                   </div>
                 </div>
               </div>
@@ -207,108 +297,76 @@ export const SuperAdminBlogsPage = () => {
         )}
       </div>
 
-      <div className="hidden md:block overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
-        <div className="overflow-x-auto">
+      {/* Desktop Table Layout View */}
+      <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
+        <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              <th className="p-4">Blog Name</th>
-              <th className="p-4">Routing / Domain</th>
-              <th className="p-4">Owner Profile</th>
-              <th className="p-4">Content Size</th>
-              <th className="p-4">System Status</th>
-              <th className="p-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
-            {filteredBlogs?.map((blog) => {
-              const rowKey = `blog-id-${blog.blog_id}`;
-              const blogName =
-                blog.name ?? blog.blog_name ?? 'Untitled workspace';
-              const blogSubdomain = blog.subdomain ?? 'workspace';
-              const blogPostsCount =
-                blog.posts_count ?? blog.total_posts ?? 0;
-              const isBlogActive = blog.is_active ?? true;
+            <thead>
+              <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <th className="p-4">Blog Name</th>
+                <th className="p-4">Routing / Domain</th>
+                <th className="p-4">Owner Profile</th>
+                <th className="p-4">Content Size</th>
+                <th className="p-4">System Status</th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
+              {filteredBlogs?.map((blog) => {
+                const rowKey = `blog-id-${blog.blog_id}`;
+                const blogName =
+                  blog.name ?? blog.blog_name ?? 'Untitled workspace';
+                const blogSubdomain = blog.subdomain ?? 'workspace';
+                const blogPostsCount =
+                  blog.posts_count ?? blog.total_posts ?? 0;
+                const isBlogActive = blog.is_active ?? true;
 
-              return (
-                <tr
-                  key={rowKey}
-                  className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
-                >
-                  <td className="p-4">
-                    <Link
-                      to={`/admin/blogs/${blog.blog_id}`}
-                      className="font-bold text-zinc-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                    >
-                      {blogName}
-                    </Link>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                      <Globe size={12} className="text-zinc-400" />
-                      {blog.custom_domain
-                        ? blog.custom_domain
-                        : `${blogSubdomain}.inko.blog`}
-                    </div>
-                  </td>
-                  <td className="p-4 text-zinc-600 dark:text-zinc-300">
-                    {blog.owner_email}
-                  </td>
-                  <td className="p-4 font-medium text-zinc-900 dark:text-white">
-                    {blogPostsCount} posts
-                  </td>
-                  <td className="p-4">
-                    {isBlogActive ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/20 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
-                        <CheckCircle size={12} /> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                        <Ban size={12} /> Suspended
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right space-x-1">
-                    {/* Open workspace detail */}
-                    <Link
-                      to={`/admin/blogs/${blog.blog_id}`}
-                      className="inline-flex p-2 rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
-                      title="Open workspace"
-                    >
-                      <Eye size={16} />
-                    </Link>
-
-                    {isBlogActive ? (
-                      <button
-                        onClick={() => openModal('suspend', blog)}
-                        className="inline-flex p-2 rounded-xl text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors"
-                        title="Suspend Publication"
+                return (
+                  <tr
+                    key={rowKey}
+                    className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
+                  >
+                    <td className="p-4">
+                      <Link
+                        to={`/admin/blogs/${blog.blog_id}`}
+                        className="font-bold text-zinc-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
                       >
-                        <Ban size={16} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => openModal('activate', blog)}
-                        className="inline-flex p-2 rounded-xl text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors"
-                        title="Activate Publication"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => openModal('delete', blog)}
-                      className="inline-flex p-2 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                      title="Purge Workspace Cascade"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        {blogName}
+                      </Link>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                        <Globe size={12} className="text-zinc-400" />
+                        {blog.custom_domain
+                          ? blog.custom_domain
+                          : `${blogSubdomain}.inko.blog`}
+                      </div>
+                    </td>
+                    <td className="p-4 text-zinc-600 dark:text-zinc-300">
+                      {blog.owner_email}
+                    </td>
+                    <td className="p-4 font-medium text-zinc-900 dark:text-white">
+                      {blogPostsCount} posts
+                    </td>
+                    <td className="p-4">
+                      {isBlogActive ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/20 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
+                          <CheckCircle size={12} /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                          <Ban size={12} /> Suspended
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-right">
+                      <RowActionsMenu blog={blog} onOpenModal={openModal} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
