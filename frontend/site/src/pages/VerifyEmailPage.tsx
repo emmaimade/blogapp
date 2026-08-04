@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle, ArrowRight, Mail } from "lucide-react";
 import axios from "axios";
@@ -13,6 +13,7 @@ export const VerifyEmailPage = () => {
   const [email, setEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
+  const hasVerified = useRef(false);
 
   const handleResendVerification = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -42,15 +43,23 @@ export const VerifyEmailPage = () => {
       return;
     }
 
+    if (hasVerified.current) return;
+    hasVerified.current = true;
+
     const verifyToken = async () => {
       try {
-        const res = await axios.get(`${API_URL}/auth/verify-email?token=${token}`);
+        const res = await axios.get(
+          `${API_URL}/auth/verify-email?token=${token}`,
+        );
         setStatus("success");
-        setMessage(res.data.message || "Your email has been successfully verified!");
+        setMessage(
+          res.data.message || "Your email has been successfully verified!",
+        );
       } catch (err: any) {
         setStatus("error");
         setMessage(
-          err.response?.data?.detail || "This verification link is invalid or has expired."
+          err.response?.data?.detail ||
+            "This verification link is invalid or has expired.",
         );
       }
     };

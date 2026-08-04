@@ -43,5 +43,6 @@ export interface AuthUser {
   is_super_admin: boolean;
   is_active?: boolean;
   email_verified: boolean;
+  must_change_password: boolean;
   blog_memberships: UserBlogMembership[];
 }

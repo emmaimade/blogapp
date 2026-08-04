@@ -12,12 +12,24 @@ export type AdminCapability =
   | 'view_audit_logs'
   | 'view_platform_stats';
 
-const BLOG_MEMBER_CAPABILITIES: AdminCapability[] = [
+export const ADMIN_CAPABILITIES: AdminCapability[] = [
+  'access_admin_studio',
+  'view_dashboard',
+  'manage_posts',
+  'manage_tags',
+  'manage_comments',
+  'manage_users',
+  'manage_settings',
+  'view_audit_logs',
+  'view_platform_stats',
+];
+
+export const BLOG_MEMBER_CAPABILITIES: AdminCapability[] = [
   'access_admin_studio',
   'view_dashboard',
 ];
 
-const SUPER_ADMIN_CAPABILITIES: AdminCapability[] = [
+export const SUPER_ADMIN_CAPABILITIES: AdminCapability[] = [
   ...BLOG_MEMBER_CAPABILITIES,
   'manage_posts',
   'manage_tags',
@@ -103,4 +115,23 @@ export const getAccessSummary = (
     title: 'No workspace assigned',
     description: 'This account is signed in, but it is not assigned to any blog workspace yet.',
   };
+};
+
+export const getPostLoginPath = (user: AuthUser): string => {
+  if (user.must_change_password) {
+    return '/admin/force-password-change';
+  }
+
+  if (isSuperAdmin(user)) {
+    return '/admin/superadmin';
+  }
+
+  const requiresOnboarding = user.blog_memberships?.some(
+    (membership) =>
+      membership.blog.is_active &&
+      membership.role === 'owner' &&
+      membership.blog.onboarding_status !== 'completed',
+  );
+
+  return requiresOnboarding ? '/admin/onboarding' : '/admin/dashboard';
 };

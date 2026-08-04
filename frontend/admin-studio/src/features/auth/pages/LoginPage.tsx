@@ -1,34 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, LockKeyhole, User, Loader2, Eye, EyeOff } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { authSession } from '../lib/session';
 import { getCurrentUserRequest, loginRequest } from '../../../shared/api/auth';
-import { isSuperAdmin } from '../lib/accessControl';
+import { getPostLoginPath } from '../lib/accessControl';
 import { useAuth } from '../context/AuthContext';
-import type { AuthUser } from '../types';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || "http://localhost:5175";
 
-const getPostLoginPath = (user: AuthUser) => {
-  if (!user.email_verified) {
-    return '/admin/verify-quarantine';
-  }
-
-  if (isSuperAdmin(user)) {
-    return '/admin/superadmin';
-  }
-
-  const hasIncompleteWorkspace = user.blog_memberships?.some(
-    (membership) =>
-      membership.blog.is_active &&
-      membership.role === 'owner' &&
-      membership.blog.onboarding_status !== 'completed',
-  );
-
-  return hasIncompleteWorkspace ? '/admin/onboarding' : '/admin/dashboard';
-};
-
 export const LoginView = () => {
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +18,15 @@ export const LoginView = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Only honor same-origin relative redirects (e.g. "/join/abc123") — never
+  // an absolute URL, which could be used to redirect a freshly-authenticated
+  // session off to an attacker-controlled site.
+  const redirectTo = searchParams.get('redirect');
+  const safeRedirect = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+    ? redirectTo
+    : null;
 
   // Force light mode on login page
   useEffect(() => {
@@ -71,7 +61,7 @@ export const LoginView = () => {
       const userData = userResponse.data;
 
       login(access_token, userData);
-      navigate(getPostLoginPath(userData));
+      navigate(safeRedirect || getPostLoginPath(userData));
     } catch (err: any) {
       console.error('Login error:', err);
 
