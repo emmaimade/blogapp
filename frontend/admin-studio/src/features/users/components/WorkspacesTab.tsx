@@ -1,74 +1,83 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../../../shared/api/client';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../auth/context/AuthContext';
+import { useBlog, type BlogMembership } from '../../../app/providers/BlogProvider';
+import {
+  getAdminCapabilities,
+  ADMIN_CAPABILITIES,
+  type AdminCapability,
+} from "../../auth/lib/accessControl";
 import { Modal } from '../../../shared/components/Modal';
+import { Shield, ShieldAlert, CheckCircle2, XCircle, Layout, FileText, Settings, type LucideIcon } from 'lucide-react';
+import type { AuthUser } from '../../auth/types';
 
-interface WorkspaceMembership {
-  id: number;
-  blog_id: number;
-  role: 'owner' | 'editor' | 'viewer';
-  permissions: {
-    can_publish: boolean;
-    can_delete_comments: boolean;
-    can_manage_settings: boolean;
-  };
-  blog: { name: string };
+interface WorkspacesTabProps {
+  targetUser: AuthUser | null;
+  isSuperadmin: boolean;
 }
 
-export default function WorkspacesTab({ targetUser, isSuperadmin, isBlogOwner }: any) {
+// Map technical keys to beautifully polished UI labels
+const CAPABILITY_LABELS: Record<AdminCapability, { label: string; icon: LucideIcon; category: 'core' | 'content' | 'admin' }> = {
+  access_admin_studio: { label: "Access Studio", icon: Layout, category: 'core' },
+  view_dashboard: { label: "View Analytics Dashboard", icon: Layout, category: 'core' },
+  manage_posts: { label: "Write & Publish Posts", icon: FileText, category: 'content' },
+  manage_tags: { label: "Manage Taxonomies & Tags", icon: FileText, category: 'content' },
+  manage_comments: { label: "Moderate Comments", icon: FileText, category: 'content' },
+  manage_users: { label: "Invite & Manage Team", icon: Settings, category: 'admin' },
+  manage_settings: { label: "Alter Blog Settings", icon: Settings, category: 'admin' },
+  view_audit_logs: { label: "Inspect Audit Trails", icon: Settings, category: 'admin' },
+  view_platform_stats: { label: "View Global Platform Stats", icon: ShieldAlert, category: 'admin' },
+};
+
+export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTabProps) {
   const queryClient = useQueryClient();
-  
-  // Clean structure to manage selection targets before saving
+  const { user: currentUser } = useAuth();
+  const { activeBlog } = useBlog();
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
+    blogId: number;
     membershipId: number;
-    type: 'role' | 'permission';
-    targetField: string;
-    newValue: any;
-    currentValue: any;
+    newValue: string;
+    currentValue: string;
     workspaceName: string;
   } | null>(null);
 
-  const updatePermissionMutation = useMutation({
-    mutationFn: async (payload: { membershipId: number; role?: string; permissions?: any }) => {
-      const token = localStorage.getItem('token');
-      return axios.patch(`/api/memberships/${payload.membershipId}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  const updateRoleMutation = useMutation({
+    mutationFn: async (payload: { blogId: number; membershipId: number; role: string }) => {
+      return api.patch(`/blogs/${payload.blogId}/members/${payload.membershipId}`, { role: payload.role });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
-      toast.success('Permissions updated successfully!');
+      const userId = targetUser?.id;
+      if (userId) queryClient.invalidateQueries({ queryKey: ['user-detail', userId] });
+      
+      // Keep the UserManager list updated if the user edited a member within their current workspace
+      if (activeBlog?.id) {
+        queryClient.invalidateQueries({ queryKey: ["blogMembers", activeBlog.id] });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['user-me'] });
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] }); 
+
+      toast.success('Workspace role updated successfully!');
       setConfirmModal(null);
     },
     onError: () => {
-      toast.error('Failed to update workspace permissions.');
+      toast.error('Failed to update workspace role.');
+      setConfirmModal(null);
     }
   });
 
-  const handleRoleSelectChange = (membership: WorkspaceMembership, newRole: string) => {
+  const handleRoleSelectChange = (membership: BlogMembership, newRole: string) => {
     if (membership.role === newRole) return;
-    
     setConfirmModal({
       isOpen: true,
+      blogId: membership.blog_id,
       membershipId: membership.id,
-      type: 'role',
-      targetField: 'role',
       newValue: newRole,
       currentValue: membership.role,
-      workspaceName: membership.blog.name
-    });
-  };
-
-  const handleToggleClick = (membership: WorkspaceMembership, permissionKey: string, currentVal: boolean) => {
-    setConfirmModal({
-      isOpen: true,
-      membershipId: membership.id,
-      type: 'permission',
-      targetField: permissionKey,
-      newValue: !currentVal,
-      currentValue: currentVal,
       workspaceName: membership.blog.name
     });
   };
@@ -76,96 +85,132 @@ export default function WorkspacesTab({ targetUser, isSuperadmin, isBlogOwner }:
   const executeConfirmedChange = () => {
     if (!confirmModal) return;
 
-    if (confirmModal.type === 'role') {
-      updatePermissionMutation.mutate({
-        membershipId: confirmModal.membershipId,
-        role: confirmModal.newValue
-      });
-    } else {
-      const activeMembership = targetUser.blog_memberships.find((m: any) => m.id === confirmModal.membershipId);
-      const updatedPermissions = {
-        ...activeMembership.permissions,
-        [confirmModal.targetField]: confirmModal.newValue
-      };
-
-      updatePermissionMutation.mutate({
-        membershipId: confirmModal.membershipId,
-        permissions: updatedPermissions
-      });
-    }
+    updateRoleMutation.mutate({
+      blogId: confirmModal.blogId,
+      membershipId: confirmModal.membershipId,
+      role: confirmModal.newValue
+    });
   };
 
-  const canManage = isSuperadmin || isBlogOwner;
+  const spaceMemberships: BlogMembership[] = targetUser?.blog_memberships || [];
+
+  if (spaceMemberships.length === 0) {
+    return (
+      <div className="flex h-[200px] w-full flex-col items-center justify-center text-center p-6 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800">
+        <p className="text-xs text-zinc-400">No active workspace assignments found for this account.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 relative">
-      {targetUser?.blog_memberships?.map((membership: WorkspaceMembership) => (
-        <div key={membership.id} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/50 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{membership.blog.name}</h4>
-              <p className="text-[11px] text-zinc-400">Workspace Tenant Scope</p>
-            </div>
+    <div className="space-y-8">
+      {spaceMemberships.map((membership: BlogMembership) => {
+        const allowedCapabilities = getAdminCapabilities(targetUser, membership);
 
-            {canManage ? (
-              <select
-                value={membership.role}
-                onChange={(e) => handleRoleSelectChange(membership, e.target.value as any)}
-                className="text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none"
-              >
-                <option value="viewer">Viewer</option>
-                <option value="editor">Editor</option>
-                <option value="owner">Owner</option>
-              </select>
-            ) : (
-              <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 capitalize">
-                {membership.role}
-              </span>
-            )}
-          </div>
+        // Find if the currently logged-in user is an 'owner' within THIS specific loop-rendered workspace
+        const currentLoggedInUserRoleInThisBlog = currentUser?.blog_memberships?.find(
+          (m) => m.blog_id === membership.blog_id
+        )?.role;
 
-          <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+        const isOwnerOfThisBlog = currentLoggedInUserRoleInThisBlog === 'owner';
+        
+        // Grant write access if they are global Superadmin OR an explicit Owner of this specific workspace partition
+        const canManageThisWorkspace = isSuperadmin || isOwnerOfThisBlog;
 
-          <div className="space-y-2">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Fine-Grained Capabilities</span>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {Object.entries(membership.permissions || {}).map(([key, value]) => {
-                const formattedLabel = key.replace('can_', '').replace('_', ' ');
-                return (
-                  <label 
-                    key={key} 
-                    className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer select-none transition-colors ${!canManage ? 'opacity-60 cursor-not-allowed' : ''} ${value ? 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/20' : 'border-zinc-100 dark:border-zinc-800'}`}
+        return (
+          <div
+            key={membership.id}
+            className="overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 shadow-sm"
+          >
+            {/* Header section with profile scope context */}
+            <div className="p-5 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    {membership.blog?.name || "Unnamed Space"}
+                  </h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Tenant Authorization Group
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <span className="text-xs text-zinc-400 font-medium mr-1">Workspace Role:</span>
+                {canManageThisWorkspace ? (
+                  <select
+                    value={membership.role}
+                    onChange={(e) => handleRoleSelectChange(membership, e.target.value)}
+                    className="text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 font-semibold text-zinc-800 dark:text-zinc-200 shadow-sm focus:outline-none focus:ring-1 focus:ring-zinc-500 cursor-pointer"
                   >
-                    <span className="capitalize text-zinc-600 dark:text-zinc-400">{formattedLabel}</span>
-                    <input
-                      type="checkbox"
-                      checked={!!value}
-                      disabled={!canManage}
-                      onChange={() => handleToggleClick(membership, key, !!value)}
-                      className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 h-3.5 w-3.5"
-                    />
-                  </label>
-                );
-              })}
+                    <option value="author">Author</option>
+                    <option value="editor">Editor</option>
+                    <option value="owner">Owner</option>
+                  </select>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 capitalize tracking-wide">
+                    {membership.role}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Grid presentation layout organized by functionality scope */}
+            <div className="p-5 space-y-4">
+              <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Assigned Role Privileges Summary
+              </span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {ADMIN_CAPABILITIES.map((capability: AdminCapability) => {
+                  const isAllowed = allowedCapabilities.has(capability);
+                  const config = CAPABILITY_LABELS[capability] || { label: capability, icon: Layout };
+                  const IconComponent = config.icon;
+
+                  return (
+                    <div
+                      key={capability}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
+                        isAllowed
+                          ? "border-violet-500/20 dark:border-violet-500/10 bg-violet-50/30 dark:bg-violet-950/5 text-zinc-800 dark:text-zinc-200"
+                          : "border-zinc-100 dark:border-zinc-900 bg-zinc-50/10 dark:bg-zinc-900/5 text-zinc-400 dark:text-zinc-600 opacity-65"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <IconComponent className={`h-4 w-4 flex-shrink-0 ${isAllowed ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400'}`} />
+                        <span className="text-xs font-medium truncate">
+                          {config.label}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        {isAllowed ? (
+                          <CheckCircle2 className="h-4 w-4 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-zinc-300 dark:text-zinc-700 flex-shrink-0" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
-      {/* Clean shared modal replacement logic[cite: 10, 11] */}
       <Modal
         isOpen={!!confirmModal?.isOpen}
-        title="Confirm Permission Restructure"
-        isDanger={false} // Uses clean non-destructive layout styling tokens[cite: 10]
-        confirmText={updatePermissionMutation.isPending ? "Saving..." : "Confirm Change"}
+        title="Confirm Workspace Assignment Change"
+        isDanger={false}
+        confirmText={updateRoleMutation.isPending ? "Updating..." : "Confirm Role Update"}
         onClose={() => setConfirmModal(null)}
         onConfirm={executeConfirmedChange}
-        message={
-          confirmModal?.type === 'role'
-            ? `Are you sure you want to alter this user's role in ${confirmModal.workspaceName} from "${confirmModal.currentValue}" to "${confirmModal.newValue}"? This will shift their baseline system visibility thresholds.`
-            : `Are you sure you want to change the "${confirmModal?.targetField?.replace('can_', '').replace('_', ' ')}" rule to ${confirmModal?.newValue ? 'ENABLED' : 'DISABLED'} for the ${confirmModal?.workspaceName} partition?`
-        }
+        autoClose={false}
+        message={`Are you sure you want to alter this user's role in ${confirmModal?.workspaceName} from "${confirmModal?.currentValue}" to "${confirmModal?.newValue}"? This will dynamically reconfigure all fine-grained privileges associated with this account context.`}
       />
     </div>
   );

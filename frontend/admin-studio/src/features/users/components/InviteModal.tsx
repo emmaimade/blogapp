@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { X, Check, Link2, Copy, Clock, Loader2 } from "lucide-react";
+import { X, Check, Mail, Loader2, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../../shared/api/client";
+import { useBlog } from "../../../app/providers/BlogProvider";
 import type { BlogRole } from "../hooks/useUserManager";
 import { RoleBadge, ROLE_META } from "./UserComponents";
-
-const SITE_URL = import.meta.env.VITE_SITE_URL || "http://localhost:5174";
 
 interface InviteModalProps {
   isOpen: boolean;
@@ -14,34 +13,38 @@ interface InviteModalProps {
 }
 
 export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) => {
+  const { activeBlog } = useBlog();
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<BlogRole>("author");
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedLink, setGeneratedLink] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [sentTo, setSentTo] = useState("");
 
-  const handleGenerate = async () => {
+  const handleInvite = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      toast.error("Enter an email address to invite.");
+      return;
+    }
+    if (!activeBlog?.id) {
+      toast.error("No active workspace selected.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await api.post("/invitations", { role });
-      const token: string = res.data.token;
-      setGeneratedLink(`${SITE_URL}/join/${token}`);
+      await api.post(`/blogs/${activeBlog.id}/invitations`, { email: trimmedEmail, role });
+      setSentTo(trimmedEmail);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to generate invite link.");
+      toast.error(err.response?.data?.detail || "Failed to send invitation.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(generatedLink);
-    setCopied(true);
-    toast.success("Link copied to clipboard!");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleClose = () => {
-    setGeneratedLink("");
+    setEmail("");
+    setSentTo("");
     setRole("author");
     onClose();
   };
@@ -55,36 +58,40 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Invite team member</h3>
-            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">Generate a link to share with anyone — valid for 7 days.</p>
+            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">We'll email them a link to join — valid for 7 days.</p>
           </div>
           <button onClick={handleClose} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800">
             <X size={18} />
           </button>
         </div>
 
-        {generatedLink ? (
+        {sentTo ? (
           <div className="mb-4 space-y-3">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-              <Check size={15} /> Invite link generated for <RoleBadge role={role} />
+              <Check size={15} /> Invitation sent to <span className="font-mono text-xs">{sentTo}</span>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-              <Link2 size={14} className="shrink-0 text-zinc-400" />
-              <span className="flex-1 truncate font-mono text-xs text-zinc-600 dark:text-zinc-300">{generatedLink}</span>
-              <button
-                onClick={handleCopy}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${copied ? "bg-emerald-100 text-emerald-700" : "bg-violet-600 text-white hover:bg-violet-700"}`}
-              >
-                {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-              </button>
+              <Mail size={14} className="shrink-0 text-zinc-400" />
+              <span className="flex-1 text-xs text-zinc-600 dark:text-zinc-300">
+                They'll receive an email with a link to accept as <RoleBadge role={role} />.
+              </span>
             </div>
-            <p className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-              <Clock size={11} /> This link expires in 7 days. Share it privately.
-            </p>
           </div>
         ) : null}
 
-        {!generatedLink && (
+        {!sentTo && (
           <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="colleague@example.com"
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">Role</label>
               <div className="grid grid-cols-2 gap-2">
@@ -114,18 +121,18 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
               </button>
               <button
                 type="button"
-                onClick={handleGenerate}
+                onClick={handleInvite}
                 disabled={isLoading}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
               >
-                {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
-                {isLoading ? "Generating..." : "Generate Invite Link"}
+                {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                {isLoading ? "Sending..." : "Send Invite"}
               </button>
             </div>
           </div>
         )}
 
-        {generatedLink && (
+        {sentTo && (
           <button type="button" onClick={handleClose} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             Done
           </button>

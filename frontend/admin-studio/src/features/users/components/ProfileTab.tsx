@@ -86,7 +86,7 @@ export default function ProfileTab({ targetUser }: ProfileTabProps) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-4 py-2 bg-primary dark:bg-violet-800 text-white dark:text-zinc-950 text-xs font-medium rounded-xl disabled:opacity-50"
+          className="px-4 py-2 bg-violet-700 dark:bg-violet-800 text-white dark:text-zinc-950 text-xs font-medium rounded-xl disabled:opacity-50"
         >
           {isSubmitting ? 'Saving...' : 'Save Changes'}
         </button>

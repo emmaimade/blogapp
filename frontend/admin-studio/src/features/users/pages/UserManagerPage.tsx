@@ -1,16 +1,42 @@
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, Search, Shield, Trash2, Users, Loader2, AlertTriangle } from "lucide-react";
+import { UserPlus, Search, Users, Loader2, MoreHorizontal, Trash2, User, Mail, Clock } from "lucide-react";
 import { formatSmart, formatLocalDate } from "../../../shared/utils/dates";
 import { useUserManager } from "../hooks/useUserManager";
 import { InviteModal } from "../components/InviteModal";
 import { Avatar, RoleBadge, RoleDropdown } from "../components/UserComponents";
+import { Modal } from "../../../shared/components/Modal";
 
 export const UserManager = () => {
   const {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
-    showInviteModal, setShowInviteModal, removingId, setRemovingId,
-    filteredMembers, isOwner, isLoading, updateRoleMutation, removeMutation
+    showInviteModal, setShowInviteModal,
+    filteredMembers, pendingInvitations, revokeInvitationMutation,
+    isOwner, isLoading, updateRoleMutation, removeMutation
   } = useUserManager();
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    isDanger?: boolean;
+    action: () => void;
+  } | null>(null);
+
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (openMenuId !== null && dropdownContainerRef.current && !dropdownContainerRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [openMenuId]);
 
   if (isLoading) {
     return (
@@ -57,7 +83,7 @@ export const UserManager = () => {
         </div>
       </div>
 
-      {/* Empty State Fallback Screen */}
+      {/* Empty State */}
       {(filteredMembers?.length ?? 0) === 0 && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-16">
           <Users className="mb-3 text-zinc-300 dark:text-zinc-700" size={40} />
@@ -74,7 +100,7 @@ export const UserManager = () => {
         </div>
       )}
 
-      {/* Primary Context Lists Matrix Wrapper */}
+      {/* Primary Table Lists Wrapper */}
       {(filteredMembers?.length ?? 0) > 0 && (
         <>
           {/* 1. Mobile Layout List Display */}
@@ -82,12 +108,11 @@ export const UserManager = () => {
             {filteredMembers?.map((member) => {
               const isCurrentUser = member.user_id === currentUser?.id;
               const canRemove = isOwner && !isCurrentUser && member.role !== "owner";
-              const isConfirmingRemove = removingId === member.id;
 
               return (
                 <div
                   key={member.id}
-                  className={`p-4 border rounded-xl bg-white dark:bg-zinc-900 transition-all space-y-3 shadow-xs ${isConfirmingRemove ? "border-red-200 dark:border-red-900/60 bg-red-50/5 dark:bg-red-950/5" : "border-zinc-200 dark:border-zinc-800"}`}
+                  className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 transition-all space-y-4 shadow-xs"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -101,33 +126,66 @@ export const UserManager = () => {
                         <span className="text-xs text-zinc-400 dark:text-zinc-500 truncate mt-0.5">{member.user.email}</span>
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
+
+                    <div className="relative flex items-center gap-2 flex-shrink-0">
                       {isOwner ? (
                         <RoleDropdown member={member} currentUserId={currentUser?.id} onRoleChange={(id, role) => updateRoleMutation.mutate({ memberId: id, newRole: role })} isPending={updateRoleMutation.isPending} />
                       ) : (
                         <RoleBadge role={member.role} />
                       )}
+
+                      <div className="relative" ref={openMenuId === member.id ? dropdownContainerRef : null}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === member.id ? null : member.id);
+                          }}
+                          className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+                        >
+                          <MoreHorizontal size={15} />
+                        </button>
+
+                        {openMenuId === member.id && (
+                          <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium">
+                            <Link to={`/admin/users/${member.user.id}`} onClick={() => setOpenMenuId(null)} className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                             <User size={14} /> View Profile
+                            </Link>
+                            {canRemove ? (
+                              <button
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  setModalConfig({
+                                    isOpen: true,
+                                    title: "Remove Team Member",
+                                    message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
+                                    confirmText: "Remove Member",
+                                    isDanger: true,
+                                    action: () => removeMutation.mutate(member.id),
+                                  });
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
+                              >
+                                <Trash2 size={14} /> Remove Member
+                              </button>
+                            ) : (
+                              <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
+                                <Trash2 size={14} /> Remove Member
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 text-xs">
-                    <div className="text-zinc-500 dark:text-zinc-400">
-                      <span className="font-medium text-zinc-400 block">Last Activity Context:</span>
-                      {member.user.last_login ? <span className="font-semibold text-zinc-700 dark:text-zinc-300">{formatSmart(member.user.last_login)}</span> : <span className="text-zinc-400 dark:text-zinc-600 italic">Never logged in</span>}
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 text-xs">
+                    <div>
+                      <span className="font-medium text-zinc-400 dark:text-zinc-500 block mb-0.5">Last Activity Context:</span>
+                      {member.user.last_login ? <span className="font-semibold text-zinc-700 dark:text-zinc-300">{formatSmart(member.user.last_login)}</span> : <span className="text-zinc-400 dark:text-zinc-600 italic">Never active</span>}
                     </div>
-                    <div className="flex-shrink-0">
-                      {isConfirmingRemove ? (
-                        <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-lg p-1">
-                          <button onClick={() => removeMutation.mutate(member.id)} disabled={removeMutation.isPending} className="rounded bg-red-600 px-2 py-1 text-2xs font-bold text-white hover:bg-red-700">Remove</button>
-                          <button onClick={() => setRemovingId(null)} className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-2xs font-medium text-zinc-700 dark:text-zinc-300">Cancel</button>
-                        </div>
-                      ) : canRemove ? (
-                        <button onClick={() => setRemovingId(member.id)} className="p-2 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors inline-flex items-center gap-1 font-medium">
-                          <Trash2 size={14} /> <span>Remove</span>
-                        </button>
-                      ) : (
-                        <div className="p-2 text-zinc-300 dark:text-zinc-700 cursor-not-allowed" title="Actions Protected"><Shield size={14} /></div>
-                      )}
+                    <div>
+                      <span className="font-medium text-zinc-400 dark:text-zinc-500 block mb-0.5">Date Registered:</span>
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">{formatLocalDate(member.user.created_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -135,9 +193,9 @@ export const UserManager = () => {
             })}
           </div>
 
-          {/* 2. Structured Desktop Table Grid View */}
-          <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+          {/* 2. Desktop Table Grid View */}
+          <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 shadow-xs">
+            <div className="overflow-x-auto overflow-y-visible">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
@@ -150,13 +208,15 @@ export const UserManager = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
-                  {filteredMembers?.map((member) => {
+                  {filteredMembers?.map((member, index) => {
                     const isCurrentUser = member.user_id === currentUser?.id;
                     const canRemove = isOwner && !isCurrentUser && member.role !== "owner";
-                    const isConfirmingRemove = removingId === member.id;
+                    
+                    // Determine placement alignment dynamically
+                    const isFirstRow = index === 0;
 
                     return (
-                      <tr key={member.id} className={`group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors ${isConfirmingRemove ? "bg-red-50/10 dark:bg-red-950/5" : ""}`}>
+                      <tr key={member.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <Avatar firstName={member.user.first_name} lastName={member.user.last_name} />
@@ -171,9 +231,16 @@ export const UserManager = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap relative z-10">
+                          {/* Pass directional context down based on row indexing */}
                           {isOwner ? (
-                            <RoleDropdown member={member} currentUserId={currentUser?.id} onRoleChange={(id, role) => updateRoleMutation.mutate({ memberId: id, newRole: role })} isPending={updateRoleMutation.isPending} />
+                            <RoleDropdown 
+                              member={member} 
+                              currentUserId={currentUser?.id} 
+                              onRoleChange={(id, role) => updateRoleMutation.mutate({ memberId: id, newRole: role })} 
+                              isPending={updateRoleMutation.isPending} 
+                              direction={isFirstRow ? "down" : "up"}
+                            />
                           ) : (
                             <RoleBadge role={member.role} />
                           )}
@@ -189,24 +256,54 @@ export const UserManager = () => {
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-900/30">Active</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500">{formatLocalDate(member.user.created_at)}</td>
-                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                          {isConfirmingRemove ? (
-                            <div className="inline-flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-lg p-1.5 text-left animate-in fade-in slide-in-from-top-1 duration-100">
-                              <AlertTriangle size={13} className="text-red-600 flex-shrink-0" />
-                              <div className="flex gap-1">
-                                <button onClick={() => removeMutation.mutate(member.id)} disabled={removeMutation.isPending} className="rounded bg-red-600 px-2 py-0.5 text-2xs font-medium text-white hover:bg-red-700">Confirm</button>
-                                <button onClick={() => setRemovingId(null)} className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-0.5 text-2xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100">Cancel</button>
-                              </div>
-                            </div>
-                          ) : canRemove ? (
-                            <button onClick={() => setRemovingId(member.id)} className="p-1.5 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors inline-flex items-center justify-center" title="Remove from Workspace">
-                              <Trash2 size={15} />
+                        
+                        <td className="px-6 py-4 text-right whitespace-nowrap relative z-10">
+                          <div className="relative inline-block text-left" ref={openMenuId === member.id ? dropdownContainerRef : null}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === member.id ? null : member.id);
+                              }}
+                              className="p-1.5 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors inline-flex items-center justify-center"
+                            >
+                              <MoreHorizontal size={15} />
                             </button>
-                          ) : (
-                            <div className="p-1.5 inline-flex items-center justify-center text-zinc-300 dark:text-zinc-700 select-none cursor-not-allowed" title={isCurrentUser ? "You cannot modify your own profile actions here." : "Only workspace owners can remove members."}>
-                              <Shield size={15} />
-                            </div>
-                          )}
+
+                            {openMenuId === member.id && (
+                              /* Dynamic context classes to handle first row vs subsequent rows */
+                              <div className={`absolute right-0 z-50 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium text-left ${
+                                isFirstRow 
+                                  ? "top-full mt-1 origin-top-right" 
+                                  : "bottom-full mb-1 origin-bottom-right"
+                              }`}>
+                                <Link to={`/admin/users/${member.user.id}`} onClick={() => setOpenMenuId(null)} className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                                  <User size={14} /> View Profile
+                                </Link>
+                                {canRemove ? (
+                                  <button
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      setModalConfig({
+                                        isOpen: true,
+                                        title: "Remove Team Member",
+                                        message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
+                                        confirmText: "Remove Member",
+                                        isDanger: true,
+                                        action: () => removeMutation.mutate(member.id),
+                                      });
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
+                                  >
+                                    <Trash2 size={14} /> Remove Member
+                                  </button>
+                                ) : (
+                                  <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
+                                    <Trash2 size={14} /> Remove Member
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -218,7 +315,65 @@ export const UserManager = () => {
         </>
       )}
 
-      <InviteModal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} onSuccess={() => queryClient.invalidateQueries({ queryKey: ["blogMembers", activeBlog?.id] })} />
+      {isOwner && pendingInvitations.length > 0 && (
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Pending invitations</h3>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              {pendingInvitations.length} awaiting acceptance
+            </span>
+          </div>
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {pendingInvitations.map((invite) => (
+              <div key={invite.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-400">
+                    <Mail size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{invite.email}</p>
+                    <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <Clock size={11} /> Expires {formatLocalDate(invite.expires_at)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <RoleBadge role={invite.role} />
+                  <button
+                    onClick={() => revokeInvitationMutation.mutate(invite.id)}
+                    disabled={revokeInvitationMutation.isPending}
+                    className="text-xs font-semibold text-red-600 dark:text-red-400 hover:underline disabled:opacity-50 cursor-pointer"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <InviteModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["blogMembers", activeBlog?.id] });
+          queryClient.invalidateQueries({ queryKey: ["blogInvitations", activeBlog?.id] });
+        }}
+      />
+
+      <Modal
+        isOpen={!!modalConfig?.isOpen}
+        title={modalConfig?.title || ""}
+        message={modalConfig?.message || ""}
+        confirmText={modalConfig?.confirmText}
+        isDanger={modalConfig?.isDanger ?? true}
+        onClose={() => setModalConfig(null)}
+        onConfirm={() => {
+          if (modalConfig?.action) modalConfig.action();
+          setModalConfig(null);
+        }}
+      />
     </div>
   );
 };

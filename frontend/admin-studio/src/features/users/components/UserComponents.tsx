@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
 
@@ -35,16 +35,33 @@ interface RoleDropdownProps {
   currentUserId?: number;
   onRoleChange: (memberId: number, role: BlogRole) => void;
   isPending: boolean;
+  direction?: "up" | "down"; // Added dynamic direction prop
 }
 
-export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending }: RoleDropdownProps) => {
+export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending, direction = "up" }: RoleDropdownProps) => {
   const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const isLocked = member.role === "owner" || member.user_id === currentUserId;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (open && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
 
   if (isLocked) return <RoleBadge role={member.role} />;
 
+  // Dynamic positioning classes based on row location
+  const dropdownClasses = direction === "down" 
+    ? "top-full mt-1 origin-top-left" 
+    : "bottom-full mb-2 origin-bottom-left";
+
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
         disabled={isPending}
@@ -55,30 +72,26 @@ export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending }:
       </button>
 
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-40 origin-top-right rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
-            {ROLES.filter((r) => r !== "owner").map((r) => {
-              const { label, color } = ROLE_META[r];
-              return (
-                <button
-                  key={r}
-                  onClick={() => {
-                    onRoleChange(member.id, r);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800 ${member.role === r ? "text-violet-700 dark:text-violet-400" : "text-zinc-700 dark:text-zinc-300"}`}
-                >
-                  <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${color}`}>
-                    <span className="text-3xs font-bold uppercase">{label.charAt(0)}</span>
-                  </span>
-                  {label}
-                  {member.role === r && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-500" />}
-                </button>
-              );
-            })}
-          </div>
-        </>
+        <div className={`absolute left-0 z-50 w-40 rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${dropdownClasses}`}>
+          {ROLES.filter((r) => r !== "owner").map((r) => {
+            const { label, color } = ROLE_META[r];
+            return (
+              <button
+                key={r}
+                onClick={() => {
+                  onRoleChange(member.id, r);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800 ${member.role === r ? "text-violet-700 dark:text-violet-400" : "text-zinc-700 dark:text-zinc-300"}`}
+              >
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${color}`}>
+                  <span className="text-3xs font-bold uppercase">{label.charAt(0)}</span>
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
