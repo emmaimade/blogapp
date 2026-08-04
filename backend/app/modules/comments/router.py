@@ -8,12 +8,23 @@ from sqlmodel import Session, select
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.moderation import flag_comment, load_comment_for_flag
-from app.core.permissions import require_blog_editor, require_completed_onboarding
+from app.core.permissions import Permissions, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user
+from app.core.notifications import add_notification
 from app.models import Comment, Post, User, PlatformRole
 from app.schemas import CommentAdminRead, CommentCreate, CommentRead, FlagContentCreate, ModerationQueueItemRead
 
 router = APIRouter(prefix="/comments", tags=["Comments"])
+
+
+def _commenter_role_label(current_user: User, blog_id: int, session: Session) -> str:
+    """
+    Distinguishes a workspace team member (owner/editor/author) commenting
+    on their own blog from an ordinary registered reader — the public blog
+    requires an account to comment, but most commenters aren't team members.
+    """
+    role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
+    return getattr(role, "value", role) or "reader"
 
 
 @router.post("/", response_model=CommentRead)
@@ -41,8 +52,24 @@ def create_comment(
         resource_id=new_comment.id,
         blog_id=post.blog_id,
         actor=current_user,
-        details={"post_id": post.id},
+        details={
+            "post_id": post.id,
+            "post_title": post.title,
+            "commenter_role": _commenter_role_label(current_user, post.blog_id, session),
+        },
     )
+
+    if post.author_id and post.author_id != current_user.id:
+        add_notification(
+            session,
+            user_id=post.author_id,
+            blog_id=post.blog_id,
+            type="comment_created",
+            title=f'New comment on "{post.title}"',
+            body=f"{current_user.first_name} {current_user.last_name} commented on your post",
+            link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
+        )
+
     session.commit()
     session.refresh(new_comment)
 
@@ -77,13 +104,20 @@ def update_comment(
     comment.content = content
 
     session.add(comment)
+
+    # Comments don't carry blog_id directly — resolve it through the parent
+    # post so this entry actually shows up in the workspace's audit log
+    # (previously omitted here, so edits were silently invisible to it).
+    post = session.get(Post, comment.post_id)
+
     add_audit_log(
         session,
         action="comment.update",
         resource_type="comment",
         resource_id=comment.id,
+        blog_id=post.blog_id if post else None,
         actor=current_user,
-        details={"post_id": comment.post_id},
+        details={"post_id": comment.post_id, "post_title": post.title if post else None},
     )
     session.commit()
     session.refresh(comment)
@@ -117,13 +151,23 @@ def delete_comment(
     comment.is_deleted = True
 
     session.add(comment)
+
+    # Same fix as update_comment — blog_id was never passed, so these
+    # deletions never made it into the workspace-scoped audit log.
+    post = session.get(Post, comment.post_id)
+
     add_audit_log(
         session,
         action="comment.delete",
         resource_type="comment",
         resource_id=comment.id,
+        blog_id=post.blog_id if post else None,
         actor=current_user,
-        details={"post_id": comment.post_id, "deleted_by": "author" if is_author else "moderator"},
+        details={
+            "post_id": comment.post_id,
+            "post_title": post.title if post else None,
+            "deleted_by": "author" if is_author else "moderator",
+        },
     )
     session.commit()
     return {"ok": True, "message": "Comment moderated successfully"}
@@ -203,6 +247,9 @@ def moderate_blog_comment(
     comment.is_deleted = True
     comment.updated_at = datetime.utcnow()
     session.add(comment)
+
+    post = session.get(Post, comment.post_id)
+
     add_audit_log(
         session,
         action="comment.moderator_delete",
@@ -210,7 +257,7 @@ def moderate_blog_comment(
         resource_id=comment.id,
         blog_id=blog_id,
         actor=current_user,
-        details={"post_id": comment.post_id},
+        details={"post_id": comment.post_id, "post_title": post.title if post else None},
     )
     session.commit()
     return {"ok": True, "message": "Comment moderated successfully"}

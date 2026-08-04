@@ -1,4 +1,5 @@
 from typing import List, Optional
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Session, select, Field, SQLModel, Relationship
 from datetime import datetime, timezone
 from enum import Enum
@@ -55,13 +56,16 @@ class PostVisibility(str, Enum):
 
 class BlogMember(SQLModel, table=True):
     __tablename__ = "blog_members"
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", ondelete="CASCADE")
     blog_id: int = Field(foreign_key="blog.id", ondelete="CASCADE")
     role: BlogRole = Field(default=BlogRole.AUTHOR)
-    invited_at: datetime = Field(default_factory=utcnow)
-    
+    invited_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False),
+    )
+
     user: "User" = Relationship(back_populates="blog_memberships")
     blog: "Blog" = Relationship(back_populates="members")
 
@@ -74,12 +78,15 @@ class Blog(SQLModel, table=True):
     description: Optional[str] = None
     is_active: bool = Field(default=True)
     owner_id: int = Field(
-        foreign_key="user.id", 
-        ondelete="CASCADE"      
+        foreign_key="user.id",
+        ondelete="CASCADE"
     )
     onboarding_status: OnboardingStatus = Field(default=OnboardingStatus.NOT_STARTED)
     onboarding_step: OnboardingStep = Field(default=OnboardingStep.ABOUT)
-    onboarding_completed_at: Optional[datetime] = None
+    onboarding_completed_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=True),
+    )
     owner_role: Optional[WorkspaceOwnerRole] = None
     workspace_type: Optional[WorkspaceType] = None
     team_size: Optional[TeamSize] = None
@@ -92,19 +99,22 @@ class Blog(SQLModel, table=True):
     comments_enabled: bool = Field(default=True)
     posts_per_page: int = Field(default=10)
     timezone: str = Field(default="UTC")
-    
-    created_at: datetime = Field(default_factory=utcnow)
+
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False),
+    )
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow}
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
-    
+
     owner: "User" = Relationship(back_populates="owned_blogs")
     members: List[BlogMember] = Relationship(back_populates="blog")
     posts: List["Post"] = Relationship(back_populates="blog")
     tags: List["Tag"] = Relationship(back_populates="blog")
     settings: List["SiteSettings"] = Relationship(back_populates="blog")
-    
+
     @staticmethod
     def generate_unique_slug(name: str, session: Session) -> str:
         base_slug = slugify(name)
@@ -118,7 +128,10 @@ class Blog(SQLModel, table=True):
 class PlatformAnalytics(SQLModel, table=True):
     __tablename__ = "platform_analytics"
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: datetime = Field(default_factory=datetime.utcnow, index=True)
+    date: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, index=True),
+    )
     total_blogs: int = Field(default=0)
     active_blogs: int = Field(default=0)
     total_users: int = Field(default=0)
@@ -139,23 +152,27 @@ class BlogSubscription(SQLModel, table=True):
     status: str = Field(default="active")
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
-    trial_ends_at: Optional[datetime] = None
-    current_period_ends_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=utcnow)
+    trial_ends_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    current_period_ends_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    cancelled_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False),
+    )
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow}
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
 
 class BlogInvitation(SQLModel, table=True):
     __tablename__ = "blog_invitations"
     id: Optional[int] = Field(default=None, primary_key=True)
     blog_id: int = Field(foreign_key="blog.id", index=True, ondelete="CASCADE")
+    email: str = Field(index=True)
     role: BlogRole = Field(default=BlogRole.AUTHOR)
     token: str = Field(unique=True, index=True)
     created_by: int = Field(foreign_key="user.id", ondelete="CASCADE")
     accepted_by: Optional[int] = Field(default=None, foreign_key="user.id", ondelete="CASCADE")
-    accepted_at: Optional[datetime] = None
-    expires_at: datetime
-    created_at: datetime = Field(default_factory=utcnow)
+    accepted_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    expires_at: datetime = Field(sa_column=Column(SQLDateTime(timezone=True), nullable=False))
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))

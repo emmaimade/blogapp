@@ -30,3 +30,8 @@ class AuditLogQueryParams(BaseModel):
     action: Optional[str] = Query(default=None, description="Filter by action name")
     resource_type: Optional[str] = Query(default=None, description="Filter by resource type")
     actor_user_id: Optional[int] = Query(default=None, description="Filter by actor user ID")
+    search: Optional[str] = Query(
+        default=None,
+        description="Free-text search across actor email, action name, and event details. "
+        "Applied server-side before pagination so result counts and page totals stay consistent.",
+    )

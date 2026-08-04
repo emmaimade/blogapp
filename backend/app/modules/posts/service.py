@@ -204,14 +204,18 @@ def read_posts(
     )
 
     can_view_drafts = False
+    role = None
     if current_user:
         role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
         if role in [BlogRole.OWNER, BlogRole.EDITOR, BlogRole.AUTHOR]:
             can_view_drafts = True
 
-    # Public visitors only see published posts
     if not can_view_drafts:
+        # Public visitors only see published posts
         query = query.where(Post.status == PostStatus.PUBLISHED)
+    elif role == BlogRole.AUTHOR:
+        # Authors see only their own posts, across all statuses
+        query = query.where(Post.author_id == current_user.id)
 
     if filter_value and filter_value.lower() == "projects":
         query = query.where(Post.is_project == True)
@@ -223,12 +227,18 @@ def get_scheduled_posts(blog_id: int, session: Session, current_user: User) -> L
     """Return all scheduled (not yet live) posts for this blog."""
     if not Permissions.can_create_post(current_user, blog_id, session):
         raise HTTPException(status_code=403, detail="Not authorized")
-    return session.exec(
+
+    role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
+    query = (
         select(Post)
         .where(Post.blog_id == blog_id, Post.status == PostStatus.SCHEDULED)
         .order_by(Post.published_at.asc())
         .options(selectinload(Post.tags), selectinload(Post.author))
-    ).all()
+    )
+    if role == BlogRole.AUTHOR:
+        query = query.where(Post.author_id == current_user.id)
+
+    return session.exec(query).all()
 
 
 def search_posts(

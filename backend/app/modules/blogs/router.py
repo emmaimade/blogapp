@@ -5,7 +5,7 @@ from typing import List
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -14,6 +14,7 @@ from app.modules.posts.service import upload_welcome_banner
 from datetime import datetime, timezone
 
 from app.core.audit import add_audit_log
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.permissions import (
     Permissions,
@@ -23,7 +24,18 @@ from app.core.permissions import (
     require_blog_owner,
     require_completed_onboarding,
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_password_hash, require_verified_email
+from app.modules.auth.service import build_login_response
+from app.modules.users.router import _generate_random_handle
+from app.core.email import dispatch_email
+from app.core.email_templates import (
+    get_password_reset_template,
+    get_password_reset_template_text,
+    get_blog_invitation_template,
+    get_blog_invitation_template_text,
+)
+from app.core.notifications import add_notification
+from app.services.auth_tokens import create_password_reset_token, TokenCooldownError
 from app.models import (
     Blog,
     BlogInvitation,
@@ -56,6 +68,7 @@ from app.schemas import (
     DashboardRecentActivity,
     FooterSettings,
     GeneralSettings,
+    InvitationRegisterCreate,
     OnboardingAboutUpdate,
     OnboardingPlanUpdate,
     OnboardingProfileUpdate,
@@ -609,7 +622,7 @@ def update_onboarding_plan(
     blog_id: int,
     payload: OnboardingPlanUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_email),
     _: None = Depends(require_blog_owner),
 ):
     blog = session.get(Blog, blog_id)
@@ -658,7 +671,15 @@ def update_blog(
         raise HTTPException(status_code=404, detail="Blog not found")
 
     update_dict = blog_data.model_dump(exclude_unset=True)
+
+    # Capture the previous values BEFORE mutating, so the audit log can show
+    # exactly what changed (e.g. name "Old Blog" -> "New Blog") rather than
+    # just which fields were touched.
+    changes = {}
     for key, value in update_dict.items():
+        old_value = getattr(blog, key, None)
+        if old_value != value:
+            changes[key] = {"from": old_value, "to": value}
         setattr(blog, key, value)
 
     session.add(blog)
@@ -669,7 +690,7 @@ def update_blog(
         resource_id=blog.id,
         blog_id=blog.id,
         actor=current_user,
-        details={"fields": sorted(update_dict.keys())},
+        details={"changes": changes} if changes else {"fields": []},
     )
     session.commit()
     session.refresh(blog)
@@ -689,6 +710,53 @@ def read_blog_members(
         .order_by(BlogMember.invited_at.asc())
     )
     return session.exec(statement).all()
+
+
+@router.post("/{blog_id}/members/{member_id}/trigger-reset-email")
+def trigger_member_reset_email(
+    blog_id: int,
+    member_id: int,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_blog_owner),
+): 
+    """Allows a blog owner to send a password reset link to a member of their own workspace (Tier 1, workspace-scoped)."""
+    membership = session.exec(
+        select(BlogMember).where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
+    ).first()
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    user = session.get(User, membership.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    try:
+        raw_token = create_password_reset_token(session, user.id)
+    except TokenCooldownError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"A reset email was already sent recently. Please wait {e.retry_after_seconds} seconds before trying again.",
+        )
+    
+    full_name = f"{user.first_name} {user.last_name}"
+    email_html = get_password_reset_template(full_name, raw_token)
+    email_text = get_password_reset_template_text(full_name, raw_token)
+    dispatch_email(background_tasks, user.email, "Reset your password", email_html, email_text)
+
+    add_audit_log(
+        session,
+        action="blog_owner.trigger_reset_email",
+        resource_type="blog_member",
+        resource_id=user.id,
+        blog_id=blog_id,
+        actor=current_user,
+        details={"member_id": membership.id, "target_email": user.email},
+    )
+    session.commit()
+
+    return {"message": f"A password reset link has been sent to {user.email}."}
 
 
 @router.post("/{blog_id}/members", response_model=BlogMemberRead, status_code=status.HTTP_201_CREATED)
@@ -750,7 +818,9 @@ def remove_blog_member(
     _: None = Depends(require_blog_owner),
 ):
     membership = session.exec(
-        select(BlogMember).where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
+        select(BlogMember)
+        .where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
+        .options(selectinload(BlogMember.user))
     ).first()
     if not membership:
         raise HTTPException(status_code=404, detail="Member not found")
@@ -766,7 +836,11 @@ def remove_blog_member(
         resource_id=membership.user_id,
         blog_id=blog_id,
         actor=current_user,
-        details={"member_id": membership.id},
+        details={
+            "member_id": membership.id,
+            "email": membership.user.email if membership.user else None,
+            "role": membership.role,
+        },
     )
     session.delete(membership)
     session.commit()
@@ -816,6 +890,14 @@ def update_blog_member_permissions(
                 detail="Validation Error: You are the sole owner of this blog. Appoint another owner before changing your role."
             )
 
+    # Capture BEFORE values so the audit log can say what actually changed
+    # (e.g. role: editor -> owner) instead of just which fields were touched.
+    changes = {}
+    if "role" in update_data and update_data["role"] != membership.role:
+        changes["role"] = {"from": membership.role, "to": update_data["role"]}
+    if "permissions" in update_data:
+        changes["permissions"] = {"from": membership.permissions, "to": update_data["permissions"]}
+
     # MUTATE FIELDS DYNAMICALLY
     for key, value in update_data.items():
         if key == "permissions" and value is not None:
@@ -833,7 +915,11 @@ def update_blog_member_permissions(
         resource_id=membership.user_id,
         blog_id=blog_id,
         actor=current_user,
-        details={"updated_fields": list(update_data.keys())},
+        details={
+            "target_name": membership.user.first_name + " " + membership.user.last_name if membership.user else None,
+            "member_id": membership.id,
+            "changes": changes,
+        },
     )
     session.commit()
     session.refresh(membership)
@@ -851,37 +937,34 @@ def get_blog_dashboard_summary(
     if not role:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this blog")
 
-    # Total posts (all statuses)
-    posts = session.exec(
-        select(func.count(Post.id)).where(Post.blog_id == blog_id)
-    ).first() or 0
+    # Authors see stats scoped to posts they authored; Owner/Editor see the
+    # whole workspace. Tags and team size are workspace-level facts, not
+    # content anyone "owns", so they stay unscoped for every role.
+    is_author_only = role == BlogRole.AUTHOR
+    post_scope = [Post.blog_id == blog_id]
+    if is_author_only:
+        post_scope.append(Post.author_id == current_user.id)
 
-    # Status-aware counts
+    posts = session.exec(select(func.count(Post.id)).where(*post_scope)).first() or 0
+
     published_posts = session.exec(
-        select(func.count(Post.id)).where(
-            Post.blog_id == blog_id, 
-            Post.status == PostStatus.PUBLISHED
-        )
+        select(func.count(Post.id)).where(*post_scope, Post.status == PostStatus.PUBLISHED)
     ).first() or 0
 
     draft_posts = session.exec(
-        select(func.count(Post.id)).where(
-            Post.blog_id == blog_id, 
-            Post.status == PostStatus.DRAFT
-        )
+        select(func.count(Post.id)).where(*post_scope, Post.status == PostStatus.DRAFT)
     ).first() or 0
 
     scheduled_posts = session.exec(
-        select(func.count(Post.id)).where(
-            Post.blog_id == blog_id, 
-            Post.status == PostStatus.SCHEDULED
-        )
+        select(func.count(Post.id)).where(*post_scope, Post.status == PostStatus.SCHEDULED)
     ).first() or 0
 
+    # Comments scoped the same way — an Author sees comment volume on
+    # *their* posts only, not the whole blog's comment activity.
     comments = session.exec(
         select(func.count(Comment.id))
         .join(Post, Comment.post_id == Post.id)
-        .where(Post.blog_id == blog_id)
+        .where(*post_scope)
     ).first() or 0
 
     tags = session.exec(
@@ -893,17 +976,17 @@ def get_blog_dashboard_summary(
     ).first() or 0
 
     total_views = session.exec(
-        select(func.sum(Post.views)).where(Post.blog_id == blog_id)
+        select(func.sum(Post.views)).where(*post_scope)
     ).first() or 0
 
     recent_posts = session.exec(
         select(Post)
-        .where(Post.blog_id == blog_id)
+        .where(*post_scope)
         .order_by(Post.updated_at.desc())
         .limit(5)
     ).all()
 
-    recent_activity = [
+    post_activity = [
         DashboardRecentActivity(
             type="post",
             title=post.title,
@@ -912,6 +995,37 @@ def get_blog_dashboard_summary(
         )
         for post in recent_posts
     ]
+
+    # Comments on posts within scope — this is what surfaces "someone
+    # commented on your post" for Authors, alongside blog-wide comment
+    # activity for Owner/Editor.
+    recent_comments = session.exec(
+        select(Comment)
+        .join(Post, Comment.post_id == Post.id)
+        .where(*post_scope, Comment.is_deleted == False)
+        .options(selectinload(Comment.user), selectinload(Comment.post))
+        .order_by(Comment.created_at.desc())
+        .limit(5)
+    ).all()
+
+    comment_activity = [
+        DashboardRecentActivity(
+            type="comment",
+            title=f'New comment on "{comment.post.title if comment.post else "a post"}"',
+            description=(
+                f"{comment.user.first_name} {comment.user.last_name} commented"
+                if comment.user else "A reader commented"
+            ),
+            time=comment.created_at,
+        )
+        for comment in recent_comments
+    ]
+
+    recent_activity = sorted(
+        post_activity + comment_activity,
+        key=lambda item: item.time,
+        reverse=True,
+    )[:5]
 
     return BlogDashboardSummary(
         blog_id=blog.id,
@@ -952,21 +1066,67 @@ def get_blog_subscription_endpoint(
 def create_invitation(
     blog_id: int,
     payload: BlogInvitationCreate,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
 ):
-    token = secrets.token_urlsafe(32)
-    invitation = BlogInvitation(
-        blog_id=blog_id,
-        role=payload.role,
-        token=token,
-        created_by=current_user.id,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=INVITE_EXPIRY_DAYS),
-    )
-    session.add(invitation)
+    normalized_email = payload.email.strip().lower()
+
+    # Don't invite someone who's already on the team
+    existing_user = session.exec(select(User).where(User.email == normalized_email)).first()
+    if existing_user:
+        existing_membership = session.exec(
+            select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == existing_user.id)
+        ).first()
+        if existing_membership:
+            raise HTTPException(status_code=400, detail="This person is already a member of this blog")
+
+    blog = session.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+
+    # If there's already a pending (unexpired, unaccepted) invite for this
+    # email, treat this as a resend rather than creating a duplicate record —
+    # refresh the token, role, and expiry instead of stacking up invitations.
+    pending = session.exec(
+        select(BlogInvitation).where(
+            BlogInvitation.blog_id == blog_id,
+            BlogInvitation.email == normalized_email,
+            BlogInvitation.accepted_at == None,
+            BlogInvitation.expires_at > datetime.now(timezone.utc),
+        )
+    ).first()
+
+    if pending:
+        pending.role = payload.role
+        pending.token = secrets.token_urlsafe(32)
+        pending.expires_at = datetime.now(timezone.utc) + timedelta(days=INVITE_EXPIRY_DAYS)
+        pending.created_by = current_user.id
+        invitation = pending
+        session.add(invitation)
+    else:
+        invitation = BlogInvitation(
+            blog_id=blog_id,
+            email=normalized_email,
+            role=payload.role,
+            token=secrets.token_urlsafe(32),
+            created_by=current_user.id,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=INVITE_EXPIRY_DAYS),
+        )
+        session.add(invitation)
+
     session.commit()
     session.refresh(invitation)
+
+    admin_url = getattr(settings, "ADMIN_STUDIO_URL", None) or ""
+    invite_url = f"{admin_url}/join/{invitation.token}"
+    inviter_name = f"{current_user.first_name} {current_user.last_name}"
+
+    email_html = get_blog_invitation_template(inviter_name, blog.name, payload.role.value, invite_url)
+    email_text = get_blog_invitation_template_text(inviter_name, blog.name, payload.role.value, invite_url)
+    dispatch_email(background_tasks, normalized_email, f"You've been invited to join {blog.name}", email_html, email_text)
+
     return invitation
 
 
@@ -1014,6 +1174,7 @@ def get_invitation_info(token: str, session: Session = Depends(get_session)):
     return BlogInvitationInfo(
         blog_name=blog.name,
         blog_slug=blog.slug,
+        email=invite.email,
         role=invite.role,
         expires_at=invite.expires_at,
         already_accepted=invite.accepted_at is not None,
@@ -1034,6 +1195,12 @@ def accept_invitation(
     if invite.accepted_at is not None:
         raise HTTPException(status_code=400, detail="This invitation has already been accepted")
 
+    if current_user.email.strip().lower() != invite.email.strip().lower():
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation was sent to a different email address. Please log in with the invited account.",
+        )
+
     # Check if user is already a member
     existing = session.exec(
         select(BlogMember).where(BlogMember.blog_id == invite.blog_id, BlogMember.user_id == current_user.id)
@@ -1052,6 +1219,19 @@ def accept_invitation(
     invite.accepted_at = datetime.now(timezone.utc)
     invite.accepted_by = current_user.id
     session.add(invite)
+
+    blog = session.get(Blog, invite.blog_id)
+    if blog and blog.owner_id != current_user.id:
+        add_notification(
+            session,
+            user_id=blog.owner_id,
+            blog_id=blog.id,
+            type="invitation_accepted",
+            title=f'{current_user.first_name} {current_user.last_name} joined {blog.name}',
+            body=f"Accepted as {invite.role.value if hasattr(invite.role, 'value') else invite.role}",
+            link=f"/admin/users?blog={blog.id}",
+        )
+
     session.commit()
 
     membership = session.exec(
@@ -1060,3 +1240,96 @@ def accept_invitation(
         .options(selectinload(BlogMember.user))
     ).first()
     return membership
+
+
+@invitations_router.post("/{token}/register-and-accept")
+def register_and_accept_invitation(
+    token: str,
+    payload: InvitationRegisterCreate,
+    session: Session = Depends(get_session),
+):
+    """
+    Creates a brand-new account for someone who doesn't have one yet and
+    immediately accepts the invitation with it — deliberately skips
+    workspace creation entirely, since the workspace is already fixed by
+    the invitation. This is the invite-flow counterpart to /users/register,
+    which always creates a new Blog alongside the User.
+    """
+    invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
+    if invite.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="This invitation link has expired")
+    if invite.accepted_at is not None:
+        raise HTTPException(status_code=400, detail="This invitation has already been accepted")
+
+    existing_user = session.exec(select(User).where(User.email == invite.email)).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="An account with this email already exists. Please log in instead.",
+        )
+
+    # NOTE: mirrors the frontend's password rules (8+ chars, uppercase,
+    # number, special char) as a floor. Ideally this should reuse whatever
+    # validator UserCreate applies at /users/register, so the two signup
+    # paths can't drift apart — worth consolidating into one shared
+    # validator if UserCreate has this logic already.
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+
+    random_handle = _generate_random_handle(invite.email, session)
+    hashed = get_password_hash(payload.password)
+
+    new_user = User(
+        username=random_handle,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=invite.email,
+        hashed_password=hashed,
+        # The invite was emailed to this exact address, which is itself
+        # proof of ownership — same reasoning Slack/Notion use to skip a
+        # redundant "check your email" step right after they just did.
+        email_verified=True,
+    )
+    session.add(new_user)
+    session.flush()
+
+    membership = BlogMember(
+        user_id=new_user.id,
+        blog_id=invite.blog_id,
+        role=invite.role,
+        invited_at=datetime.now(timezone.utc),
+    )
+    session.add(membership)
+
+    invite.accepted_at = datetime.now(timezone.utc)
+    invite.accepted_by = new_user.id
+    session.add(invite)
+
+    add_audit_log(
+        session,
+        action="user.register_via_invite",
+        resource_type="user",
+        resource_id=new_user.id,
+        actor=new_user,
+        blog_id=invite.blog_id,
+        details={"role": invite.role.value},
+    )
+
+    blog = session.get(Blog, invite.blog_id)
+    if blog and blog.owner_id != new_user.id:
+        add_notification(
+            session,
+            user_id=blog.owner_id,
+            blog_id=blog.id,
+            type="invitation_accepted",
+            title=f'{new_user.first_name} {new_user.last_name} joined {blog.name}',
+            body=f"Accepted as {invite.role.value}",
+            link=f"/admin/users?blog={blog.id}",
+        )
+
+    session.commit()
+    session.refresh(new_user)
+
+    return build_login_response(new_user, session)

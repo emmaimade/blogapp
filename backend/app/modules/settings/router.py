@@ -54,6 +54,20 @@ def get_setting(session: Session, blog_id: int, key: str, default_model: Any) ->
         return default_model().model_dump()
 
 
+def _diff_fields(old_values: Dict, new_values: Dict) -> Dict[str, Dict[str, Any]]:
+    """
+    Compare old vs new settings values and return only the fields that
+    actually changed, each as {"from": ..., "to": ...}. Keeps audit log
+    details compact and genuinely useful instead of just listing field names.
+    """
+    changes: Dict[str, Dict[str, Any]] = {}
+    for key, new_value in new_values.items():
+        old_value = old_values.get(key)
+        if old_value != new_value:
+            changes[key] = {"from": old_value, "to": new_value}
+    return changes
+
+
 def update_setting(
     session: Session,
     blog_id: int,
@@ -63,6 +77,16 @@ def update_setting(
 ) -> Dict:
     statement = select(SiteSettings).where(SiteSettings.setting_key == key, SiteSettings.blog_id == blog_id)
     existing = session.exec(statement).first()
+
+    # Capture the previous values BEFORE we overwrite them, so the audit log
+    # can show what actually changed rather than just which keys were touched.
+    if existing:
+        try:
+            old_values = json.loads(existing.setting_value)
+        except (json.JSONDecodeError, TypeError):
+            old_values = {}
+    else:
+        old_values = {}
 
     settings_json = json.dumps(value_model.model_dump())
 
@@ -81,13 +105,14 @@ def update_setting(
         )
 
     values = value_model.model_dump()
+    changes = _diff_fields(old_values, values)
     add_audit_log(
         session,
         action="branding.updated" if key == "branding" else "settings.updated",
         resource_type="settings",
         blog_id=blog_id,
         actor=actor,
-        details={"key": key, "fields": sorted(values.keys())},
+        details={"key": key, "changes": changes} if changes else {"key": key, "fields": []},
     )
     session.commit()
     return values
@@ -275,7 +300,17 @@ def update_contact_settings(
 
 
 @router.get("/all", response_model=AllSiteSettings)
-def get_all_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
+def get_all_settings(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_blog_owner),
+):
+    # This aggregate endpoint is only meant for the admin settings dashboard,
+    # unlike the per-section GETs below (which stay public since the live
+    # blog site needs them to render footer/SEO/branding/about/contact for
+    # anonymous visitors). require_blog_owner (via get_current_blog) already
+    # validates blog_id + membership/superadmin, so no separate blog dep needed here.
     return AllSiteSettings(
         general=get_setting(session, blog_id, "general", GeneralSettings),
         about=get_setting(session, blog_id, "about_page", AboutPageSettings),

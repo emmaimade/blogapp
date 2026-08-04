@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 def utcnow() -> datetime:
@@ -19,7 +20,7 @@ class SiteSettings(SQLModel, table=True):
     
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow},
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
 
     class Config:
@@ -36,7 +37,7 @@ class PlatformSettings(SQLModel, table=True):
     setting_value: str
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow},
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
 
     class Config:

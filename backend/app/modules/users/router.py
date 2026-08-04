@@ -1,16 +1,24 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import List
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
-from app.core.security import get_current_user, get_password_hash
-from app.services.auth_tokens import create_verification_token
+from app.core.security import get_current_user, get_password_hash, require_password_changed
+from app.services.auth_tokens import create_verification_token, TokenCooldownError
 from app.core.email import dispatch_email
-from app.core.email_templates import get_verification_template
+from app.core.email_templates import (
+    get_verification_template, 
+    get_verification_template_text,
+    get_account_deleted_template, 
+    get_account_deleted_template_text
+)
 from app.models import (
+    AuditLog,
     Blog,
     BlogMember,
     BlogRole,
@@ -42,22 +50,18 @@ def _generate_random_handle(email: str, session: Session) -> str:
     and appends a random 4-digit suffix to create a safe database username.
     """
     email_prefix = email.split("@")[0]
-    # Keep only letters, numbers, and underscores; convert to lowercase
     base = "".join(c for c in email_prefix if c.isalnum() or c == "_").lower() or "user"
     
     unique_handle = f"{base}{random.randint(1000, 9999)}"
     
-    # Loop to double-check that the random handle isn't accidentally taken
     while session.exec(select(User).where(User.username == unique_handle)).first():
         unique_handle = f"{base}{random.randint(1000, 9999)}"
         
     return unique_handle
 
 
-@router.post("/register", response_model=UserRead)
+@router.post("/register")
 def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
-    # existing_user = session.exec(select(User).where(User.username == user_data.username)).first()
-
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already exists")
@@ -111,12 +115,18 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: 
     session.commit()
     session.refresh(new_user)
 
-    # Automatically fire verification email in background task
-    raw_token = create_verification_token(session, new_user.id)
-    email_content = get_verification_template(f"{new_user.first_name} {new_user.last_name}", raw_token)
-    dispatch_email(background_tasks, new_user.email, "Verify your email address", email_content)
+    try:
+        raw_token = create_verification_token(session, new_user.id)
+        email_content = get_verification_template(f"{new_user.first_name} {new_user.last_name}", raw_token)
+        email_text = get_verification_template_text(f"{new_user.first_name} {new_user.last_name}", raw_token)
+        dispatch_email(background_tasks, new_user.email, "Verify your email address", email_content, email_text)
+    except TokenCooldownError:
+        # Extremely unlikely for a brand-new user (no prior token could exist yet),
+        # but if it somehow fires, don't fail a successful registration over an
+        # email-cooldown edge case — the account and workspace are already committed.
+        pass
 
-    return build_user_payload(new_user, session)
+    return build_login_response(new_user.id, session)
 
 
 @router.post("/login")
@@ -133,7 +143,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
         actor=user,
     )
     session.commit()
-    return build_login_response(user, session)
+    return build_login_response(user.id, session)
 
 
 @router.get("/me", response_model=UserRead)
@@ -141,23 +151,109 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    return build_user_payload(current_user, session)
+    return build_user_payload(current_user.id, session)
+
+
+@router.get("/me/audit-logs")
+def get_my_audit_logs(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Retrieve personal security and activity logs for the authenticated user.
+    """
+    # Query database strictly for actions where current_user is the actor.
+    # Excludes http.* middleware noise rows, same as the workspace and
+    # superadmin audit log endpoints.
+    statement = (
+        select(AuditLog)
+        .where(
+            AuditLog.actor_user_id == current_user.id,
+            ~AuditLog.action.startswith("http."),
+        )
+        .order_by(AuditLog.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    
+    logs = session.exec(statement).all()
+    return logs
+
+
+@router.get("/{user_id}", response_model=UserRead)
+def get_user_profile(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """
+    Fetches user information page profiles. Gated tightly to:
+    - The target user themselves.
+    - Global Platform Superadmins.
+    - Workspace/Blog owners sharing a workspace partition with the target user.
+    """
+    # Define standard payload fetching expression strategy to populate memberships and deep blog relations
+    # 1. A user can always view their own info page profile
+    if current_user.id == user_id:
+        try:
+            return build_user_payload(current_user.id, session)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User profile target missing")
+
+    if getattr(current_user, "is_super_admin", False) or getattr(current_user, "platform_role", "") == "super_admin":
+        try:
+            return build_user_payload(user_id, session)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="User profile target missing")
+        
+    # 3. Blog Owners can look up a user ONLY if they share an explicitly OWNED workspace
+    owned_blog_ids = session.exec(
+        select(BlogMember.blog_id)
+        .where(
+            BlogMember.user_id == current_user.id,
+            BlogMember.role == BlogRole.OWNER
+        )
+    ).all()
+
+    if owned_blog_ids:
+        # Verify if target profile user is linked inside our owned workspace slices
+        shared_member = session.exec(
+            select(BlogMember)
+            .where(
+                BlogMember.user_id == user_id,
+                BlogMember.blog_id.in_(owned_blog_ids)
+            )
+        ).first()
+        
+        if shared_member:
+            try:
+                return build_user_payload(user_id, session)
+            except ValueError:
+                pass
+
+    # 4. Fallthrough: Reject unauthorized requests
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authorized to view this user's information"
+    )
 
 
 @router.patch("/me", response_model=UserRead)
 def update_user_profile(
     user_data: UserUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_password_changed),
 ):
     db_user = current_user
     update_dict = user_data.model_dump(exclude_unset=True)
+    update_dict.pop("password", None)
 
-    if "password" in update_dict:
-        new_password = update_dict.pop("password")
-        db_user.hashed_password = get_password_hash(new_password)
-
+    # Capture the previous values BEFORE mutating, so the audit log can show
+    # what actually changed (e.g. first_name "Jane" -> "Janet") rather than
+    # just which fields were touched.
+    changes = {}
     for key, value in update_dict.items():
+        old_value = getattr(db_user, key, None)
+        if old_value != value:
+            changes[key] = {"from": old_value, "to": value}
         setattr(db_user, key, value)
 
     session.add(db_user)
@@ -167,17 +263,19 @@ def update_user_profile(
         resource_type="user",
         resource_id=db_user.id,
         actor=current_user,
-        details={"fields": sorted(update_dict.keys())},
+        details={"changes": changes} if changes else {"fields": []},
     )
     session.commit()
     session.refresh(db_user)
-    return build_user_payload(db_user, session)
+
+    return build_user_payload(db_user.id, session)
 
 
 @router.delete("/me")
 def delete_user_account(
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_password_changed),
 ):
     add_audit_log(
         session,
@@ -186,6 +284,16 @@ def delete_user_account(
         resource_id=current_user.id,
         actor=current_user,
     )
-    session.delete(current_user)
+
+    user_email = current_user.email
+    full_name = f"{current_user.first_name} {current_user.last_name}"
+
+    current_user.deleted_at = datetime.now(timezone.utc)
+    session.add(current_user)
     session.commit()
+
+    email_html = get_account_deleted_template(full_name)
+    email_text = get_account_deleted_template_text(full_name)
+    dispatch_email(background_tasks, user_email, "Your account has been deleted", email_html, email_text)
+
     return {"message": "Account deleted successfully"}

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Field, SQLModel
 
 def utcnow() -> datetime:
@@ -20,4 +21,7 @@ class AuditLog(SQLModel, table=True):
     details: Optional[str] = None
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
-    created_at: datetime = Field(default_factory=utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, index=True),
+    )

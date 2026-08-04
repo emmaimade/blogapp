@@ -1,7 +1,9 @@
 import json
+import secrets
+import string
 from typing import Any, List, Optional
 from datetime import datetime, date, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, BackgroundTasks
 from sqlmodel import Session, select
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import selectinload
@@ -11,8 +13,23 @@ from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.moderation import record_moderation_action
 from app.core.permissions import require_super_admin
-from app.core.security import get_current_user
-from app.models import AuditLog, Blog, User, Post, Comment, ModerationItem, BlogMember, PlatformSettings as PlatformSettingsRecord
+from app.core.security import get_current_user, get_password_hash
+from app.core.email import dispatch_email
+from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
+from app.services.auth_tokens import create_password_reset_token, TokenCooldownError
+from app.models import (
+    AuditLog, 
+    Blog, 
+    User, 
+    Post, 
+    Comment, 
+    ModerationItem, 
+    BlogMember, 
+    SupportTicket, 
+    SupportMessage, 
+    TicketStatus, 
+    PlatformSettings as PlatformSettingsRecord)
+from app.modules.support.router import SupportTicketRead
 from app.schemas import (
     AuditLogRead,
     BlogAnalytics,
@@ -37,6 +54,39 @@ class UserSuspendUpdate(BaseModel):
 
 class BlogToggleActive(BaseModel):
     is_active: bool
+
+
+class UpdateTicketStatusSchema(BaseModel):
+    status: TicketStatus
+
+
+class RecentPostSummary(BaseModel):
+    id: int
+    title: str
+    published: bool
+    created_at: datetime
+    views: int = 0
+
+
+class MemberSummary(BaseModel):
+    user_id: int
+    email: str
+    role: str
+    joined_at: Optional[datetime] = None
+
+
+class BlogDetailAnalytics(BlogAnalytics):  # or just extend BlogAnalytics
+    recent_posts: List[RecentPostSummary] = []
+    members: List[MemberSummary] = []
+
+
+def _generate_temporary_password(length: int = 12) -> str:
+    """Generates a secure random temporary password guaranteed to satisfy the app's own password policy (letters + digits)."""
+    alphabet = string.ascii_letters + string.digits
+    while True:
+        candidate = "".join(secrets.choice(alphabet) for _ in range(length))
+        if any(c.isalpha() for c in candidate) and any(c.isdigit() for c in candidate):
+            return candidate
 
 
 @router.get("/stats", response_model=PlatformStats)
@@ -113,6 +163,82 @@ def get_all_blogs_analytics(
 # ============================================================================
 # BLOG MANAGEMENT ENDPOINTS
 # ============================================================================
+@router.get("/blogs/{blog_id}", response_model=BlogDetailAnalytics)
+def get_blog_detail(
+    blog_id: int,
+    _: None = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    """Return a single blog/workspace for the superadmin detail view."""
+    blog = session.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Blog not found",
+        )
+
+    posts_count = session.exec(
+        select(func.count(Post.id)).where(Post.blog_id == blog.id)
+    ).first() or 0
+    views = session.exec(
+        select(func.sum(Post.views)).where(Post.blog_id == blog.id)
+    ).first() or 0
+    member_count = len(blog.members) if hasattr(blog, "members") else 0
+    last_post = session.exec(
+        select(Post.created_at)
+        .where(Post.blog_id == blog.id)
+        .order_by(Post.created_at.desc())
+    ).first()
+
+    # --- new: recent posts (last 8) ---
+    recent_posts_rows = session.exec(
+        select(Post)
+        .where(Post.blog_id == blog.id)
+        .order_by(Post.created_at.desc())
+        .limit(8)
+    ).all()
+    recent_posts = [
+        RecentPostSummary(
+            id=p.id,
+            title=p.title or "Untitled",
+            published=bool(getattr(p, "published", False)),
+            created_at=p.created_at,
+            views=getattr(p, "views", 0) or 0,
+        )
+        for p in recent_posts_rows
+    ]
+
+    # --- new: members ---
+    members = []
+    if hasattr(blog, "members"):
+        for m in blog.members:
+            user = getattr(m, "user", None)
+            members.append(
+                MemberSummary(
+                    user_id=m.user_id,
+                    email=user.email if user else "unknown",
+                    role=getattr(m, "role", "member") or "member",
+                    joined_at=getattr(m, "created_at", None),
+                )
+            )
+
+    return BlogDetailAnalytics(
+        blog_id=blog.id,
+        blog_name=blog.name,
+        name=blog.name,
+        subdomain=blog.subdomain,
+        custom_domain=blog.custom_domain,
+        is_active=blog.is_active,
+        owner_email=blog.owner.email if blog.owner else "",
+        total_posts=posts_count,
+        total_views=views,
+        team_members=member_count,
+        created_at=blog.created_at,
+        last_activity=last_post,
+        recent_posts=recent_posts,
+        members=members,
+    )
+
 
 @router.patch("/blogs/{blog_id}", response_model=BlogAnalytics)
 def update_blog_status(
@@ -127,6 +253,7 @@ def update_blog_status(
     if not blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
     
+    previous_is_active = blog.is_active
     blog.is_active = data.is_active
     session.add(blog)
     add_audit_log(
@@ -136,7 +263,7 @@ def update_blog_status(
         resource_id=blog.id,
         blog_id=blog.id,
         actor=current_user,
-        details={"is_active": blog.is_active},
+        details={"from": previous_is_active, "to": blog.is_active},
     )
     session.commit()
     session.refresh(blog)
@@ -259,6 +386,7 @@ def update_user_status(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
+    previous_is_active = user.is_active
     user.is_active = data.is_active
     session.add(user)
     
@@ -268,12 +396,91 @@ def update_user_status(
         resource_type="user",
         resource_id=user.id,
         actor=current_user,
-        details={"is_active": user.is_active},
+        details={"from": previous_is_active, "to": user.is_active},
     )
     session.commit()
     session.refresh(user)
     
     return user
+
+
+@router.patch("/users/{user_id}/force-temporary-password")
+def force_temporary_password(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Immediately overwrites a user's password with a generated temporary one and forces them to change it at next login (Tier 2)."""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot force a temporary password on your own account. Use the change password form instead.",
+        )
+
+    temporary_password = _generate_temporary_password()
+    user.hashed_password = get_password_hash(temporary_password)
+    user.must_change_password = True
+    session.add(user)
+
+    add_audit_log(
+        session,
+        action="superadmin.force_temporary_password",
+        resource_type="user",
+        resource_id=user.id,
+        actor=current_user,
+    )
+    session.commit()
+
+    full_name = f"{user.first_name} {user.last_name}"
+    email_html = get_temporary_password_issued_template(full_name)
+    email_text = get_temporary_password_issued_template_text(full_name)
+    dispatch_email(background_tasks, user.email, "A temporary password has been set on your account", email_html, email_text)
+
+    return {"temporary_password": temporary_password}
+
+
+@router.post("/users/{user_id}/trigger-reset-email")
+def trigger_reset_email(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Send a password reset link to any user's own mailbox (Tier 1, platform-wide)."""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    try:
+        raw_token = create_password_reset_token(session, user.id)
+    except TokenCooldownError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"A reset email was already sent recently. Please wait {e.retry_after_seconds} seconds before trying again.",
+        )
+
+    full_name = f"{user.first_name} {user.last_name}"
+    email_html = get_password_reset_template(full_name, raw_token)
+    email_text = get_password_reset_template_text(full_name, raw_token)
+    dispatch_email(background_tasks, user.email, "Reset your password", email_html, email_text)
+
+    add_audit_log(
+        session,
+        action="superadmin.trigger_reset_email",
+        resource_type="user",
+        resource_id=user.id,
+        actor=current_user,
+    )
+    session.commit()
+
+    return {"message": f"A password reset link has been sent to {user.email}."}
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -341,6 +548,21 @@ def superadmin_delete_user(
 # ============================================================================
 
 PLATFORM_SETTINGS_KEY = "platform"
+
+
+def _diff_top_level_fields(old_values: dict[str, Any], new_values: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """
+    Compare old vs new top-level settings fields and return only what actually
+    changed, as {"from": ..., "to": ...}. For nested/object fields this shows
+    the whole old/new sub-object rather than a deep per-key diff — still far
+    more useful than a bare list of field names.
+    """
+    changes: dict[str, dict[str, Any]] = {}
+    for key, new_value in new_values.items():
+        old_value = old_values.get(key)
+        if old_value != new_value:
+            changes[key] = {"from": old_value, "to": new_value}
+    return changes
 
 
 def _deep_merge(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -451,17 +673,19 @@ def update_platform_settings(
 ):
     """Update platform settings."""
     current = _load_platform_settings(session)
+    incoming = data.model_dump(exclude_unset=True, mode="json")
     merged = _apply_compatibility_projection(_deep_merge(
         current.model_dump(mode="json"),
-        data.model_dump(exclude_unset=True, mode="json"),
+        incoming,
     ))
     saved = _save_platform_settings(session, PlatformSettings.model_validate(merged))
+    changes = _diff_top_level_fields(current.model_dump(mode="json"), incoming)
     add_audit_log(
         session,
         action="superadmin.platform_settings_update",
         resource_type="platform_settings",
         actor=current_user,
-        details={"fields": sorted(data.model_dump(exclude_unset=True).keys())},
+        details={"changes": changes} if changes else {"fields": []},
     )
     session.commit()
     return PlatformSettingsResponse.model_validate(saved)
@@ -609,7 +833,11 @@ def get_audit_logs(
 ):
     """Get platform audit logs."""
     safe_limit = max(1, min(limit, 200))
-    statement = select(AuditLog)
+    # Exclude the generic http.* rows the AuditLogMiddleware writes for every
+    # POST/PATCH/PUT/DELETE — they're noise duplicates of the semantic action
+    # already logged in the router (e.g. "user.login" already covers what
+    # "http.post" on /users/login would otherwise repeat).
+    statement = select(AuditLog).where(~AuditLog.action.startswith("http."))
     if blog_id is not None:
         statement = statement.where(AuditLog.blog_id == blog_id)
     if actor_user_id is not None:
@@ -667,11 +895,154 @@ def _to_audit_log_read(log: AuditLog) -> AuditLogRead:
     )
 
 
+def _format_datetime_label(value: Any) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+        return parsed.strftime("%b %d, %Y at %I:%M %p UTC")
+    except (ValueError, TypeError):
+        return None
+
+
+ROLE_LABELS = {
+    "owner": "Owner",
+    "editor": "Editor",
+    "author": "Author",
+    "viewer": "Viewer",
+}
+
+
+def _role_label(role: Any) -> str:
+    if isinstance(role, str):
+        return ROLE_LABELS.get(role.lower(), role)
+    return str(role) if role is not None else "unknown"
+
+
 def _describe_audit_log(log: AuditLog, details: dict[str, Any]) -> str:
     subject = log.resource_type.replace("_", " ")
     if log.resource_id is not None:
         subject = f"{subject} #{log.resource_id}"
+    action_label = log.action.replace(".", " ")
+
+    # Membership actions carry an email (and often a role) — say who, not just "blog member add"
+    if log.action == "blog.member_add" and details.get("email"):
+        role = details.get("role")
+        return f"Added {details['email']} to the workspace" + (f" as {role}" if role else "")
+
+    if log.action == "blog.member_remove" and details.get("email"):
+        role = details.get("role")
+        return f"Removed {details['email']} from the workspace" + (f" ({role})" if role else "")
+
+    # Posts encode status in the action name itself (post.published, post.draft,
+    # post.scheduled) rather than post.created — handle them explicitly before
+    # the generic create/update/delete-by-suffix check below.
+    if log.resource_type == "post" and details.get("title"):
+        title = details["title"]
+        if log.action == "post.deleted":
+            return f"Deleted post \u201c{title}\u201d"
+        if log.action == "post.updated":
+            return f"Updated post \u201c{title}\u201d"
+        if log.action == "post.published":
+            return f"Published post \u201c{title}\u201d"
+        if log.action == "post.scheduled":
+            when = _format_datetime_label(details.get("published_at"))
+            return f"Scheduled post \u201c{title}\u201d" + (f" for {when}" if when else "")
+        if log.action == "post.draft":
+            return f"Saved post \u201c{title}\u201d as a draft"
+
+    # --- Comment Actions ---
+    # Comments use "post_title" rather than "title" so they don't get swept
+    # into the post-specific branch above. Readers must register to comment
+    # on the public blog, so most comment.create rows are ordinary readers,
+    # not workspace team members — call that out when it's a team member,
+    # since that's the more notable case to a platform admin reviewing activity.
+    if log.resource_type == "comment":
+        post_title = details.get("post_title")
+        on_post = f' on "{post_title}"' if post_title else (f" on post #{details['post_id']}" if details.get("post_id") else "")
+
+        if log.action in ("comment.create", "comment.created"):
+            role = details.get("commenter_role")
+            if role and role != "reader":
+                return f"Commented{on_post} (as {_role_label(role)})"
+            return f"A reader commented{on_post}"
+
+        if log.action in ("comment.update", "comment.updated"):
+            return f"Edited a comment{on_post}"
+
+        if log.action in ("comment.delete", "comment.deleted", "comment.moderator_delete"):
+            deleted_by = details.get("deleted_by")
+            if log.action == "comment.moderator_delete" or deleted_by == "moderator":
+                return f"Removed a comment{on_post} (moderator)"
+            return f"Deleted a comment{on_post}"
+
+    # Named create/update/delete resources (posts, tags, comments, support tickets, etc.)
+    # — use the name/title/subject instead of a bare resource id.
+    name = details.get("name") or details.get("title") or details.get("subject")
+    if name:
+        if log.action.endswith((".create", ".created")):
+            return f"Created {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
+        if log.action.endswith((".update", ".updated")):
+            return f"Updated {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
+        if log.action.endswith((".delete", ".deleted")):
+            return f"Deleted {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
+
+    # Simple before/after toggle (e.g. status flips): {"from": ..., "to": ...}
+    if "from" in details and "to" in details:
+        return f"{action_label} on {subject}: {details['from']} \u2192 {details['to']}"
+
+    # Multi-field diffs (e.g. blog.update, settings.updated): {"changes": {field: {"from", "to"}}}
+    changes = details.get("changes")
+    if changes:
+        parts = [f"{field} {c.get('from')} \u2192 {c.get('to')}" for field, c in changes.items()]
+        return f"{action_label} on {subject}: {'; '.join(parts)}"
+
     fields = details.get("fields")
     if fields:
-        return f"{log.action.replace('.', ' ')} on {subject}: {', '.join(fields)}"
-    return f"{log.action.replace('.', ' ')} on {subject}"
+        return f"{action_label} on {subject}: {', '.join(fields)}"
+    return f"{action_label} on {subject}"
+
+
+# ============================================================================
+# SUPPORT TICKET ENDPOINTS
+# ============================================================================
+
+@router.get("/support", response_model=List[SupportTicketRead])
+def list_all_tickets(
+    ticket_status: Optional[TicketStatus] = None,
+    _: None = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    query = select(SupportTicket).order_by(SupportTicket.updated_at.desc())
+    if ticket_status:
+        query = query.where(SupportTicket.status == ticket_status)
+    return session.exec(query).all()
+
+
+@router.patch("/support/{ticket_id}/status", response_model=SupportTicketRead)
+def update_ticket_status(
+    ticket_id: int,
+    payload: UpdateTicketStatusSchema,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    ticket = session.get(SupportTicket, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    old_status = ticket.status
+    ticket.status = payload.status
+    session.add(ticket)
+
+    add_audit_log(
+        session,
+        action="support.status_updated",
+        resource_type="support_ticket",
+        resource_id=ticket.id,
+        actor=current_user,
+        details={"from": old_status.value, "to": payload.status.value},
+    )
+    session.commit()
+    session.refresh(ticket)
+    return ticket

@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional
 
 from slugify import slugify
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Field, Relationship, SQLModel, Session, select
 
 def utcnow() -> datetime:
@@ -52,7 +53,7 @@ class Post(SQLModel, table=True):
     published:    bool            = Field(default=False)
     published_at: Optional[datetime] = Field(
         default=None,
-        index=True,
+        sa_column=Column(SQLDateTime(timezone=True), index=True),
         description="UTC datetime when post goes/went live.",
     )
 
@@ -64,10 +65,10 @@ class Post(SQLModel, table=True):
     tags:             List[Tag]             = Relationship(back_populates="posts", link_model=PostTagLink)
     project_metadata: Optional[ProjectMetadata] = Relationship(back_populates="post")
 
-    created_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow},
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
 
     @staticmethod

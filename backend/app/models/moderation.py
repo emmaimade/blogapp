@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -26,12 +27,15 @@ class ModerationItem(SQLModel, table=True):
     resolved_by_id: Optional[int] = Field(default=None, 
         foreign_key="user.id", 
         ondelete="SET NULL")
-    created_at: datetime = Field(default_factory=utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, index=True),
+    )
     updated_at: datetime = Field(
         default_factory=utcnow,
-        sa_column_kwargs={"onupdate": utcnow},
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
-    resolved_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
 
 
 class ModerationAction(SQLModel, table=True):
@@ -42,4 +46,7 @@ class ModerationAction(SQLModel, table=True):
     actor_user_id: Optional[int] = Field(default=None, index=True)
     action: str = Field(index=True)
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=utcnow, index=True)
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False, index=True),
+    )

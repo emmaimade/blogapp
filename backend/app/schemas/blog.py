@@ -78,11 +78,13 @@ class BlogMemberUpdate(BaseModel):
     permissions: Optional[Dict[str, bool]] = None
 
 class BlogInvitationCreate(BaseModel):
+    email: EmailStr
     role: BlogRole = BlogRole.AUTHOR
 
 class BlogInvitationRead(UTCDatetimeMixin, BaseModel):
     id: int
     blog_id: int
+    email: str
     role: BlogRole
     token: str
     expires_at: datetime
@@ -96,9 +98,18 @@ class BlogInvitationInfo(BaseModel):
     """Public info shown to an invitee before they accept"""
     blog_name: str
     blog_slug: str
+    email: str
     role: BlogRole
     expires_at: datetime
     already_accepted: bool
+
+class InvitationRegisterCreate(BaseModel):
+    """Payload for creating a brand-new account directly from an invite link —
+    deliberately has no workspace fields, since the workspace is already
+    determined by the invitation being accepted."""
+    first_name: str
+    last_name: str
+    password: str
 
 class DashboardRecentActivity(UTCDatetimeMixin, BaseModel):
     type: str
