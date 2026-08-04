@@ -40,7 +40,8 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
 
   // 2. Query execution with verified backend endpoints
   const { data: logs = [], isLoading, isFetching, refetch } = useQuery<AuditLogEntry[]>({
-    queryKey: ['contextual-audit-logs', targetUserId, accessTier, page, activeBlog?.id],
+    // Included currentUser?.id in key for cache isolation on personal views
+    queryKey: ['contextual-audit-logs', currentUser?.id, targetUserId, accessTier, page, activeBlog?.id],
     queryFn: async () => {
       let url = '/users/me/audit-logs';
       let params: Record<string, any> = {
@@ -48,7 +49,6 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
         limit: PAGE_SIZE,
       };
 
-      // Correct endpoints matching your existing backend router architecture
       if (accessTier === 'superadmin') {
         url = '/superadmin/audit-logs';
         params.actor_user_id = targetUserId;
@@ -60,7 +60,8 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
       const res = await api.get(url, { params });
       return Array.isArray(res.data) ? res.data : (res.data.logs || []);
     },
-    enabled: accessTier !== 'denied' && (accessTier !== 'owner' || !!activeBlog?.id),
+    // Don't wait for activeBlog.id if we are just pulling our own /users/me logs
+    enabled: accessTier !== 'denied' && (accessTier === 'self' || accessTier === 'superadmin' || !!activeBlog?.id),
   });
 
   const getActionIcon = (action: string) => {
@@ -70,6 +71,17 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
     if (act.includes('update') || act.includes('patch') || act.includes('edit')) return <Edit3 size={14} className="text-amber-500" />;
     if (act.includes('delete') || act.includes('remove')) return <Trash2 size={14} className="text-rose-500" />;
     return <Settings size={14} className="text-zinc-400" />;
+  };
+
+  // Humanizes backend audit action names for a cleaner profile interface
+  const humanizeAction = (action: string) => {
+    const act = action.toLowerCase();
+    if (act === 'user.login') return 'Logged In';
+    if (act === 'user.register') return 'Account Registered';
+    if (act === 'user.update_profile') return 'Updated Profile';
+    if (act === 'user.delete_account') return 'Account Deleted';
+    
+    return action.replace(/[._]/g, ' ');
   };
 
   if (accessTier === 'denied') {
@@ -122,7 +134,7 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-zinc-900 dark:text-zinc-200 capitalize">
-                      {log.action.replace(/[._]/g, ' ')}
+                      {humanizeAction(log.action)}
                     </span>
                   </div>
                   {log.description && (

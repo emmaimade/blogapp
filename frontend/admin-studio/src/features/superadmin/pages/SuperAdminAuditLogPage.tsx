@@ -99,6 +99,12 @@ const iconClass: Record<Severity, string> = {
   critical: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300',
 };
 
+const humanize = (value: string) =>
+  value
+    .replace(/\./g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const getActionMeta = (log: AuditLogEntry): ActionMeta => {
   if (ACTION_META[log.action]) return ACTION_META[log.action];
   if (log.action.startsWith('http.')) {
@@ -113,11 +119,61 @@ const getActionMeta = (log: AuditLogEntry): ActionMeta => {
   return { label: humanize(log.action), category: 'system', severity: 'info', icon: <ShieldCheck size={14} /> };
 };
 
-const humanize = (value: string) =>
-  value
-    .replace(/\./g, ' ')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  editor: 'Editor',
+  author: 'Author',
+  viewer: 'Viewer',
+};
+
+const roleLabel = (role: unknown) =>
+  typeof role === 'string' ? ROLE_LABELS[role.toLowerCase()] ?? role : String(role ?? 'unknown');
+
+const describeLog = (log: AuditLogEntry, meta: ActionMeta): string => {
+  const details = log.details && typeof log.details === 'object' ? log.details : {};
+  const action = log.action.toLowerCase();
+
+  if (action.includes('member_add')) {
+    const email = (details.email as string) || null;
+    const role = details.role ? roleLabel(details.role) : null;
+    if (email && role) return `Added ${email} as ${role}`;
+    if (email) return `Added ${email} to the workspace`;
+  }
+
+  if (action.includes('member_remove')) {
+    const email = (details.email as string) || null;
+    const role = details.role ? ` (${roleLabel(details.role)})` : '';
+    if (email) return `Removed ${email}${role} from the workspace`;
+  }
+
+  if (action.includes('member_permissions_update')) {
+    const email = (details.email as string) || 'a team member';
+    const roleChange = details.changes && typeof details.changes === 'object'
+      ? (details.changes as Record<string, any>).role
+      : undefined;
+    if (roleChange) {
+      return `Changed ${email}'s role from ${roleLabel(roleChange.from)} to ${roleLabel(roleChange.to)}`;
+    }
+    return `Updated ${email}'s permissions`;
+  }
+
+  if (details.from !== undefined && details.to !== undefined) {
+    return `${meta.label}: ${String(details.from)} \u2192 ${String(details.to)}`;
+  }
+
+  const changes = details.changes;
+  if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
+    const parts = Object.entries(changes).map(
+      ([field, c]) => {
+        const changeObj = c && typeof c === 'object' ? (c as { from?: unknown; to?: unknown }) : {};
+        return `${humanize(field)} ${String(changeObj.from ?? '')} \u2192 ${String(changeObj.to ?? '')}`;
+      },
+    );
+    if (parts.length > 0) return `${meta.label}: ${parts.join('; ')}`;
+  }
+
+  return log.description || meta.label;
+};
 
 const stringifyDetail = (value: unknown) => {
   if (value === null || value === undefined) return '';
@@ -125,38 +181,6 @@ const stringifyDetail = (value: unknown) => {
     return String(value);
   }
   return JSON.stringify(value);
-};
-
-const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-
-const exportCsv = (logs: AuditLogEntry[]) => {
-  const rows = logs.map((log) => [
-    log.id,
-    log.created_at,
-    log.action,
-    log.resource_type,
-    log.resource_id,
-    log.blog_id,
-    log.actor_email,
-    log.actor_user_id,
-    log.ip_address,
-    log.description,
-    JSON.stringify(log.details ?? {}),
-  ]);
-  const csv = [
-    ['id', 'created_at', 'action', 'resource_type', 'resource_id', 'blog_id', 'actor_email', 'actor_user_id', 'ip_address', 'description', 'details'],
-    ...rows,
-  ]
-    .map((row) => row.map(csvEscape).join(','))
-    .join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `inko-platform-audit-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
 };
 
 export const SuperAdminAuditLogPage = () => {
@@ -169,8 +193,8 @@ export const SuperAdminAuditLogPage = () => {
   const [actorIdFilter, setActorIdFilter] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const { data: logs = [], isLoading, isFetching, refetch } = useQuery<AuditLogEntry[]>({
-    queryKey: ['superadmin-audit-logs', page, actionFilter, blogIdFilter, actorIdFilter],
+  const { data, isLoading, isFetching, refetch } = useQuery<{ logs: AuditLogEntry[]; totalCount: number }>({
+    queryKey: ['superadmin-audit-logs', page, actionFilter, blogIdFilter, actorIdFilter, search],
     queryFn: async () => {
       const res = await api.get('/superadmin/audit-logs', {
         params: {
@@ -179,11 +203,16 @@ export const SuperAdminAuditLogPage = () => {
           action: actionFilter !== 'all' ? actionFilter : undefined,
           blog_id: blogIdFilter.trim() ? Number(blogIdFilter) : undefined,
           actor_user_id: actorIdFilter.trim() ? Number(actorIdFilter) : undefined,
+          search: search.trim() ? search.trim() : undefined,
         },
       });
-      return res.data;
+      const totalCount = Number(res.headers['x-total-count'] ?? res.data.length);
+      return { logs: res.data, totalCount };
     },
   });
+
+  const logs = data?.logs ?? [];
+  const totalCount = data?.totalCount ?? 0;
 
   const actionOptions = useMemo(
     () => Array.from(new Set([...Object.keys(ACTION_META), ...logs.map((log) => log.action)])).sort(),
@@ -191,25 +220,13 @@ export const SuperAdminAuditLogPage = () => {
   );
 
   const filteredLogs = useMemo(() => {
-    const term = search.trim().toLowerCase();
     return logs.filter((log) => {
       const meta = getActionMeta(log);
       const matchesCategory = categoryFilter === 'all' || meta.category === categoryFilter;
       const matchesSeverity = severityFilter === 'all' || meta.severity === severityFilter;
-      const matchesSearch =
-        !term ||
-        log.action.toLowerCase().includes(term) ||
-        meta.label.toLowerCase().includes(term) ||
-        log.description?.toLowerCase().includes(term) ||
-        log.actor_email?.toLowerCase().includes(term) ||
-        log.resource_type.toLowerCase().includes(term) ||
-        String(log.resource_id ?? '').includes(term) ||
-        String(log.blog_id ?? '').includes(term) ||
-        log.ip_address?.toLowerCase().includes(term);
-
-      return matchesCategory && matchesSeverity && matchesSearch;
+      return matchesCategory && matchesSeverity;
     });
-  }, [categoryFilter, logs, search, severityFilter]);
+  }, [categoryFilter, logs, severityFilter]);
 
   const metrics = useMemo(() => {
     const critical = filteredLogs.filter((log) => getActionMeta(log).severity === 'critical').length;
@@ -218,6 +235,25 @@ export const SuperAdminAuditLogPage = () => {
     const uniqueActors = new Set(filteredLogs.map((log) => log.actor_email).filter(Boolean)).size;
     return { critical, warning, superadmin, uniqueActors };
   }, [filteredLogs]);
+
+  const handleExportCsv = async () => {
+    const response = await api.get('/superadmin/audit-logs/export', {
+      params: {
+        action: actionFilter !== 'all' ? actionFilter : undefined,
+        blog_id: blogIdFilter.trim() ? Number(blogIdFilter) : undefined,
+        actor_user_id: actorIdFilter.trim() ? Number(actorIdFilter) : undefined,
+        search: search.trim() ? search.trim() : undefined,
+      },
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `platform-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <div className="space-y-6">
@@ -230,9 +266,8 @@ export const SuperAdminAuditLogPage = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportCsv(filteredLogs)}
-            disabled={filteredLogs.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
             <Download size={14} /> Export CSV
           </button>
@@ -247,10 +282,10 @@ export const SuperAdminAuditLogPage = () => {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<Database size={16} />} label="Visible Events" value={filteredLogs.length} tone="zinc" />
-        <MetricCard icon={<AlertTriangle size={16} />} label="Critical Events" value={metrics.critical} tone="red" />
-        <MetricCard icon={<ShieldCheck size={16} />} label="Superadmin Actions" value={metrics.superadmin} tone="amber" />
-        <MetricCard icon={<User size={16} />} label="Unique Actors" value={metrics.uniqueActors} tone="blue" />
+        <MetricCard icon={<Database size={16} />} label="Total Records Found" value={totalCount} tone="zinc" />
+        <MetricCard icon={<AlertTriangle size={16} />} label="Critical Events (Page)" value={metrics.critical} tone="red" />
+        <MetricCard icon={<ShieldCheck size={16} />} label="Superadmin Actions (Page)" value={metrics.superadmin} tone="amber" />
+        <MetricCard icon={<User size={16} />} label="Unique Actors (Page)" value={metrics.uniqueActors} tone="blue" />
       </div>
 
       <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -262,9 +297,9 @@ export const SuperAdminAuditLogPage = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
-              placeholder="Search actor, action, IP, resource..."
+              placeholder="Search actor, action, IP, details..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); setPage(0); }}
               className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-700"
             />
           </div>
@@ -291,73 +326,77 @@ export const SuperAdminAuditLogPage = () => {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60">
-          <span />
-          <span>Event</span>
-          <span>Actor</span>
-          <span>Tenant</span>
-          <span>Resource</span>
-          <span>Time</span>
-        </div>
+        <div className="overflow-x-auto">
+            <div className="min-w-full sm:min-w-200">
+            <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <span />
+              <span>Event</span>
+              <span>Actor</span>
+              <span>Tenant</span>
+              <span>Resource</span>
+              <span>Time</span>
+            </div>
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-24">
-            <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
-            <span className="text-xs font-medium text-zinc-400">Loading platform audit events...</span>
-          </div>
-        ) : filteredLogs.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
-            <p className="text-sm font-medium text-zinc-500">No audit entries match these filters.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-            {filteredLogs.map((log) => {
-              const meta = getActionMeta(log);
-              const isExpanded = expandedId === log.id;
-              return (
-                <div key={log.id}>
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                    className="grid w-full grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
-                  >
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
-                      {meta.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
-                          {meta.severity}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-24">
+                <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
+                <span className="text-xs font-medium text-zinc-400">Loading platform audit events...</span>
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="px-6 py-16 text-center">
+                <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
+                <p className="text-sm font-medium text-zinc-500">No audit entries match these filters.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+                {filteredLogs.map((log) => {
+                  const meta = getActionMeta(log);
+                  const isExpanded = expandedId === log.id;
+                  return (
+                    <div key={log.id}>
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                        className="grid w-full grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
+                      >
+                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
+                          {meta.icon}
                         </span>
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{log.description || log.action}</span>
-                    </span>
-                    <span className="min-w-0 text-xs text-zinc-600 dark:text-zinc-300">
-                      <span className="block truncate font-medium">{log.actor_email || log.actor || 'System'}</span>
-                      {log.actor_user_id && <span className="text-[11px] text-zinc-400">ID {log.actor_user_id}</span>}
-                    </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{log.blog_id ? `Blog #${log.blog_id}` : 'Platform'}</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {log.resource_type}
-                      {log.resource_id ? ` #${log.resource_id}` : ''}
-                    </span>
-                    <span className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      <span title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
-                      <ChevronDown size={14} className={`transition ${isExpanded ? 'rotate-180' : ''}`} />
-                    </span>
-                  </button>
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
+                              {meta.severity}
+                            </span>
+                          </span>
+                          <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
+                        </span>
+                        <span className="min-w-0 text-xs text-zinc-600 dark:text-zinc-300">
+                          <span className="block truncate font-medium">{log.actor_email || log.actor || 'System'}</span>
+                          {log.actor_user_id && <span className="text-[11px] text-zinc-400">ID {log.actor_user_id}</span>}
+                        </span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">{log.blog_id ? `Blog #${log.blog_id}` : 'Platform'}</span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {log.resource_type}
+                          {log.resource_id ? ` #${log.resource_id}` : ''}
+                        </span>
+                        <span className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                          <span title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
+                          <ChevronDown size={14} className={`transition ${isExpanded ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
 
-                  {isExpanded && <ExpandedLog log={log} meta={meta} />}
-                </div>
-              );
-            })}
+                      {isExpanded && <ExpandedLog log={log} meta={meta} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900/50">
           <p className="text-xs text-zinc-400">
-            Showing {filteredLogs.length} of {logs.length} fetched events. Page {page + 1}.
+            Showing Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE) || 1} ({totalCount} total entries).
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -369,7 +408,7 @@ export const SuperAdminAuditLogPage = () => {
             </button>
             <button
               onClick={() => setPage((value) => value + 1)}
-              disabled={logs.length < PAGE_SIZE || isLoading}
+              disabled={(page + 1) * PAGE_SIZE >= totalCount || isLoading}
               className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
               Next
@@ -425,7 +464,7 @@ const ExpandedLog = ({ log, meta }: { log: AuditLogEntry; meta: ActionMeta }) =>
           {log.user_agent && (
             <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">User Agent</p>
-              <p className="break-words font-mono text-xs text-zinc-600 dark:text-zinc-300">{log.user_agent}</p>
+              <p className="wrap-break-word font-mono text-xs text-zinc-600 dark:text-zinc-300">{log.user_agent}</p>
             </div>
           )}
         </div>
@@ -444,7 +483,7 @@ const ExpandedLog = ({ log, meta }: { log: AuditLogEntry; meta: ActionMeta }) =>
               {detailEntries.map(([key, value]) => (
                 <div key={key} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{humanize(key)}</p>
-                  <p className="break-words font-mono text-xs text-zinc-700 dark:text-zinc-300">{stringifyDetail(value)}</p>
+                  <p className="wrap-break-word font-mono text-xs text-zinc-700 dark:text-zinc-300">{stringifyDetail(value)}</p>
                 </div>
               ))}
             </div>
@@ -461,6 +500,6 @@ const ExpandedLog = ({ log, meta }: { log: AuditLogEntry; meta: ActionMeta }) =>
 const DetailItem = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{label}</p>
-    <p className="break-words text-xs font-semibold text-zinc-700 dark:text-zinc-300">{value}</p>
+    <p className="wrap-break-word text-xs font-semibold text-zinc-700 dark:text-zinc-300">{value}</p>
   </div>
 );
