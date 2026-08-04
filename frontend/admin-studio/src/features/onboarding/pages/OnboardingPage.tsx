@@ -4,7 +4,7 @@ import { detectUserTimezone } from '../../../shared/utils/dates';
 import {
   ArrowRight, ArrowLeft, Check, Loader2, Mail,
   Rocket, ShieldCheck, Sparkles, Users,
-  CheckCircle2, Globe, FileText, BarChart3, Building2,
+  CheckCircle2, Globe, FileText, BarChart3, Building2, HelpCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -12,6 +12,8 @@ import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useAuth } from '../../auth/context/AuthContext';
 import { InkoLogo } from '../../../assets/inko';
+import { EmailVerificationBanner } from '../../auth/components/EmailVerificationBanner';
+import { SupportModal } from '../../support/components/SupportModal';
 
 type SubscriptionPlan = 'free' | 'pro' | 'team';
 type OnboardingStepKey = 'about' | 'profile' | 'publication' | 'team' | 'plan';
@@ -95,10 +97,12 @@ const inputClass =
 const selectClass = inputClass;
 
 const Field = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
-  <div className="space-y-1.5">
-    <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">{label}</label>
-    {hint && <p className="text-xs text-zinc-400">{hint}</p>}
-    {children}
+  <div className="self-stretch h-full flex flex-col">
+    <div className="space-y-1.5">
+      <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">{label}</label>
+      {hint && <p className="text-xs text-zinc-400">{hint}</p>}
+    </div>
+    <div className="mt-auto pt-1.5">{children}</div>
   </div>
 );
 
@@ -108,11 +112,13 @@ export const OnboardingPage = () => {
   const { activeBlog, requiresOnboarding } = useBlog();
   const { refreshUser } = useAuth();
 
+  const [checkingVerification, setCheckingVerification] = useState(false);
   const [currentStep, setCurrentStep] = useState<OnboardingStepKey>('about');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'editor' | 'author'>('editor');
   const [showOptionalProfile, setShowOptionalProfile] = useState(false);
   const [done, setDone] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   const hasInitialized = useRef(false);
 
@@ -222,6 +228,25 @@ export const OnboardingPage = () => {
     },
   });
 
+  const handleLaunch = async () => {
+    setCheckingVerification(true);
+    try {
+      const { data: freshUser } = await api.get("/users/me");
+      if (!freshUser.email_verified) {
+        toast.error(
+          "Please verify your email before launching your blog. Check your inbox for the link.",
+        );
+        return;
+      }
+      await refreshUser();
+      savePlan.mutate();
+    } catch {
+      toast.error("Could not confirm verification status. Please try again.");
+    } finally {
+      setCheckingVerification(false);
+    }
+  };
+
   const progress = onboardingQuery.data?.summary;
   const blog = onboardingQuery.data?.blog;
 
@@ -289,19 +314,26 @@ export const OnboardingPage = () => {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col">
-      <header className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4 flex items-center justify-between">
+<header className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center">
             <InkoLogo size={28} />
           </div>
-          <span className="text-xl font-black text-zinc-900 dark:text-white">Inko</span>
-          <span className="hidden sm:block text-zinc-300 dark:text-zinc-700">·</span>
-          <span className="hidden sm:block text-sm text-zinc-500 dark:text-zinc-400">Workspace setup</span>
+          <span className="text-xl font-black text-zinc-900 dark:text-white">
+            Inko
+          </span>
+          <span className="hidden sm:block text-zinc-300 dark:text-zinc-700">
+            ·
+          </span>
+          <span className="hidden sm:block text-sm text-zinc-500 dark:text-zinc-400">
+            Workspace setup
+          </span>
         </div>
 
         <div className="flex items-center gap-3">
           {(() => {
-            const completedCount = Object.values(completedMap).filter(Boolean).length;
+            const completedCount =
+              Object.values(completedMap).filter(Boolean).length;
             const pct = Math.round((completedCount / STEP_ORDER.length) * 100);
             return (
               <>
@@ -317,8 +349,20 @@ export const OnboardingPage = () => {
               </>
             );
           })()}
+          <button
+            onClick={() => setShowSupportModal(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+            aria-label="Contact support"
+          >
+            <HelpCircle size={15} />
+            <span className="hidden sm:inline">Help</span>
+          </button>
         </div>
       </header>
+
+      <SupportModal open={showSupportModal} onClose={() => setShowSupportModal(false)} />
+
+      <EmailVerificationBanner />
 
       <div className="flex-1 flex overflow-hidden">
         <aside className="hidden md:flex flex-col w-56 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-8">
@@ -336,46 +380,60 @@ export const OnboardingPage = () => {
                   disabled={locked}
                   className={`flex items-start gap-3 rounded-xl px-3 py-3 text-left transition-all ${
                     active
-                      ? 'bg-accent dark:bg-violet-950/40'
+                      ? "bg-accent dark:bg-violet-950/40"
                       : done
-                      ? 'bg-green-50/60 dark:bg-green-950/20 hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer'
-                      : locked
-                      ? 'opacity-40 cursor-not-allowed'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer'
+                        ? "bg-green-50/60 dark:bg-green-950/20 hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer"
+                        : locked
+                          ? "opacity-40 cursor-not-allowed"
+                          : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
                   }`}
                 >
-                  <div className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
-                    done
-                      ? 'bg-green-500 text-white dark:bg-green-600'
-                      : active
-                      ? 'bg-purple-600 text-white'
-                      : locked
-                      ? 'border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400'
-                      : 'border-2 border-zinc-300 dark:border-zinc-600 text-zinc-500'
-                  }`}>
+                  <div
+                    className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                      done
+                        ? "bg-green-500 text-white dark:bg-green-600"
+                        : active
+                          ? "bg-purple-600 text-white"
+                          : locked
+                            ? "border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400"
+                            : "border-2 border-zinc-300 dark:border-zinc-600 text-zinc-500"
+                    }`}
+                  >
                     {done ? <Check size={12} /> : i + 1}
                   </div>
 
                   <div className="min-w-0">
-                    <div className={`text-sm font-semibold leading-none ${
-                      active ? 'text-purple-600'
-                      : done ? 'text-green-700 dark:text-green-400'
-                      : 'text-zinc-700 dark:text-zinc-300'
-                    }`}>
+                    <div
+                      className={`text-sm font-semibold leading-none ${
+                        active
+                          ? "text-purple-600"
+                          : done
+                            ? "text-green-700 dark:text-green-400"
+                            : "text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
                       {meta.label}
                       {meta.optional && (
-                        <span className="ml-1.5 text-[10px] font-normal text-zinc-400">optional</span>
+                        <span className="ml-1.5 text-[10px] font-normal text-zinc-400">
+                          optional
+                        </span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-zinc-400 dark:text-zinc-500 leading-snug">{meta.hint}</div>
+                    <div className="mt-1 text-xs text-zinc-400 dark:text-zinc-500 leading-snug">
+                      {meta.hint}
+                    </div>
                   </div>
                 </button>
 
                 {!isLast && (
                   <div className="flex justify-start pl-[1.375rem]">
-                    <div className={`w-px h-3 transition-colors duration-300 ${
-                      done ? 'bg-green-300 dark:bg-green-700' : 'bg-zinc-200 dark:bg-zinc-700'
-                    }`} />
+                    <div
+                      className={`w-px h-3 transition-colors duration-300 ${
+                        done
+                          ? "bg-green-300 dark:bg-green-700"
+                          : "bg-zinc-200 dark:bg-zinc-700"
+                      }`}
+                    />
                   </div>
                 )}
               </div>
@@ -389,30 +447,47 @@ export const OnboardingPage = () => {
               <div className="text-xs font-semibold text-purple-600 uppercase tracking-widest mb-2">
                 Step {currentIndex + 1} of {STEP_ORDER.length}
                 {STEP_META[currentStep].optional && (
-                  <span className="ml-2 text-zinc-400 normal-case tracking-normal">· optional</span>
+                  <span className="ml-2 text-zinc-400 normal-case tracking-normal">
+                    · optional
+                  </span>
                 )}
               </div>
               <h1 className="text-2xl font-black text-zinc-900 dark:text-white">
-                {currentStep === 'about'       && 'Tell us about your setup'}
-                {currentStep === 'profile'     && 'Set up your blog profile'}
-                {currentStep === 'publication' && 'Configure publishing defaults'}
-                {currentStep === 'team'        && 'Invite your team'}
-                {currentStep === 'plan'        && 'Choose how you want to start'}
+                {currentStep === "about" && "Tell us about your setup"}
+                {currentStep === "profile" && "Set up your blog profile"}
+                {currentStep === "publication" &&
+                  "Configure publishing defaults"}
+                {currentStep === "team" && "Invite your team"}
+                {currentStep === "plan" && "Choose how you want to start"}
               </h1>
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {currentStep === 'about'       && 'This helps us personalise the admin studio for how your team works.'}
-                {currentStep === 'profile'     && 'The basics readers will see. You can update these any time in Settings.'}
-                {currentStep === 'publication' && 'Set sensible defaults once. Every new post will inherit these.'}
-                {currentStep === 'team'        && 'Teammates added now will get an email invite instantly. You can always add more later.'}
-                {currentStep === 'plan'        && 'Your trial is already active. Pick a plan now or stay on free and upgrade when ready.'}
+                {currentStep === "about" &&
+                  "This helps us personalise the admin studio for how your team works."}
+                {currentStep === "profile" &&
+                  "The basics readers will see. You can update these any time in Settings."}
+                {currentStep === "publication" &&
+                  "Set sensible defaults once. Every new post will inherit these."}
+                {currentStep === "team" &&
+                  "Teammates added now will get an email invite instantly. You can always add more later."}
+                {currentStep === "plan" &&
+                  "Your trial is already active. Pick a plan now or stay on free and upgrade when ready."}
               </p>
             </div>
 
             {/* ── STEP: ABOUT ─────────────────────────────────────── */}
-            {currentStep === 'about' && (
+            {currentStep === "about" && (
               <div className="space-y-5">
                 <Field label="Your role">
-                  <select className={selectClass} value={aboutForm.owner_role} onChange={(e) => setAboutForm((p) => ({ ...p, owner_role: e.target.value }))}>
+                  <select
+                    className={selectClass}
+                    value={aboutForm.owner_role}
+                    onChange={(e) =>
+                      setAboutForm((p) => ({
+                        ...p,
+                        owner_role: e.target.value,
+                      }))
+                    }
+                  >
                     <option value="blogger">Blogger / Creator</option>
                     <option value="agency">Agency</option>
                     <option value="saas_company">SaaS company</option>
@@ -420,7 +495,16 @@ export const OnboardingPage = () => {
                   </select>
                 </Field>
                 <Field label="What are you building?">
-                  <select className={selectClass} value={aboutForm.workspace_type} onChange={(e) => setAboutForm((p) => ({ ...p, workspace_type: e.target.value }))}>
+                  <select
+                    className={selectClass}
+                    value={aboutForm.workspace_type}
+                    onChange={(e) =>
+                      setAboutForm((p) => ({
+                        ...p,
+                        workspace_type: e.target.value,
+                      }))
+                    }
+                  >
                     <option value="personal_blog">Personal blog</option>
                     <option value="client_blogs">Client blogs</option>
                     <option value="company_blog">Company blog</option>
@@ -430,19 +514,21 @@ export const OnboardingPage = () => {
                 <Field label="Team size">
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { value: 'solo',    label: 'Just me' },
-                      { value: 'small',   label: '2 – 5' },
-                      { value: 'growing', label: '6 – 20' },
-                      { value: 'large',   label: '20+' },
+                      { value: "solo", label: "Just me" },
+                      { value: "small", label: "2 – 5" },
+                      { value: "growing", label: "6 – 20" },
+                      { value: "large", label: "20+" },
                     ].map(({ value, label }) => (
                       <button
                         key={value}
                         type="button"
-                        onClick={() => setAboutForm((p) => ({ ...p, team_size: value }))}
+                        onClick={() =>
+                          setAboutForm((p) => ({ ...p, team_size: value }))
+                        }
                         className={`rounded-lg border py-3 text-sm font-semibold transition-all cursor-pointer ${
                           aboutForm.team_size === value
-                            ? 'border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300'
-                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                            ? "border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
+                            : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                         }`}
                       >
                         {label}
@@ -459,34 +545,67 @@ export const OnboardingPage = () => {
             )}
 
             {/* ── STEP: PROFILE ──────────────────────────────────── */}
-            {currentStep === 'profile' && (
+            {currentStep === "profile" && (
               <div className="space-y-5">
                 <Field label="Blog display name">
                   <input
                     className={inputClass}
                     value={profileForm.name}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, name: e.target.value }))}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, name: e.target.value }))
+                    }
                     placeholder="My Awesome Blog"
                   />
                 </Field>
-                <Field label="Tagline" hint="One sentence that captures what your blog is about.">
+                <Field
+                  label="Tagline"
+                  hint="One sentence that captures what your blog is about."
+                >
                   <input
                     className={inputClass}
                     value={profileForm.tagline}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, tagline: e.target.value }))}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, tagline: e.target.value }))
+                    }
                     placeholder="Your ideas, amplified"
                   />
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Category">
-                    <select className={selectClass} value={profileForm.category} onChange={(e) => setProfileForm((p) => ({ ...p, category: e.target.value }))}>
-                      {['Tech', 'Business', 'Lifestyle', 'Marketing', 'Education', 'Design', 'Other'].map((c) => (
+                    <select
+                      className={selectClass}
+                      value={profileForm.category}
+                      onChange={(e) =>
+                        setProfileForm((p) => ({
+                          ...p,
+                          category: e.target.value,
+                        }))
+                      }
+                    >
+                      {[
+                        "Tech",
+                        "Business",
+                        "Lifestyle",
+                        "Marketing",
+                        "Education",
+                        "Design",
+                        "Other",
+                      ].map((c) => (
                         <option key={c}>{c}</option>
                       ))}
                     </select>
                   </Field>
                   <Field label="Primary language">
-                    <select className={selectClass} value={profileForm.primary_language} onChange={(e) => setProfileForm((p) => ({ ...p, primary_language: e.target.value }))}>
+                    <select
+                      className={selectClass}
+                      value={profileForm.primary_language}
+                      onChange={(e) =>
+                        setProfileForm((p) => ({
+                          ...p,
+                          primary_language: e.target.value,
+                        }))
+                      }
+                    >
                       <option value="en">English</option>
                       <option value="fr">French</option>
                       <option value="es">Spanish</option>
@@ -496,11 +615,19 @@ export const OnboardingPage = () => {
                   </Field>
                 </div>
 
-                <Field label="Description" hint="Optional — shown on your blog's about page.">
+                <Field
+                  label="Description"
+                  hint="Optional — shown on your blog's about page."
+                >
                   <textarea
                     className={`${inputClass} min-h-24 resize-none`}
                     value={profileForm.description}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, description: e.target.value }))}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
                     placeholder="A short paragraph about what you publish…"
                   />
                 </Field>
@@ -516,10 +643,30 @@ export const OnboardingPage = () => {
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Logo URL" hint="Optional">
-                      <input className={inputClass} value={profileForm.logo_url} onChange={(e) => setProfileForm((p) => ({ ...p, logo_url: e.target.value }))} placeholder="https://…" />
+                      <input
+                        className={inputClass}
+                        value={profileForm.logo_url}
+                        onChange={(e) =>
+                          setProfileForm((p) => ({
+                            ...p,
+                            logo_url: e.target.value,
+                          }))
+                        }
+                        placeholder="https://…"
+                      />
                     </Field>
                     <Field label="Favicon URL" hint="Optional">
-                      <input className={inputClass} value={profileForm.favicon_url} onChange={(e) => setProfileForm((p) => ({ ...p, favicon_url: e.target.value }))} placeholder="https://…" />
+                      <input
+                        className={inputClass}
+                        value={profileForm.favicon_url}
+                        onChange={(e) =>
+                          setProfileForm((p) => ({
+                            ...p,
+                            favicon_url: e.target.value,
+                          }))
+                        }
+                        placeholder="https://…"
+                      />
                     </Field>
                   </div>
                 )}
@@ -534,23 +681,39 @@ export const OnboardingPage = () => {
             )}
 
             {/* ── STEP: PUBLICATION ──────────────────────────────── */}
-            {currentStep === 'publication' && (
+            {currentStep === "publication" && (
               <div className="space-y-5">
-                <Field label="Default post visibility" hint="New posts will inherit this setting. Authors can override per post.">
+                <Field
+                  label="Default post visibility"
+                  hint="New posts will inherit this setting. Authors can override per post."
+                >
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { value: 'public',       label: 'Public',       icon: Globe },
-                      { value: 'members_only', label: 'Members only', icon: Users },
-                      { value: 'paid_only',    label: 'Paid only',    icon: ShieldCheck },
+                      { value: "public", label: "Public", icon: Globe },
+                      {
+                        value: "members_only",
+                        label: "Members only",
+                        icon: Users,
+                      },
+                      {
+                        value: "paid_only",
+                        label: "Paid only",
+                        icon: ShieldCheck,
+                      },
                     ].map(({ value, label, icon: Icon }) => (
                       <button
                         key={value}
                         type="button"
-                        onClick={() => setPublicationForm((p) => ({ ...p, default_post_visibility: value as any }))}
+                        onClick={() =>
+                          setPublicationForm((p) => ({
+                            ...p,
+                            default_post_visibility: value as any,
+                          }))
+                        }
                         className={`flex flex-col items-center gap-2 rounded-lg border py-4 text-xs font-semibold transition-all cursor-pointer ${
                           publicationForm.default_post_visibility === value
-                            ? 'border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300'
-                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                            ? "border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
+                            : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                         }`}
                       >
                         <Icon size={16} />
@@ -561,11 +724,19 @@ export const OnboardingPage = () => {
                 </Field>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Timezone" hint="Used for scheduling and post timestamps. Auto-detected from your browser.">
+                  <Field
+                    label="Timezone"
+                    hint="Used for scheduling and post timestamps. Auto-detected from your browser."
+                  >
                     <select
                       className={selectClass}
                       value={publicationForm.timezone}
-                      onChange={(e) => setPublicationForm((p) => ({ ...p, timezone: e.target.value }))}
+                      onChange={(e) =>
+                        setPublicationForm((p) => ({
+                          ...p,
+                          timezone: e.target.value,
+                        }))
+                      }
                     >
                       {!TIMEZONES.includes(publicationForm.timezone) && (
                         <option value={publicationForm.timezone}>
@@ -573,30 +744,56 @@ export const OnboardingPage = () => {
                         </option>
                       )}
                       {TIMEZONES.map((tz) => (
-                        <option key={tz} value={tz}>{tz}</option>
+                        <option key={tz} value={tz}>
+                          {tz}
+                        </option>
                       ))}
                     </select>
                   </Field>
 
                   <Field label="Posts per page">
-                    <input type="number" min={1} max={50} className={inputClass} value={publicationForm.posts_per_page} onChange={(e) => setPublicationForm((p) => ({ ...p, posts_per_page: Number(e.target.value) || 1 }))} />
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      className={inputClass}
+                      value={publicationForm.posts_per_page}
+                      onChange={(e) =>
+                        setPublicationForm((p) => ({
+                          ...p,
+                          posts_per_page: Number(e.target.value) || 1,
+                        }))
+                      }
+                    />
                   </Field>
                 </div>
 
-                <label className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-all ${
-                  publicationForm.comments_enabled
-                    ? 'border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700'
-                    : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300'
-                }`}>
+                <label
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-all ${
+                    publicationForm.comments_enabled
+                      ? "border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700"
+                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300"
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={publicationForm.comments_enabled}
-                    onChange={(e) => setPublicationForm((p) => ({ ...p, comments_enabled: e.target.checked }))}
+                    onChange={(e) =>
+                      setPublicationForm((p) => ({
+                        ...p,
+                        comments_enabled: e.target.checked,
+                      }))
+                    }
                     className="accent-primary w-4 h-4 cursor-pointer"
                   />
                   <div>
-                    <div className="text-sm font-semibold text-zinc-900 dark:text-white">Enable comments by default</div>
-                    <div className="text-xs text-zinc-400 mt-0.5">Readers can comment on posts. You can moderate in Comments.</div>
+                    <div className="text-sm font-semibold text-zinc-900 dark:text-white">
+                      Enable comments by default
+                    </div>
+                    <div className="text-xs text-zinc-400 mt-0.5">
+                      Readers can comment on posts. You can moderate in
+                      Comments.
+                    </div>
                   </div>
                 </label>
 
@@ -609,16 +806,21 @@ export const OnboardingPage = () => {
             )}
 
             {/* ── STEP: TEAM ─────────────────────────────────────── */}
-            {currentStep === 'team' && (
+            {currentStep === "team" && (
               <div className="space-y-5">
                 <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <Users size={16} className="text-purple-600" />
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">Invite a teammate</span>
+                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                      Invite a teammate
+                    </span>
                   </div>
                   <div className="space-y-3">
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={15} />
+                      <Mail
+                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
+                        size={15}
+                      />
                       <input
                         className={`${inputClass} pl-10`}
                         type="email"
@@ -628,9 +830,19 @@ export const OnboardingPage = () => {
                       />
                     </div>
                     <div className="flex gap-3">
-                      <select className={`${selectClass} flex-1`} value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'editor' | 'author')}>
-                        <option value="editor">Editor — can manage all content</option>
-                        <option value="author">Author — can create and edit own posts</option>
+                      <select
+                        className={`${selectClass} flex-1`}
+                        value={inviteRole}
+                        onChange={(e) =>
+                          setInviteRole(e.target.value as "editor" | "author")
+                        }
+                      >
+                        <option value="editor">
+                          Editor — can manage all content
+                        </option>
+                        <option value="author">
+                          Author — can create and edit own posts
+                        </option>
                       </select>
                       <button
                         type="button"
@@ -638,7 +850,7 @@ export const OnboardingPage = () => {
                         disabled={inviteMutation.isPending || !inviteEmail}
                         className="flex-shrink-0 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 cursor-pointer"
                       >
-                        {inviteMutation.isPending ? 'Sending…' : 'Send invite'}
+                        {inviteMutation.isPending ? "Sending…" : "Send invite"}
                       </button>
                     </div>
                   </div>
@@ -646,11 +858,22 @@ export const OnboardingPage = () => {
 
                 <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500 dark:text-zinc-400">
                   {[
-                    { role: 'Editor', desc: 'Full content access, can invite authors, moderate comments.' },
-                    { role: 'Author', desc: 'Creates and publishes own posts. No team or settings access.' },
+                    {
+                      role: "Editor",
+                      desc: "Full content access, can invite authors, moderate comments.",
+                    },
+                    {
+                      role: "Author",
+                      desc: "Creates and publishes own posts. No team or settings access.",
+                    },
                   ].map(({ role, desc }) => (
-                    <div key={role} className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-3">
-                      <div className="font-semibold text-zinc-700 dark:text-zinc-300 mb-1">{role}</div>
+                    <div
+                      key={role}
+                      className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-3"
+                    >
+                      <div className="font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                        {role}
+                      </div>
                       {desc}
                     </div>
                   ))}
@@ -670,7 +893,11 @@ export const OnboardingPage = () => {
                     disabled={completeTeam.isPending}
                     className="flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold bg-purple-600 text-white shadow-md shadow-primary/20 hover:bg-purple-700 transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    {completeTeam.isPending ? <Loader2 className="animate-spin" size={15} /> : <ArrowRight size={15} />}
+                    {completeTeam.isPending ? (
+                      <Loader2 className="animate-spin" size={15} />
+                    ) : (
+                      <ArrowRight size={15} />
+                    )}
                     Continue to plan
                   </button>
                   <button
@@ -686,74 +913,98 @@ export const OnboardingPage = () => {
             )}
 
             {/* ── STEP: PLAN ─────────────────────────────────────── */}
-            {currentStep === 'plan' && (
+            {currentStep === "plan" && (
               <div className="space-y-5">
                 <div className="flex items-start gap-3 rounded-lg border border-accent-border bg-accent/40 dark:bg-violet-950/30 dark:border-violet-800/50 px-4 py-3">
-                  <CheckCircle2 size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2
+                    size={16}
+                    className="text-purple-600 flex-shrink-0 mt-0.5"
+                  />
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                    Your <strong className="text-zinc-900 dark:text-white">14-day free trial</strong> is already running. You won't be charged until you choose a paid plan and add a card.
+                    Your{" "}
+                    <strong className="text-zinc-900 dark:text-white">
+                      14-day free trial
+                    </strong>{" "}
+                    is already running. You won't be charged until you choose a
+                    paid plan and add a card.
                   </p>
                 </div>
 
                 <div className="space-y-3">
                   {[
                     {
-                      key: 'free',
-                      title: 'Free trial',
-                      price: 'Free for 14 days',
-                      desc: 'Full access during trial. Upgrade when you\'re ready.',
+                      key: "free",
+                      title: "Free trial",
+                      price: "Free for 14 days",
+                      desc: "Full access during trial. Upgrade when you're ready.",
                       icon: ShieldCheck,
                       recommended: false,
                     },
                     {
-                      key: 'pro',
-                      title: 'Professional',
-                      price: '$29 / month',
-                      desc: 'Custom domain, API access, advanced analytics, priority support.',
+                      key: "pro",
+                      title: "Professional",
+                      price: "$29 / month",
+                      desc: "Custom domain, API access, advanced analytics, priority support.",
                       icon: Rocket,
                       recommended: true,
                     },
                     {
-                      key: 'team',
-                      title: 'Enterprise',
-                      price: 'Custom pricing',
-                      desc: 'Unlimited workspaces, SSO, dedicated support, SLA guarantee.',
+                      key: "team",
+                      title: "Enterprise",
+                      price: "Custom pricing",
+                      desc: "Unlimited workspaces, SSO, dedicated support, SLA guarantee.",
                       icon: Sparkles,
                       recommended: false,
                     },
-                  ].map(({ key, title, price, desc, icon: Icon, recommended }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setSelectedPlan(key as SubscriptionPlan)}
-                      className={`w-full flex items-start gap-4 rounded-lg border p-4 text-left transition-all cursor-pointer ${
-                        selectedPlan === key
-                          ? 'border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10'
-                          : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900'
-                      }`}
-                    >
-                      <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? 'bg-purple-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>
-                        <Icon size={18} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-zinc-900 dark:text-white">{title}</span>
-                          {recommended && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">
-                              Popular
+                  ].map(
+                    ({ key, title, price, desc, icon: Icon, recommended }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedPlan(key as SubscriptionPlan)}
+                        className={`w-full flex items-start gap-4 rounded-lg border p-4 text-left transition-all cursor-pointer ${
+                          selectedPlan === key
+                            ? "border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10"
+                            : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
+                        }`}
+                      >
+                        <div
+                          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? "bg-purple-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+                        >
+                          <Icon size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                              {title}
                             </span>
+                            {recommended && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                                Popular
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs font-semibold text-purple-600 mt-0.5">
+                            {price}
+                          </div>
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                            {desc}
+                          </div>
+                        </div>
+                        <div
+                          className={`flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                            selectedPlan === key
+                              ? "border-purple-600 bg-purple-600"
+                              : "border-zinc-300 dark:border-zinc-600"
+                          }`}
+                        >
+                          {selectedPlan === key && (
+                            <Check size={11} className="text-white" />
                           )}
                         </div>
-                        <div className="text-xs font-semibold text-purple-600 mt-0.5">{price}</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{desc}</div>
-                      </div>
-                      <div className={`flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                        selectedPlan === key ? 'border-purple-600 bg-purple-600' : 'border-zinc-300 dark:border-zinc-600'
-                      }`}>
-                        {selectedPlan === key && <Check size={11} className="text-white" />}
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ),
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -766,33 +1017,45 @@ export const OnboardingPage = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => savePlan.mutate()}
-                    disabled={savePlan.isPending}
+                    onClick={handleLaunch}
+                    disabled={savePlan.isPending || checkingVerification}
                     className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-purple-600 text-white shadow-md shadow-primary/20 hover:bg-purple-700 transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    {savePlan.isPending
-                      ? <><Loader2 className="animate-spin" size={15} /> Launching your blog…</>
-                      : <><Check size={15} /> Launch my blog</>
-                    }
+                    {savePlan.isPending ? (
+                      <>
+                        <Loader2 className="animate-spin" size={15} /> Launching
+                        your blog…
+                      </>
+                    ) : (
+                      <>
+                        <Check size={15} /> Launch my blog
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             )}
 
-            {currentStep !== 'plan' && (
+            {currentStep !== "plan" && (
               <div className="mt-10 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-4 py-4">
                 <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
                   Unlocks when complete
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { icon: FileText, label: 'Post editor' },
-                    { icon: Users,    label: 'Team tools' },
-                    { icon: BarChart3, label: 'Analytics' },
-                    { icon: Building2, label: 'All settings' },
+                    { icon: FileText, label: "Post editor" },
+                    { icon: Users, label: "Team tools" },
+                    { icon: BarChart3, label: "Analytics" },
+                    { icon: Building2, label: "All settings" },
                   ].map(({ icon: Icon, label }) => (
-                    <div key={label} className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
-                      <Icon size={13} className="text-zinc-300 dark:text-zinc-600" />
+                    <div
+                      key={label}
+                      className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500"
+                    >
+                      <Icon
+                        size={13}
+                        className="text-zinc-300 dark:text-zinc-600"
+                      />
                       {label}
                     </div>
                   ))}
