@@ -131,8 +131,7 @@ export const SignupPage = () => {
     setError("");
 
     try {
-      // MATCHED ROUTE: Calls user registration system endpoint
-      await axios.post(`${API_URL}/users/register`, {
+      const res = await axios.post(`${API_URL}/users/register`, {
         first_name: formData.firstName.trim(),
         last_name: formData.lastName.trim(),
         email: formData.email.trim(),
@@ -141,16 +140,7 @@ export const SignupPage = () => {
         workspace_slug: formData.workspaceSlug.trim(),
       });
 
-      const loginFormData = new URLSearchParams();
-      loginFormData.append("username", formData.email.trim());
-      loginFormData.append("password", formData.password);
-
-      const loginRes = await axios.post(`${API_URL}/auth/login`, loginFormData, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-
-      const { access_token } = loginRes.data;
-
+      const { access_token } = res.data;
       window.location.href = `${ADMIN_STUDIO_URL}/auth/callback?token=${access_token}&next=/admin/onboarding`;
     } catch (err: any) {
       const backendDetail = err.response?.data?.detail;

@@ -21,10 +21,10 @@ export const SiteRouter = () => {
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
       <Route element={<AuthLayout />}>
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
       <Route path="/join/:token" element={<JoinPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

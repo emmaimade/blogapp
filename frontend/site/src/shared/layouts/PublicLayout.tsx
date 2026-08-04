@@ -177,10 +177,10 @@ export const PublicLayout = () => {
             {/* Brand Column */}
             <div>
               <div className="flex items-center gap-2 font-black text-lg text-white mb-4">
-                <div className="flex h-8 w-8 items-center justify-center bg-primary rounded-lg">
-                  <InkoLogo color="white" size={20} />
+                <div className="flex h-8 w-8 items-center justify-center">
+                  <InkoLogo color="purple" size={20} />
                 </div>
-                <span>INKO</span>
+                <span>Inko</span>
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
                 Multi-tenant blog platform for teams and agencies. Publish,
@@ -228,7 +228,7 @@ export const PublicLayout = () => {
 
           {/* Footer Bottom */}
           <div className="border-t border-zinc-800 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-zinc-400">
-            <p>&copy; {new Date().getFullYear()} INKO. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Inko. All rights reserved.</p>
 
             <div className="flex gap-6">
               <a href="https://twitter.com/inkoblog" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" aria-label="Twitter">

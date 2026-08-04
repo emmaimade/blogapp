@@ -45,7 +45,7 @@ export const AuthLayout = () => {
             Acceptable Use
           </a>
         </div>
-        <p>© 2026 INKO. All rights reserved.</p>
+        <p>© 2026 Inko. All rights reserved.</p>
       </footer>
     </div>
   );
