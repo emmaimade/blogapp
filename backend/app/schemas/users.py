@@ -51,6 +51,7 @@ class UserRead(UTCDatetimeMixin, BaseModel):
     is_super_admin: bool
     is_active: bool
     email_verified: bool
+    must_change_password: bool
     created_at: datetime
     last_login: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -61,8 +62,9 @@ class UserRead(UTCDatetimeMixin, BaseModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     email: Optional[EmailStr] = None
-    password: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

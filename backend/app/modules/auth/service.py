@@ -13,25 +13,23 @@ def authenticate_user(identifier: str, password: str, session: Session) -> User 
         return None
     if not user.is_active or user.deleted_at is not None:
         return None
-    # Require email verification before allowing login
-    if not getattr(user, "email_verified", False):
-        return None
     return user
 
-def build_user_payload(user: User, session: Session) -> UserRead:
+def build_user_payload(user_id: int, session: Session) -> UserRead:
     statement = (
         select(User)
-        .where(User.id == user.id)
+        .where(User.id == user_id)
         .options(selectinload(User.blog_memberships).selectinload(BlogMember.blog))
     )
     hydrated_user = session.exec(statement).first()
     if not hydrated_user:
-        raise ValueError(f"User with id={user.id} could not be loaded")
+        raise ValueError(f"User with id={user_id} could not be loaded")
     return UserRead.model_validate(hydrated_user)
+
 
 def build_login_response(user: User, session: Session) -> dict:
     access_token = create_access_token(data={"sub": user.username})
-    user_payload = build_user_payload(user, session)
+    user_payload = build_user_payload(user.id, session)
     return {
         "message": "Login successful",
         "access_token": access_token,

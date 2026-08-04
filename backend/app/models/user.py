@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
+from sqlalchemy import Column, DateTime as SQLDateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -26,10 +27,11 @@ class User(SQLModel, table=True):
     is_super_admin: bool = Field(default=False)
     is_active: bool = Field(default=True)
     email_verified: bool = Field(default=False, nullable=False)
-    deleted_at: Optional[datetime] = Field(default=None, nullable=True)
+    must_change_password: bool = Field(default=False, nullable=False)
+    deleted_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     
-    created_at: datetime = Field(default_factory=utcnow)
-    last_login: Optional[datetime] = Field(default=None, nullable=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))
+    last_login: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     
     owned_blogs: List["Blog"] = Relationship(back_populates="owner", cascade_delete=True)
     blog_memberships: List["BlogMember"] = Relationship(back_populates="user")

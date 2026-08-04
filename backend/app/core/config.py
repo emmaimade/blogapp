@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # ── Frontend URLs ──
     PUBLIC_SITE_URL: str = "http://localhost:5175"
     ADMIN_STUDIO_URL: str = "http://localhost:5173"
+    PUBLIC_LOGO_URL: str = "https://inko.blog/static/email/inko-logo.png"
 
     # ── SMTP Mail Infrastructure Configurations ──
     # validation maps both SMTP_SERVER and legacy SMTP_HOST to this field
@@ -19,7 +20,7 @@ class Settings(BaseSettings):
 
     # Maps EMAILS_FROM_EMAIL and legacy EMAIL_FROM cleanly
     EMAILS_FROM_EMAIL: str = Field("no-reply@example.com", validation_alias="EMAIL_FROM")
-    EMAILS_FROM_NAME: str = "BlogApp"
+    EMAILS_FROM_NAME: str = "Inko"
 
     # ── Cloudinary Media Configurations ──
     CLOUDINARY_NAME: str = Field(..., validation_alias="cloudinary_name")

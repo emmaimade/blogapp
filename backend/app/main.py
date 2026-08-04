@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.db import create_db_and_tables
 from app.core.scheduler import start_scheduler, stop_scheduler
+from app.core.password_change_middleware import RequirePasswordChangeMiddleware
 from app.modules import (
     auth_router,
     blog_comments_router,
@@ -18,6 +19,7 @@ from app.modules import (
     invitations_router,
     superadmin_router,
     audit_router,
+    support_router,
 )
 
 # ── Lifespan — replaces deprecated @app.on_event ─────────────────────────────
@@ -26,7 +28,7 @@ from app.modules import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    create_db_and_tables()
+    # create_db_and_tables()
     start_scheduler()
     yield
     # Shutdown
@@ -49,6 +51,9 @@ origins = [
     "http://127.0.0.1:8000",
 ]
 
+app.add_middleware(RequirePasswordChangeMiddleware)
+app.add_middleware(AuditLogMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -56,7 +61,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(AuditLogMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
@@ -70,6 +74,7 @@ app.include_router(blogs_router)
 app.include_router(invitations_router)
 app.include_router(superadmin_router)
 app.include_router(audit_router)
+app.include_router(support_router)
 
 
 @app.get("/")
