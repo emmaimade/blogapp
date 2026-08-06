@@ -166,8 +166,10 @@ export const AdminLayout: React.FC = () => {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showMobileWorkspaceMenu, setShowMobileWorkspaceMenu] = useState(false);
-  
+  const [searchQuery, setSearchQuery] = useState("");
+
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const userIsSuperAdmin = isSuperAdmin(user);
 
   // Sync state with HTML class list for theme customization
@@ -209,6 +211,33 @@ useEffect(() => {
     setIsMobileMenuOpen(false);
     setShowMobileWorkspaceMenu(false);
   }, [location.pathname]);
+
+  // Global "/" shortcut to jump into the topbar search, ignored while the
+  // user is already typing in an input/textarea/contenteditable elsewhere.
+  useEffect(() => {
+    const handleSlashShortcut = (event: KeyboardEvent) => {
+      if (event.key !== "/") return;
+      const target = event.target as HTMLElement | null;
+      const isTypingElsewhere =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (isTypingElsewhere) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+
+    document.addEventListener("keydown", handleSlashShortcut);
+    return () => document.removeEventListener("keydown", handleSlashShortcut);
+  }, []);
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+    navigate(`/admin/search?q=${encodeURIComponent(trimmed)}`);
+  };
 
   // Handle outside clicks for mobile dropdown overlay stacks
   useEffect(() => {
@@ -412,18 +441,38 @@ useEffect(() => {
         <header className="hidden lg:block sticky top-0 z-40 border-b border-zinc-200/80 bg-white/92 px-5 py-2.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/92">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                className="flex h-9 min-w-[250px] items-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-left text-sm text-zinc-500 transition hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-950 dark:hover:text-zinc-200"
+              <form
+                onSubmit={handleSearchSubmit}
+                className="flex h-9 min-w-[250px] items-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-left text-sm text-zinc-500 transition focus-within:border-violet-300 focus-within:bg-white hover:bg-white hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:focus-within:border-violet-800 dark:hover:bg-zinc-950 dark:hover:text-zinc-200"
               >
-                <Search size={14} />
-                <span className="flex-1 truncate">
-                  Search posts, comments, settings...
-                </span>
-                <span className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400 dark:border-zinc-700 dark:bg-zinc-950">
-                  /
-                </span>
-              </button>
+                <Search size={14} className="flex-shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search posts, comments, settings..."
+                  aria-label="Search posts, comments, settings"
+                  className="flex-1 min-w-0 truncate bg-transparent text-sm text-zinc-700 placeholder:text-zinc-500 outline-none dark:text-zinc-200 dark:placeholder:text-zinc-400"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    aria-label="Clear search"
+                    className="flex-shrink-0 rounded p-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  >
+                    <X size={12} />
+                  </button>
+                ) : (
+                  <span className="flex-shrink-0 rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400 dark:border-zinc-700 dark:bg-zinc-950">
+                    /
+                  </span>
+                )}
+              </form>
             </div>
             {user && renderUserActions()}
           </div>
