@@ -192,19 +192,20 @@ export const SuperAdminPlatformSettingsPage = () => {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-full sm:w-fit overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Tabs — equal-width, always fits, matches the Posts page pill pattern */}
+      <div className="flex items-stretch gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
         {tabs.map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 shrink-0 whitespace-nowrap px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === key
                 ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
           >
-            {icon} {label}
+            <span className="hidden sm:inline-flex">{icon}</span>
+            {label}
           </button>
         ))}
       </div>

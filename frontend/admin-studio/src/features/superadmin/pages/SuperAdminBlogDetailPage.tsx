@@ -427,7 +427,7 @@ export const SuperAdminBlogDetailPage = () => {
           ) : (
             <Trash2 size={16} />
           )}
-          Permanently Purge
+          Delete Workspace
         </button>
       </div>
 

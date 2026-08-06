@@ -227,12 +227,33 @@ export const SuperAdminModerationPage = () => {
 
       {/* Tabs + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-full sm:w-fit overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Mobile: 2x2 grid of chips — full labels, all counts visible at once */}
+        <div className="grid grid-cols-2 gap-2 w-full sm:hidden">
           {tabs.map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-2 shrink-0 whitespace-nowrap px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                tab === key
+                  ? 'bg-white dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white shadow-sm'
+                  : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400'
+              }`}
+            >
+              <span>{label}</span>
+              <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === key ? 'bg-accent text-accent-text' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'}`}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop: original compact pill row */}
+        <div className="hidden sm:flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 w-fit">
+          {tabs.map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 tab === key
                   ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
