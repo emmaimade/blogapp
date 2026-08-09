@@ -52,10 +52,10 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={handleClose} />
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
-        <div className="mb-5 flex items-start justify-between">
+      <div className="relative w-full max-w-md overflow-hidden rounded-t-[1.75rem] border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900 sm:rounded-[1.75rem] sm:p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Invite team member</h3>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">We'll email them a link to join — valid for 7 days.</p>
@@ -94,7 +94,7 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
 
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">Role</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["editor", "author"] as BlogRole[]).map((r) => {
                   const { label } = ROLE_META[r];
                   return (
@@ -102,7 +102,7 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
                       key={r}
                       type="button"
                       onClick={() => setRole(r)}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3.5 text-center text-xs font-semibold transition-all ${role === r ? "border-violet-500 bg-violet-5/50 text-violet-800 dark:border-violet-500 dark:bg-violet-950/40 dark:text-violet-300" : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 px-3 py-3.5 text-center text-xs font-semibold transition-all ${role === r ? "border-violet-500 bg-violet-500/10 text-violet-800 dark:border-violet-500 dark:bg-violet-950/40 dark:text-violet-300" : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
                     >
                       <span className="text-sm font-bold">{label}</span>
                     </button>
@@ -115,7 +115,7 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-1">
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row">
               <button type="button" onClick={handleClose} className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                 Cancel
               </button>
