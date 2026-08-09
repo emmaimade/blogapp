@@ -424,7 +424,10 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
               label="My Profile"
             />
             <button
-              onClick={() => setShowSupportModal(true)}
+              onClick={() => {
+                setIsOpen(false);
+                setShowSupportModal(true);
+              }}
               className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/60 transition-all"
             >
               <HelpCircle size={18} className="flex-shrink-0" />
