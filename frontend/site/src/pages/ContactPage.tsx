@@ -1,6 +1,7 @@
-import { Mail, Phone, MapPin, Send, ArrowRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, ArrowRight, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PrimaryCta } from '../shared/components/PrimaryCta';
 
 export const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,26 @@ export const ContactPage = () => {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const faqs = [
+    {
+      question: 'How long does a demo take?',
+      answer: 'A typical demo takes 30-45 minutes. We walk you through INKO features and answer any questions specific to your use case.',
+    },
+    {
+      question: 'Do you offer custom enterprise plans?',
+      answer: 'Yes! For enterprise customers, we offer custom plans with dedicated support, SSO, and advanced security features.',
+    },
+    {
+      question: 'What integrations do you support?',
+      answer: 'We support Zapier, Slack, webhooks, and custom API integrations. Let us know what tools you use and we can help.',
+    },
+    {
+      question: 'Can I migrate from another platform?',
+      answer: 'Absolutely. We help customers migrate their content from other platforms with minimal downtime.',
+    },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -50,11 +71,6 @@ export const ContactPage = () => {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-accent-border mb-8">
-            <span className="text-sm font-semibold text-accent-text">
-              Get in touch
-            </span>
-          </div>
           
           <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
             Let's talk about{' '}
@@ -288,56 +304,42 @@ export const ContactPage = () => {
             <p className="text-zinc-600">Answers to frequently asked questions about INKO.</p>
           </div>
 
-          <div className="space-y-6">
-            {[
-              {
-                question: 'How long does a demo take?',
-                answer: 'A typical demo takes 30-45 minutes. We walk you through INKO features and answer any questions specific to your use case.',
-              },
-              {
-                question: 'Do you offer custom enterprise plans?',
-                answer: 'Yes! For enterprise customers, we offer custom plans with dedicated support, SSO, and advanced security features.',
-              },
-              {
-                question: 'What integrations do you support?',
-                answer: 'We support Zapier, Slack, webhooks, and custom API integrations. Let us know what tools you use and we can help.',
-              },
-              {
-                question: 'Can I migrate from another platform?',
-                answer: 'Absolutely. We help customers migrate their content from other platforms with minimal downtime.',
-              },
-            ].map((faq, index) => (
-              <details
-                key={index}
-                className="group border-2 border-zinc-200 rounded-xl p-6 bg-white hover:border-zinc-300 transition-all cursor-pointer"
-              >
-                <summary className="flex items-center justify-between font-bold text-zinc-900">
-                  <span>{faq.question}</span>
-                  <span className="text-zinc-900 group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <p className="mt-4 text-zinc-600 leading-relaxed">{faq.answer}</p>
-              </details>
-            ))}
+          <div className="w-full overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-sm">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div key={index} className="border-b border-zinc-100 last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-zinc-50 transition-colors"
+                  >
+                    <span className="text-lg font-medium text-zinc-900">{faq.question}</span>
+                    <ChevronDown
+                      size={18}
+                      className={`text-zinc-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 pt-0">
+                      <p className="text-zinc-600 leading-relaxed">{faq.answer}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-zinc-900 mb-6">Ready to get started?</h2>
-          <p className="text-xl text-zinc-600 mb-8">
-            Join hundreds of teams using INKO. Start your 14-day free trial today.
-          </p>
-          <Link
-            to="/signup"
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-zinc-900/10 hover:shadow-xl hover:shadow-zinc-900/20 transition-all"
-          >
-            Start free trial
-            <ArrowRight size={20} />
-          </Link>
-        </div>
-      </section>
+      <PrimaryCta
+        title="Ready to get started?"
+        description="Join hundreds of teams using INKO. Start your 14-day free trial today."
+        ctaText="Start free trial"
+        ctaLink="/signup"
+        className="bg-white"
+      />
     </div>
   );
 };

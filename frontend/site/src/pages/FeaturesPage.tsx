@@ -1,5 +1,6 @@
   import { Building2, Users, FileText, ShieldCheck, Lock, BarChart3, Code, Globe, Settings, Bell, ArrowRight } from 'lucide-react';
   import { Link } from 'react-router-dom';
+  import { PrimaryCta } from '../shared/components/PrimaryCta';
 
   const mainFeatures = [
     {
@@ -127,12 +128,6 @@
           </div>
 
           <div className="relative z-10 max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-accent-border mb-8">
-              <span className="text-sm font-semibold text-accent-text">
-                Powerful features
-              </span>
-            </div>
-            
             <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
               Everything you need to{' '}
               <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
@@ -294,21 +289,13 @@
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-6">Ready to get started?</h2>
-            <p className="text-xl text-zinc-600 mb-8">
-              All features included in every plan. 14-day free trial.
-            </p>
-            <Link
-              to="/signup"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-zinc-900/10 hover:shadow-xl hover:shadow-zinc-900/20 transition-all"
-            >
-              Start free trial
-              <ArrowRight size={20} />
-            </Link>
-          </div>
-        </section>
+        <PrimaryCta
+          title="Ready to get started?"
+          description="All features included in every plan. 14-day free trial."
+          ctaText="Start free trial"
+          ctaLink="/signup"
+          className="bg-white"
+        />
       </div>
     );
   };

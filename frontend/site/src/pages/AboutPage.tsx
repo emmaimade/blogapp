@@ -1,5 +1,6 @@
 import { ArrowRight, Users, Globe, Heart, Target, Shield, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PrimaryCta } from '../shared/components/PrimaryCta';
 
 const values = [
   {
@@ -45,21 +46,21 @@ const team = [
     role: 'Co-founder & CTO',
     bio: 'Full-stack engineer with a background in multi-tenant SaaS architecture at scale.',
     initials: 'PN',
-    color: 'bg-violet-600',
+    color: 'bg-primary',
   },
   {
     name: 'James Okafor',
     role: 'Head of Product',
     bio: 'Content strategist turned product manager. Obsessed with editorial workflows and publishing UX.',
     initials: 'JO',
-    color: 'bg-purple-700',
+    color: 'bg-primary',
   },
   {
     name: 'Sofia Lindqvist',
     role: 'Head of Design',
     bio: 'Designed interfaces for B2B SaaS tools for a decade. Believes great design is invisible.',
     initials: 'SL',
-    color: 'bg-fuchsia-600',
+    color: 'bg-primary',
   },
 ];
 
@@ -76,9 +77,6 @@ export const AboutPage = () => {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-accent-border mb-8">
-            <span className="text-sm font-semibold text-accent-text">Our story</span>
-          </div>
 
           <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
             Built by publishers,{' '}
@@ -245,29 +243,16 @@ export const AboutPage = () => {
       </section>
 
       {/* CTA */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_center,_rgba(124,58,237,0.20),_transparent)]" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
-        <div className="relative z-10 max-w-3xl mx-auto text-center text-white">
-          <h2 className="text-4xl font-bold mb-4">Ready to give INKO a try?</h2>
-          <p className="text-xl mb-8 text-white/80">Start your 14-day free trial. No credit card required.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/signup"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all shadow-xl shadow-primary/20"
-            >
-              Start free trial <ArrowRight size={20} />
-            </Link>
-            <Link
-              to="/contact"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 border-2 border-white/20 text-white font-bold rounded-xl hover:border-white/40 hover:bg-white/5 transition-all"
-            >
-              Talk to us
-            </Link>
-          </div>
-          <p className="mt-6 text-white/50 text-sm">✓ No credit card required · ✓ 14-day free trial · ✓ Cancel anytime</p>
-        </div>
-      </section>
+      <PrimaryCta
+        title="Ready to give INKO a try?"
+        description="Start your 14-day free trial. No credit card required."
+        ctaText="Start free trial"
+        ctaLink="/signup"
+        secondaryButtonText="Talk to us"
+        secondaryButtonLink="/contact"
+        variant="light"
+        secondaryText="✓ No credit card required · ✓ 14-day free trial · ✓ Cancel anytime"
+      />
 
     </div>
   );

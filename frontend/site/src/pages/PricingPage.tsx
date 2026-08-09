@@ -1,5 +1,7 @@
-import { Check, X, ArrowRight } from 'lucide-react';
+import { Check, X, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PrimaryCta } from '../shared/components/PrimaryCta';
 
 const pricingPlans = [
   {
@@ -97,6 +99,8 @@ const faqs = [
 ];
 
 export const PricingPage = () => {
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
   return (
     <div className="space-y-0">
       {/* Hero Section */}
@@ -108,12 +112,6 @@ export const PricingPage = () => {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-accent-border mb-8">
-            <span className="text-sm font-semibold text-accent-text">
-              Transparent pricing
-            </span>
-          </div>
-          
           <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
             Plans built for{' '}
             <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
@@ -268,39 +266,41 @@ export const PricingPage = () => {
             <p className="text-xl text-zinc-600">Have questions? We're here to help.</p>
           </div>
 
-          <div className="space-y-6">
-            {faqs.map((faq, index) => (
-              <details
-                key={index}
-                className="group border-2 border-zinc-200 rounded-xl p-6 hover:border-zinc-300 transition-all cursor-pointer"
-              >
-                <summary className="flex items-center justify-between font-bold text-zinc-900">
-                  <span>{faq.question}</span>
-                  <span className="text-zinc-900 group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <p className="mt-4 text-zinc-600 leading-relaxed">{faq.answer}</p>
-              </details>
-            ))}
+          <div className="w-full overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-sm">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div key={index} className="border-b border-zinc-100 last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-zinc-50 transition-colors"
+                  >
+                    <span className="text-lg font-medium text-zinc-900">{faq.question}</span>
+                    <ChevronDown
+                      size={18}
+                      className={`text-zinc-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 pt-0">
+                      <p className="text-zinc-600 leading-relaxed">{faq.answer}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-50">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-zinc-900 mb-6">Ready to get started?</h2>
-          <p className="text-xl text-zinc-600 mb-8">
-            Join hundreds of teams using INKO. 14-day free trial, no credit card required.
-          </p>
-          <Link
-            to="/signup"
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-zinc-900/10 hover:shadow-xl hover:shadow-zinc-900/20 transition-all"
-          >
-            Start free trial
-            <ArrowRight size={20} />
-          </Link>
-        </div>
-      </section>
+      <PrimaryCta
+        title="Ready to get started?"
+        description="Join hundreds of teams using INKO. 14-day free trial, no credit card required."
+        ctaText="Start free trial"
+        ctaLink="/signup"
+      />
     </div>
   );
 };

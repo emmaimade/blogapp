@@ -1,5 +1,6 @@
 import { ArrowRight, Building2, FileText, ShieldCheck, Users, Star, TrendingUp, Shield, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PrimaryCta } from '../shared/components/PrimaryCta';
 
 const features = [
   {
@@ -62,12 +63,6 @@ export const HomePage = () => {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent border border-accent-border mb-8">
-            <span className="text-sm font-semibold text-accent-text">
-              Multi-tenant blog CMS platform
-            </span>
-          </div>
-          
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-zinc-900 mb-6 leading-[1.1]">
             Launch branded blogs{' '}
             <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
@@ -210,22 +205,13 @@ export const HomePage = () => {
       </section>
 
       {/* ✅ Final CTA Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900 overflow-hidden">
-        {/* Purple glow matching footer */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_center,_rgba(124,58,237,0.20),_transparent)]" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
-        <div className="relative z-10 max-w-3xl mx-auto text-center text-white">
-          <h2 className="text-4xl font-bold mb-4">Ready to launch your blogs?</h2>
-          <p className="text-xl mb-8 text-white/80">Join hundreds of teams using INKO to scale their publishing.</p>
-          <Link
-            to="/signup"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all shadow-xl shadow-primary/20"
-          >
-            Start free trial <ArrowRight size={20} />
-          </Link>
-          <p className="mt-6 text-white/50 text-sm">✓ No credit card required  ✓ 14-day free trial  ✓ Cancel anytime</p>
-        </div>
-      </section>
+      <PrimaryCta
+        title="Ready to launch your blogs?"
+        description="Join hundreds of teams using INKO to scale their publishing."
+        ctaText="Start free trial"
+        ctaLink="/signup"
+        secondaryText="✓ No credit card required  ✓ 14-day free trial  ✓ Cancel anytime"
+      />
     </div>
   );
 };
