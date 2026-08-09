@@ -143,7 +143,7 @@ export const PublicLayout = () => {
               <div className="flex flex-col gap-3 pt-4 border-t border-zinc-200">
                 <a
                   href={ADMIN_STUDIO_URL}
-                  className="text-zinc-900 font-semibold text-center py-2.5 hover:bg-zinc-100 rounded-lg transition-colors"
+                  className="text-zinc-900 font-semibold text-center py-2.5 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors"
                 >
                   Sign in
                 </a>

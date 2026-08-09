@@ -196,7 +196,7 @@ export const SignupPage = () => {
         {step === 1 ? (
           <>
             {/* Name Fields Row */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-zinc-700">First Name</label>
                 <div className="relative">
