@@ -1,14 +1,26 @@
 import random
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
-from app.core.security import get_current_user, get_password_hash, require_password_changed
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+)
+from app.core.security import (
+    ensure_strong_password,
+    get_current_user,
+    get_password_hash,
+    require_password_changed,
+)
 from app.services.auth_tokens import create_verification_token, TokenCooldownError
 from app.core.email import dispatch_email
 from app.core.email_templates import (
@@ -64,8 +76,15 @@ def _generate_random_handle(email: str, session: Session) -> str:
 def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
     if existing_email:
-        raise HTTPException(status_code=400, detail="Email already exists")
-    
+        raise ConflictError(ErrorCode.EMAIL_ALREADY_EXISTS)
+
+    # This is the only entry point that reaches /users/register without a
+    # client that already enforces password strength — the public blog's own
+    # signup form (blog/src/pages/Auth.tsx) submits here with no client-side
+    # check at all. Uses the same shared policy as password reset/change/invite
+    # signup, so all password-setting paths agree.
+    ensure_strong_password(user_data.password)
+
     random_handle = _generate_random_handle(user_data.email, session)
 
     hashed = get_password_hash(user_data.password)
@@ -126,14 +145,20 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: 
         # email-cooldown edge case — the account and workspace are already committed.
         pass
 
-    return build_login_response(new_user.id, session)
+    # build_login_response takes the User itself (it reads user.username to mint
+    # the token), not an id — passing new_user.id made this endpoint raise
+    # AttributeError and return a bare 500. The two other call sites in
+    # auth/router.py and blogs/router.py already pass the object.
+    return build_login_response(new_user, session)
 
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        # Identical response for unknown account and wrong password — see the
+        # note on /auth/login for why this stays 400 rather than 401.
+        raise AuthenticationError(ErrorCode.INVALID_CREDENTIALS)
 
     add_audit_log(
         session,
@@ -143,7 +168,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
         actor=user,
     )
     session.commit()
-    return build_login_response(user.id, session)
+    # Same fix as /users/register above — this takes the User, not its id.
+    return build_login_response(user, session)
 
 
 @router.get("/me", response_model=UserRead)
@@ -196,13 +222,13 @@ def get_user_profile(user_id: int, current_user: User = Depends(get_current_user
         try:
             return build_user_payload(current_user.id, session)
         except ValueError:
-            raise HTTPException(status_code=404, detail="User profile target missing")
+            raise NotFoundError(ErrorCode.USER_NOT_FOUND)
 
     if getattr(current_user, "is_super_admin", False) or getattr(current_user, "platform_role", "") == "super_admin":
         try:
             return build_user_payload(user_id, session)
         except ValueError:
-            raise HTTPException(status_code=404, detail="User profile target missing")
+            raise NotFoundError(ErrorCode.USER_NOT_FOUND)
         
     # 3. Blog Owners can look up a user ONLY if they share an explicitly OWNED workspace
     owned_blog_ids = session.exec(
@@ -230,9 +256,9 @@ def get_user_profile(user_id: int, current_user: User = Depends(get_current_user
                 pass
 
     # 4. Fallthrough: Reject unauthorized requests
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not authorized to view this user's information"
+    raise AuthorizationError(
+        ErrorCode.FORBIDDEN,
+        "You don't have permission to view this profile.",
     )
 
 
