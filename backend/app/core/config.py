@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     DATABASE_URL: Optional[str] = None
 
+    # ── Observability ──
+    LOG_LEVEL: str = "INFO"
+    # SQLAlchemy statement echo. Off by default: it writes every statement and
+    # its bound parameters to stdout, which is noisy in production and puts row
+    # data into logs. Set SQL_ECHO=true locally when debugging a query.
+    SQL_ECHO: bool = False
+
     # Pydantic v2 modern environment config block
     model_config = SettingsConfigDict(
         env_file=".env",

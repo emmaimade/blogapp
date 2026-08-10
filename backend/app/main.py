@@ -5,8 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.db import create_db_and_tables
+from app.core.error_handlers import register_exception_handlers
+from app.core.logging_config import configure_logging
+from app.core.request_context import RequestContextMiddleware
 from app.core.scheduler import start_scheduler, stop_scheduler
 from app.core.password_change_middleware import RequirePasswordChangeMiddleware
+from app.schemas.errors import ErrorResponse, ValidationErrorResponse
 from app.modules import (
     auth_router,
     blog_comments_router,
@@ -28,6 +32,7 @@ from app.modules import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    configure_logging()
     # create_db_and_tables()
     start_scheduler()
     yield
@@ -35,7 +40,29 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="CMS Backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="CMS Backend",
+    version="0.1.0",
+    lifespan=lifespan,
+    # Documents the real error contract on every operation, replacing FastAPI's
+    # default `{"detail": ...}` stub in the generated OpenAPI schema.
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Not permitted"},
+        404: {"model": ErrorResponse, "description": "Not found"},
+        409: {"model": ErrorResponse, "description": "Conflict"},
+        422: {"model": ValidationErrorResponse, "description": "Validation failed"},
+        429: {"model": ErrorResponse, "description": "Rate limited"},
+        500: {"model": ErrorResponse, "description": "Unexpected server error"},
+        503: {"model": ErrorResponse, "description": "Service unavailable"},
+    },
+)
+
+# ── Error handling ────────────────────────────────────────────────────────────
+# Registered before the routers so every route is covered. See
+# app/core/error_handlers.py for the response contract.
+register_exception_handlers(app)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 origins = [
@@ -51,8 +78,16 @@ origins = [
     "http://127.0.0.1:8000",
 ]
 
+# Middleware is applied outermost-last, so the effective request order is:
+#   CORS -> RequestContext -> AuditLog -> RequirePasswordChange -> routes
+#
+# RequestContextMiddleware sits *inside* CORS on purpose. It is what turns an
+# unhandled exception into the standard error envelope, and a response produced
+# outside CORSMiddleware reaches the browser without CORS headers — leaving the
+# frontend unable to read anything but "network error".
 app.add_middleware(RequirePasswordChangeMiddleware)
 app.add_middleware(AuditLogMiddleware)
+app.add_middleware(RequestContextMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +95,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────

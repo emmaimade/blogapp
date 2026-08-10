@@ -229,6 +229,77 @@ JWT-based authentication with secure password hashing:
 
 Protected endpoints require valid JWT token.
 
+## Error Handling
+
+All errors return one envelope. Technical detail goes to the log, never the response.
+
+```json
+{
+  "success": false,
+  "message": "The post you're looking for could not be found.",
+  "code": "POST_NOT_FOUND",
+  "request_id": "3f9a1c74e8b24d5f9c0a1b2c3d4e5f60",
+  "detail": "The post you're looking for could not be found."
+}
+```
+
+Validation failures (422) add `errors`, keyed by field path:
+
+```json
+{
+  "success": false,
+  "message": "Please correct the highlighted fields.",
+  "code": "VALIDATION_ERROR",
+  "errors": { "title": "This field is required." }
+}
+```
+
+`detail` mirrors `message` for backwards compatibility with existing clients that
+read `err.response.data.detail`. New client code should branch on `code` — the
+prose in `message` may be reworded at any time.
+
+### Raising errors
+
+Raise an `AppError` subclass. **Never raise `HTTPException`, and never put an
+exception into a message** — the status and the public wording both come from the
+error-code registry:
+
+```python
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import NotFoundError, ConflictError, ExternalServiceError
+
+raise NotFoundError(ErrorCode.POST_NOT_FOUND)                 # 404, registry wording
+raise ConflictError(ErrorCode.EMAIL_ALREADY_EXISTS)           # 409
+raise NotFoundError(ErrorCode.POST_NOT_FOUND, "Custom copy.") # explicit override
+
+# Technical context goes to log_message — it never reaches the client.
+raise ExternalServiceError(
+    ErrorCode.UPLOAD_FAILED,
+    log_message=f"cloudinary rejected upload: {exc}",
+)
+```
+
+Anything unexpected — a `TypeError`, an ORM failure, a bug — is caught centrally,
+logged with a full traceback and the request context, and returned as a generic
+`INTERNAL_ERROR` with the `request_id` the user can quote.
+
+### Adding a new error
+
+Add an `ErrorCode` member and its `ErrorSpec` in `app/core/error_codes.py`. That is
+the whole change: status code, public message, and OpenAPI documentation follow.
+
+| File | Role |
+|------|------|
+| `app/core/error_codes.py` | Taxonomy: code → HTTP status + public message |
+| `app/core/exceptions.py` | `AppError` and its category subclasses |
+| `app/core/error_handlers.py` | Handlers; the only place a body is built |
+| `app/core/request_context.py` | `X-Request-ID` correlation, unhandled-error catch |
+| `app/core/logging_config.py` | Log format, request-ID stamping |
+| `app/schemas/errors.py` | OpenAPI models for the envelope |
+
+`X-Request-ID` is returned on every response and accepted on requests, so a
+frontend trace can be matched to the backend log line that recorded the failure.
+
 ## Development Tips
 
 ### Debug Mode
@@ -295,14 +366,18 @@ Creates test admin user with email `admin@example.com` and password `admin123`.
 ## Testing
 
 ```bash
-# Run tests
-pytest
-
-# With coverage
-pytest --cov=app
+uv run pytest
 ```
 
-Test file: `tests/test_posts_endpoints.py`
+Tests run against a throwaway SQLite file (`tests/conftest.py` pins `DATABASE_URL`
+before the app is imported) and never open SMTP connections, so no live database
+or credentials are needed.
+
+| File | Covers |
+|------|--------|
+| `tests/test_error_handling.py` | Envelope shape, every error category, and a leak scanner asserting no response body contains tracebacks, driver/ORM names, SQL, file paths, or pydantic internals |
+| `tests/test_error_flows.py` | The same guarantees end-to-end on real endpoints, plus proof that success responses are unchanged |
+| `tests/test_posts_endpoints.py` | Post endpoint smoke tests |
 
 ## Deployment
 
