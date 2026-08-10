@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.core.moderation import flag_comment, load_comment_for_flag
 from app.core.permissions import Permissions, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user
@@ -38,7 +40,7 @@ def create_comment(
 
     post = session.get(Post, comment_data.post_id)
     if not post:
-        raise HTTPException(status_code=404, detail=f"Post with ID {comment_data.post_id} not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
     new_comment = Comment(**comment_data.model_dump())
     new_comment.user_id = current_user.id
@@ -96,10 +98,13 @@ def update_comment(
     comment = session.exec(statement).first()
 
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
+        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
 
     if comment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You are not authorized to edit this comment")
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "You can only edit your own comments.",
+        )
 
     comment.content = content
 
@@ -133,15 +138,15 @@ def delete_comment(
     comment = session.get(Comment, comment_id)
 
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
+        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
 
     is_author = comment.user_id == current_user.id
     is_admin = current_user.is_super_admin or current_user.platform_role == PlatformRole.SUPER_ADMIN
 
     if not (is_author or is_admin):
-        raise HTTPException(
-            status_code=403,
-            detail="Moderator privileges or ownership required to delete this content",
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "You can only delete your own comments.",
         )
 
     if is_author:
@@ -241,7 +246,7 @@ def moderate_blog_comment(
     )
     comment = session.exec(statement).first()
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
+        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
 
     comment.content = "[This comment has been deleted by a moderator]"
     comment.is_deleted = True

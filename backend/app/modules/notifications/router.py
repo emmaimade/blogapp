@@ -1,9 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from datetime import datetime, timezone
 
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user
 from app.models import Notification, User
 
@@ -43,8 +45,10 @@ def mark_read(
     current_user: User = Depends(get_current_user),
 ):
     notification = session.get(Notification, notification_id)
+    # Someone else's notification is reported as missing rather than
+    # forbidden, so IDs can't be probed for existence.
     if not notification or notification.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Notification not found")
+        raise NotFoundError(ErrorCode.NOTIFICATION_NOT_FOUND)
 
     if notification.read_at is None:
         notification.read_at = datetime.now(timezone.utc)

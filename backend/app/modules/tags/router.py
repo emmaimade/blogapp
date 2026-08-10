@@ -1,11 +1,13 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import desc, func
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import ConflictError, NotFoundError
 from app.core.permissions import get_public_blog, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user
 from app.models import Post, PostTagLink, Tag, User, Blog
@@ -25,9 +27,9 @@ def create_tag(
 ):
     existing_tag = session.exec(select(Tag).where(Tag.name.ilike(tag_data.name), Tag.blog_id == blog_id)).first()
     if existing_tag:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tag '{tag_data.name}' already exists",
+        raise ConflictError(
+            ErrorCode.TAG_ALREADY_EXISTS,
+            errors={"name": "A tag with this name already exists."},
         )
 
     db_tag = Tag(name=tag_data.name, blog_id=blog_id)
@@ -95,16 +97,16 @@ def update_tag(
 ):
     db_tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.blog_id == blog_id)).first()
     if not db_tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+        raise NotFoundError(ErrorCode.TAG_NOT_FOUND)
 
     if tag_data.name:
         existing_name = session.exec(
             select(Tag).where(Tag.name.ilike(tag_data.name), Tag.id != tag_id, Tag.blog_id == blog_id)
         ).first()
         if existing_name:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Tag name '{tag_data.name}' already exists",
+            raise ConflictError(
+                ErrorCode.TAG_ALREADY_EXISTS,
+                errors={"name": "A tag with this name already exists."},
             )
 
         db_tag.name = tag_data.name
@@ -135,7 +137,7 @@ def delete_tag(
 ):
     tag = session.exec(select(Tag).where(Tag.id == tag_id, Tag.blog_id == blog_id)).first()
     if not tag:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+        raise NotFoundError(ErrorCode.TAG_NOT_FOUND)
 
     add_audit_log(
         session,

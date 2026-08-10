@@ -3,12 +3,14 @@ Multi-Tenant Permission System
 ===============================
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from sqlmodel import Session, select
 from typing import Optional
 
 from app.models import Blog, BlogMember, BlogRole, OnboardingStatus, PlatformRole, User
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.core.security import get_current_user
 
 class Permissions:
@@ -82,7 +84,7 @@ async def get_public_blog(
 ) -> Blog:
     blog = session.get(Blog, blog_id)
     if not blog or not blog.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     return blog
 
 async def get_current_blog(
@@ -93,16 +95,16 @@ async def get_current_blog(
     if Permissions.is_super_admin(current_user):
         blog = session.get(Blog, blog_id)
         if not blog:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+            raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
         return blog
     membership = session.exec(
         select(BlogMember).where(BlogMember.user_id == current_user.id, BlogMember.blog_id == blog_id)
     ).first()
     if not membership:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this blog")
+        raise AuthorizationError(ErrorCode.NOT_A_MEMBER)
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     return blog
 
 async def require_blog_owner(
@@ -116,7 +118,10 @@ async def require_blog_owner(
         select(BlogMember).where(BlogMember.user_id == current_user.id, BlogMember.blog_id == blog.id, BlogMember.role == BlogRole.OWNER)
     ).first()
     if not membership:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Must be blog owner to perform this action")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "Only a workspace owner can do this.",
+        )
 
 async def require_blog_editor(
     blog: Blog = Depends(get_current_blog),
@@ -129,7 +134,10 @@ async def require_blog_editor(
         select(BlogMember).where(BlogMember.user_id == current_user.id, BlogMember.blog_id == blog.id, BlogMember.role.in_([BlogRole.OWNER, BlogRole.EDITOR]))
     ).first()
     if not membership:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Must be blog owner or editor to perform this action")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "Only a workspace owner or editor can do this.",
+        )
 
 async def require_blog_author(
     blog: Blog = Depends(get_current_blog),
@@ -146,11 +154,14 @@ async def require_blog_author(
         )
     ).first()
     if not membership:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Must be blog owner, editor, or author to perform this action")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "You need author access to this workspace to do this.",
+        )
 
 async def require_super_admin(current_user: User = Depends(get_current_user)):
     if not Permissions.is_super_admin(current_user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required")
+        raise AuthorizationError(ErrorCode.SUPER_ADMIN_REQUIRED)
 
 
 async def require_completed_onboarding(
@@ -160,10 +171,7 @@ async def require_completed_onboarding(
     if Permissions.is_super_admin(current_user):
         return
     if blog.onboarding_status != OnboardingStatus.COMPLETED:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Workspace onboarding is incomplete",
-        )
+        raise AuthorizationError(ErrorCode.ONBOARDING_INCOMPLETE)
 
 def get_user_blogs(
     current_user: User = Depends(get_current_user),

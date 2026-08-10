@@ -2,10 +2,12 @@ import json
 from datetime import datetime
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, or_
 
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.core.permissions import Permissions
 from app.core.security import get_current_user
 from app.models import AuditLog, Blog
@@ -214,13 +216,13 @@ def get_workspace_audit_logs(
     """
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
     if role not in [BlogRole.OWNER, BlogRole.EDITOR]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Must be blog owner or editor to view activity logs",
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "Only a workspace owner or editor can view activity logs.",
         )
 
     statement = select(AuditLog).where(

@@ -6,11 +6,14 @@ from typing import Any, Dict
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AuthorizationError, BadRequestError, ExternalServiceError
+from app.core.logging_config import get_logger
 from app.core.permissions import get_public_blog, require_blog_owner, require_completed_onboarding
 from app.core.security import get_current_user
 from app.models import SiteSettings, User, Blog
@@ -32,6 +35,8 @@ from app.schemas import (
 
 load_dotenv()
 
+logger = get_logger("settings")
+
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
@@ -50,7 +55,13 @@ def get_setting(session: Session, blog_id: int, key: str, default_model: Any) ->
 
     try:
         return default_model.model_validate(json.loads(setting.setting_value)).model_dump()
-    except (json.JSONDecodeError, Exception):
+    except Exception:
+        # Stored settings predate the current schema, or the row is corrupt.
+        # Falling back to defaults keeps the page usable; the reason is logged
+        # rather than surfaced, since the visitor can't act on it.
+        logger.warning(
+            "Falling back to defaults for setting %r on blog %s", key, blog_id, exc_info=True
+        )
         return default_model().model_dump()
 
 
@@ -121,9 +132,18 @@ def update_setting(
 def upload_branding_asset(file: UploadFile, folder: str, allowed_types: tuple[str, ...]) -> Dict[str, str]:
     content_type = file.content_type or ""
     if content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+        raise BadRequestError(
+            ErrorCode.INVALID_FILE_TYPE,
+            "Please upload a PNG, JPEG, WebP, or SVG image.",
+        )
 
-    result = cloudinary.uploader.upload(file.file, folder=folder, resource_type="image")
+    try:
+        result = cloudinary.uploader.upload(file.file, folder=folder, resource_type="image")
+    except Exception as exc:
+        raise ExternalServiceError(
+            ErrorCode.UPLOAD_FAILED,
+            log_message=f"cloudinary upload failed for {folder}: {type(exc).__name__}: {exc}",
+        ) from exc
     return {"url": result.get("secure_url")}
 
 
@@ -178,7 +198,11 @@ def get_footer_settings(
             data = FooterSettings.model_validate(json.loads(setting.setting_value))
             return data.model_dump()
         except Exception:
-            pass
+            logger.warning(
+                "Stored footer settings for blog %s are unreadable; using defaults",
+                blog_id,
+                exc_info=True,
+            )
 
     # No saved footer yet — hydrate sensible defaults from the blog model
     # so the user sees their own tagline and blog name instead of generic placeholders
@@ -212,9 +236,10 @@ def update_footer_settings(
         plan = subscription.plan if subscription else SubscriptionPlan.FREE
         
         if plan == SubscriptionPlan.FREE:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Editing the copyright text is only available for Pro and Team plans. Please upgrade to remove the INKO attribution."
+            raise AuthorizationError(
+                ErrorCode.PLAN_UPGRADE_REQUIRED,
+                "Editing the copyright text is available on the Pro and Team plans. "
+                "Upgrade to remove the INKO attribution.",
             )
     
     return update_setting(session, blog_id, "footer", settings, current_user)

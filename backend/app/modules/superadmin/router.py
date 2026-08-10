@@ -3,7 +3,7 @@ import secrets
 import string
 from typing import Any, List, Optional
 from datetime import datetime, date, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Response, BackgroundTasks
+from fastapi import APIRouter, Depends, status, Response, BackgroundTasks
 from sqlmodel import Session, select
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import selectinload
@@ -11,12 +11,14 @@ from pydantic import BaseModel
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import BadRequestError, NotFoundError, ValidationError
 from app.core.moderation import record_moderation_action
 from app.core.permissions import require_super_admin
 from app.core.security import get_current_user, get_password_hash
 from app.core.email import dispatch_email
 from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
-from app.services.auth_tokens import create_password_reset_token, TokenCooldownError
+from app.services.auth_tokens import create_password_reset_token
 from app.models import (
     AuditLog, 
     Blog, 
@@ -172,10 +174,7 @@ def get_blog_detail(
     """Return a single blog/workspace for the superadmin detail view."""
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found",
-        )
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     posts_count = session.exec(
         select(func.count(Post.id)).where(Post.blog_id == blog.id)
@@ -251,7 +250,7 @@ def update_blog_status(
     """Toggle a blog's active status."""
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     
     previous_is_active = blog.is_active
     blog.is_active = data.is_active
@@ -307,7 +306,7 @@ def delete_blog(
     """Permanently delete a blog and all its content."""
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     
     # Delete all posts
     posts = session.exec(select(Post).where(Post.blog_id == blog_id)).all()
@@ -384,7 +383,7 @@ def update_user_status(
     user = session.exec(statement).first()
     
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
     
     previous_is_active = user.is_active
     user.is_active = data.is_active
@@ -415,12 +414,13 @@ def force_temporary_password(
     """Immediately overwrites a user's password with a generated temporary one and forces them to change it at next login (Tier 2)."""
     user = session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
 
     if user.id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot force a temporary password on your own account. Use the change password form instead.",
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "You cannot set a temporary password on your own account. "
+            "Use the change password form instead.",
         )
 
     temporary_password = _generate_temporary_password()
@@ -456,15 +456,11 @@ def trigger_reset_email(
     """Send a password reset link to any user's own mailbox (Tier 1, platform-wide)."""
     user = session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
     
-    try:
-        raw_token = create_password_reset_token(session, user.id)
-    except TokenCooldownError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"A reset email was already sent recently. Please wait {e.retry_after_seconds} seconds before trying again.",
-        )
+    # The send cooldown raises TokenCooldownError, an AppError, so it reaches
+    # the client as a 429 with Retry-After without a local conversion here.
+    raw_token = create_password_reset_token(session, user.id)
 
     full_name = f"{user.first_name} {user.last_name}"
     email_html = get_password_reset_template(full_name, raw_token)
@@ -493,10 +489,13 @@ def superadmin_delete_user(
     """Permanently (or softly) delete a user account by superadmin."""
     user = session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
 
     if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "You cannot delete your own account from here.",
+        )
 
     # Prevent deleting the last superadmin
     if user.is_super_admin:
@@ -507,9 +506,9 @@ def superadmin_delete_user(
             )
         ).all()
         if len(remaining_superadmins) <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot delete the last super admin account"
+            raise BadRequestError(
+                ErrorCode.OPERATION_NOT_ALLOWED,
+                "This is the last super admin account and cannot be deleted.",
             )
 
     # Audit before deletion
@@ -719,10 +718,7 @@ def get_blog_subscription(
     ).first()
     
     if not subscription:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subscription not found"
-        )
+        raise NotFoundError(ErrorCode.SUBSCRIPTION_NOT_FOUND)
     
     return subscription
 
@@ -786,11 +782,11 @@ def moderate_flagged_content(
     """Persist a moderation decision and apply content changes when needed."""
     action = payload.action.lower()
     if action not in {"approve", "reject", "remove"}:
-        raise HTTPException(status_code=400, detail="Action must be approve, reject, or remove")
+        raise ValidationError(errors={"action": "Choose approve, reject, or remove."})
 
     item = session.get(ModerationItem, item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Moderation item not found")
+        raise NotFoundError(ErrorCode.MODERATION_ITEM_NOT_FOUND)
 
     if action == "remove":
         _remove_flagged_content(session, item)
@@ -868,7 +864,10 @@ def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
             session.add(post)
         return
 
-    raise HTTPException(status_code=400, detail="Unsupported moderation item type")
+    raise BadRequestError(
+        ErrorCode.OPERATION_NOT_ALLOWED,
+        "This kind of content cannot be removed automatically.",
+    )
 
 
 def _to_audit_log_read(log: AuditLog) -> AuditLogRead:
@@ -1029,7 +1028,7 @@ def update_ticket_status(
 ):
     ticket = session.get(SupportTicket, ticket_id)
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
+        raise NotFoundError(ErrorCode.TICKET_NOT_FOUND)
 
     old_status = ticket.status
     ticket.status = payload.status

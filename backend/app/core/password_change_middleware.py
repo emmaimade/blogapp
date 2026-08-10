@@ -6,6 +6,8 @@ from starlette.responses import JSONResponse
 
 from app.core.config import ALGORITHM, SECRET_KEY
 from app.core.db import engine
+from app.core.error_codes import ErrorCode, spec_for
+from app.core.error_handlers import build_error_payload
 from app.models import User
 
 # Exempt (method, path) pairs — checked as exact matches.
@@ -67,9 +69,15 @@ class RequirePasswordChangeMiddleware(BaseHTTPMiddleware):
             user = session.exec(select(User).where(User.username == username)).first()
 
         if user and user.must_change_password:
+            # Built through the shared payload builder so this middleware-level
+            # rejection is indistinguishable from a route-level one.
             return JSONResponse(
-                status_code=403,
-                content={"detail": "You must set a new password before continuing."},
+                status_code=spec_for(ErrorCode.PASSWORD_CHANGE_REQUIRED).status_code,
+                content=build_error_payload(
+                    code=ErrorCode.PASSWORD_CHANGE_REQUIRED,
+                    message=spec_for(ErrorCode.PASSWORD_CHANGE_REQUIRED).message,
+                    request_id=getattr(request.state, "request_id", None),
+                ),
             )
 
         return await call_next(request)

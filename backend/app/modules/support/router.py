@@ -1,10 +1,12 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Depends, BackgroundTasks, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AuthorizationError, BadRequestError, NotFoundError, ValidationError
 from app.core.security import get_current_user
 from app.core.email import dispatch_email
 from app.core.email_templates import get_new_support_ticket_admin_template, get_new_support_ticket_admin_template_text
@@ -75,8 +77,13 @@ def create_ticket(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if not payload.subject.strip() or not payload.body.strip():
-        raise HTTPException(status_code=400, detail="Subject and message are required.")
+    field_errors = {}
+    if not payload.subject.strip():
+        field_errors["subject"] = "This field is required."
+    if not payload.body.strip():
+        field_errors["body"] = "This field is required."
+    if field_errors:
+        raise ValidationError(errors=field_errors)
 
     ticket = SupportTicket(
         user_id=current_user.id,
@@ -130,12 +137,15 @@ def get_ticket(
 ):
     ticket = session.get(SupportTicket, ticket_id)
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
+        raise NotFoundError(ErrorCode.TICKET_NOT_FOUND)
 
     is_owner = ticket.user_id == current_user.id
     is_superadmin = current_user.is_super_admin or current_user.platform_role == "super_admin"
     if not is_owner and not is_superadmin:
-        raise HTTPException(status_code=403, detail="Not authorized to view this ticket")
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "You don't have permission to view this ticket.",
+        )
 
     return ticket
 
@@ -149,18 +159,24 @@ def reply_to_ticket(
 ):
     ticket = session.get(SupportTicket, ticket_id)
     if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
+        raise NotFoundError(ErrorCode.TICKET_NOT_FOUND)
 
     is_owner = ticket.user_id == current_user.id
     is_superadmin = current_user.is_super_admin or current_user.platform_role == "super_admin"
     if not is_owner and not is_superadmin:
-        raise HTTPException(status_code=403, detail="Not authorized to reply to this ticket")
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "You don't have permission to reply to this ticket.",
+        )
 
     if ticket.status == TicketStatus.CLOSED:
-        raise HTTPException(status_code=400, detail="This ticket is closed and can no longer receive replies.")
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "This ticket is closed and can no longer receive replies.",
+        )
 
     if not payload.body.strip():
-        raise HTTPException(status_code=400, detail="Message body is required.")
+        raise ValidationError(errors={"body": "This field is required."})
 
     message = SupportMessage(ticket_id=ticket.id, sender_id=current_user.id, body=payload.body.strip())
     session.add(message)

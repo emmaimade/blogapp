@@ -8,18 +8,29 @@ from typing import List, Optional
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import (
+    AuthorizationError,
+    BadRequestError,
+    ExternalServiceError,
+    NotFoundError,
+    ValidationError,
+)
+from app.core.logging_config import get_logger
 from app.models import Comment, Post, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
 from app.core.permissions import Permissions
 
 load_dotenv()
+
+logger = get_logger("posts")
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_NAME"),
@@ -75,10 +86,13 @@ def upload_welcome_banner(blog_name: str) -> str:
             overwrite=True
         )
         url = result.get("secure_url")
-        print(f"✅ Welcome banner uploaded: {url}")
+        logger.info("Welcome banner uploaded for %s", blog_name)
         return url
-    except Exception as e:
-        print(f"⚠️ Failed to upload welcome banner: {e}")
+    except Exception:
+        # A cosmetic banner is not worth failing onboarding over, so this one
+        # genuinely does swallow the error — but it now goes to the log with a
+        # traceback instead of a print, and the caller still gets a usable URL.
+        logger.exception("Welcome banner upload failed for %s; using fallback", blog_name)
         return "https://picsum.photos/id/870/1200/630"  # fallback
 
 # END
@@ -112,9 +126,8 @@ def _resolve_status(
 
     if status == PostStatus.SCHEDULED:
         if not published_at:
-            raise HTTPException(
-                status_code=400,
-                detail="published_at is required when status is 'scheduled'",
+            raise ValidationError(
+                errors={"published_at": "Choose when this post should go live."},
             )
         # Normalise to UTC-aware
         if published_at.tzinfo is None:
@@ -139,8 +152,20 @@ def _resolve_status(
 
 def upload_post_image(file: UploadFile) -> dict[str, str]:
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Invalid file type")
-    result = cloudinary.uploader.upload(file.file, folder="blog_images")
+        raise BadRequestError(
+            ErrorCode.INVALID_FILE_TYPE,
+            "Please choose an image file.",
+        )
+    try:
+        result = cloudinary.uploader.upload(file.file, folder="blog_images")
+    except Exception as exc:
+        # Cloudinary's exceptions carry account identifiers and raw API
+        # responses, so the text stays in the log and the caller sees only the
+        # generic upload failure message.
+        raise ExternalServiceError(
+            ErrorCode.UPLOAD_FAILED,
+            log_message=f"cloudinary upload failed: {type(exc).__name__}: {exc}",
+        ) from exc
     return {"url": result.get("secure_url")}
 
 
@@ -148,7 +173,10 @@ def upload_post_image(file: UploadFile) -> dict[str, str]:
 
 def create_post(blog_id: int, post_data: PostCreate, session: Session, current_user: User) -> Post:
     if not Permissions.can_create_post(current_user, blog_id, session):
-        raise HTTPException(status_code=403, detail="Not authorized to create posts in this blog")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "You don't have permission to create posts in this workspace.",
+        )
 
     resolved_status, resolved_published, resolved_published_at = _resolve_status(
         post_data.status, post_data.published, post_data.published_at
@@ -226,7 +254,7 @@ def read_posts(
 def get_scheduled_posts(blog_id: int, session: Session, current_user: User) -> List[Post]:
     """Return all scheduled (not yet live) posts for this blog."""
     if not Permissions.can_create_post(current_user, blog_id, session):
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise AuthorizationError(ErrorCode.INSUFFICIENT_PERMISSIONS)
 
     role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
     query = (
@@ -270,7 +298,10 @@ def update_post(
 ) -> Post:
     db_post = _get_post_or_404(session, blog_id, post_id)
     if not Permissions.can_edit_post(current_user, db_post, session):
-        raise HTTPException(status_code=403, detail="Not authorized to edit this post")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "You don't have permission to edit this post.",
+        )
 
     update_dict = post_data.model_dump(
         exclude_unset=True,
@@ -318,7 +349,10 @@ def update_post(
 def delete_post(blog_id: int, post_id: int, session: Session, current_user: User) -> dict:
     post = _get_post_or_404(session, blog_id, post_id)
     if not Permissions.can_edit_post(current_user, post, session):
-        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "You don't have permission to delete this post.",
+        )
     add_audit_log(
         session,
         action="post.deleted",
@@ -347,7 +381,7 @@ def read_post(blog_id: int, post_id: int, session: Session) -> Post:
     )
     post = session.exec(statement).first()
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
     return post
 
 
@@ -365,7 +399,7 @@ def read_post_by_slug(
     )
     post = session.exec(statement).first()
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
     # Increment views only for published posts
     if post.status == PostStatus.PUBLISHED:
@@ -381,7 +415,9 @@ def read_post_by_slug(
         can_view = role in [BlogRole.OWNER, BlogRole.EDITOR, BlogRole.AUTHOR]
 
     if post.status != PostStatus.PUBLISHED and not can_view:
-        raise HTTPException(status_code=403, detail="Not authorized to view this post")
+        # A draft is indistinguishable from a missing post to anyone without
+        # workspace access — 403 here would confirm that the slug exists.
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
     return post
 
@@ -393,7 +429,7 @@ def _get_post_or_404(session: Session, blog_id: int, post_id: int) -> Post:
         select(Post).where(Post.id == post_id, Post.blog_id == blog_id)
     ).first()
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
     return post
 
 

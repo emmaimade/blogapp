@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import NotFoundError
 from app.models import Comment, ModerationAction, ModerationItem, Post, User
 
 
@@ -19,7 +20,7 @@ def flag_comment(
 ) -> ModerationItem:
     post = session.get(Post, comment.post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
     item = _create_or_update_pending_item(
         session,
@@ -106,7 +107,7 @@ def load_comment_for_flag(session: Session, comment_id: int) -> Comment:
     statement = select(Comment).where(Comment.id == comment_id).options(selectinload(Comment.user))
     comment = session.exec(statement).first()
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
+        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
     return comment
 
 
@@ -114,7 +115,7 @@ def load_post_for_flag(session: Session, blog_id: int, post_id: int) -> Post:
     statement = select(Post).where(Post.id == post_id, Post.blog_id == blog_id).options(selectinload(Post.author))
     post = session.exec(statement).first()
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
     return post
 
 
