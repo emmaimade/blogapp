@@ -5,7 +5,7 @@ from typing import List
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, status, BackgroundTasks
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -15,7 +15,16 @@ from datetime import datetime, timezone
 
 from app.core.audit import add_audit_log
 from app.core.config import settings
+from app.core.datetimes import as_utc, utc_now
 from app.core.db import get_session
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import (
+    AuthorizationError,
+    BadRequestError,
+    ConflictError,
+    GoneError,
+    NotFoundError,
+)
 from app.core.permissions import (
     Permissions,
     get_current_blog,
@@ -24,7 +33,12 @@ from app.core.permissions import (
     require_blog_owner,
     require_completed_onboarding,
 )
-from app.core.security import get_current_user, get_password_hash, require_verified_email
+from app.core.security import (
+    ensure_strong_password,
+    get_current_user,
+    get_password_hash,
+    require_verified_email,
+)
 from app.modules.auth.service import build_login_response
 from app.modules.users.router import _generate_random_handle
 from app.core.email import dispatch_email
@@ -35,7 +49,7 @@ from app.core.email_templates import (
     get_blog_invitation_template_text,
 )
 from app.core.notifications import add_notification
-from app.services.auth_tokens import create_password_reset_token, TokenCooldownError
+from app.services.auth_tokens import create_password_reset_token
 from app.models import (
     Blog,
     BlogInvitation,
@@ -417,7 +431,7 @@ def read_blog_by_subdomain(
 ):
     blog = session.exec(select(Blog).where(Blog.subdomain == subdomain)).first()
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     return blog
 
 @router.get("/check-slug/{slug}")
@@ -462,7 +476,7 @@ def update_onboarding_about(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     blog.owner_role = payload.owner_role
     blog.workspace_type = payload.workspace_type
@@ -489,7 +503,7 @@ def update_onboarding_profile(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     blog.name = payload.name
     blog.tagline = payload.tagline
@@ -548,7 +562,7 @@ def update_onboarding_publication(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     blog.default_post_visibility = payload.default_post_visibility
     blog.comments_enabled = payload.comments_enabled
@@ -601,7 +615,7 @@ def complete_onboarding_team_step(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     _save_team_step_skipped(session, blog_id, payload.skipped)
     blog.onboarding_status = OnboardingStatus.IN_PROGRESS
@@ -627,7 +641,7 @@ def update_onboarding_plan(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     # Update subscription
     subscription = _load_subscription(session, blog_id)
@@ -668,7 +682,7 @@ def update_blog(
 ):
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     update_dict = blog_data.model_dump(exclude_unset=True)
 
@@ -726,19 +740,15 @@ def trigger_member_reset_email(
         select(BlogMember).where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
     ).first()
     if not membership:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+        raise NotFoundError(ErrorCode.MEMBER_NOT_FOUND)
 
     user = session.get(User, membership.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
 
-    try:
-        raw_token = create_password_reset_token(session, user.id)
-    except TokenCooldownError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"A reset email was already sent recently. Please wait {e.retry_after_seconds} seconds before trying again.",
-        )
+    # The send cooldown raises TokenCooldownError, an AppError, so it reaches
+    # the client as a 429 with Retry-After without a local conversion here.
+    raw_token = create_password_reset_token(session, user.id)
     
     full_name = f"{user.first_name} {user.last_name}"
     email_html = get_password_reset_template(full_name, raw_token)
@@ -770,18 +780,24 @@ def invite_blog_member(
     # Find the user by email
     user_to_invite = session.exec(select(User).where(User.email == payload.email)).first()
     if not user_to_invite:
-        raise HTTPException(status_code=404, detail="No user found with that email address")
+        raise NotFoundError(
+            ErrorCode.USER_NOT_FOUND,
+            "No account exists for that email address. Send them an invitation instead.",
+        )
 
     # Prevent duplicate membership
     existing = session.exec(
         select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == user_to_invite.id)
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="This user is already a member of this blog")
+        raise ConflictError(ErrorCode.ALREADY_A_MEMBER)
 
     # Prevent inviting yourself
     if user_to_invite.id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot invite yourself")
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "You are already part of this workspace.",
+        )
 
     membership = BlogMember(
         user_id=user_to_invite.id,
@@ -823,11 +839,17 @@ def remove_blog_member(
         .options(selectinload(BlogMember.user))
     ).first()
     if not membership:
-        raise HTTPException(status_code=404, detail="Member not found")
+        raise NotFoundError(ErrorCode.MEMBER_NOT_FOUND)
     if membership.role == BlogRole.OWNER:
-        raise HTTPException(status_code=400, detail="Cannot remove the blog owner")
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "The workspace owner cannot be removed. Transfer ownership first.",
+        )
     if membership.user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="You cannot remove yourself")
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "You cannot remove yourself from the workspace.",
+        )
 
     add_audit_log(
         session,
@@ -862,9 +884,9 @@ def update_blog_member_permissions(
             select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == current_user.id)
         ).first()
         if not actor_membership or actor_membership.role != BlogRole.OWNER:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. Only Blog Owners or Superadmins can modify workspace privileges."
+            raise AuthorizationError(
+                ErrorCode.INSUFFICIENT_PERMISSIONS,
+                "Only a workspace owner can change member permissions.",
             )
 
     # FETCH TARGET MEMBER RECORD
@@ -874,7 +896,7 @@ def update_blog_member_permissions(
         .options(selectinload(BlogMember.user))
     ).first()
     if not membership:
-        raise HTTPException(status_code=404, detail="Blog member not found")
+        raise NotFoundError(ErrorCode.MEMBER_NOT_FOUND)
 
     # EXTRACT UNSET/PASSED PARAMETERS
     update_data = payload.model_dump(exclude_unset=True)
@@ -885,9 +907,10 @@ def update_blog_member_permissions(
             select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog_id, BlogMember.role == BlogRole.OWNER)
         ).one()
         if owner_count <= 1 and membership.user_id == current_user.id:
-            raise HTTPException(
-                status_code=400,
-                detail="Validation Error: You are the sole owner of this blog. Appoint another owner before changing your role."
+            raise BadRequestError(
+                ErrorCode.OPERATION_NOT_ALLOWED,
+                "You are the only owner of this workspace. Make someone else an "
+                "owner before changing your own role.",
             )
 
     # Capture BEFORE values so the audit log can say what actually changed
@@ -935,7 +958,7 @@ def get_blog_dashboard_summary(
 ):
     role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
     if not role:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this blog")
+        raise AuthorizationError(ErrorCode.NOT_A_MEMBER)
 
     # Authors see stats scoped to posts they authored; Owner/Editor see the
     # whole workspace. Tags and team size are workspace-level facts, not
@@ -1080,11 +1103,11 @@ def create_invitation(
             select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == existing_user.id)
         ).first()
         if existing_membership:
-            raise HTTPException(status_code=400, detail="This person is already a member of this blog")
+            raise ConflictError(ErrorCode.ALREADY_A_MEMBER)
 
     blog = session.get(Blog, blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     # If there's already a pending (unexpired, unaccepted) invite for this
     # email, treat this as a resend rather than creating a duplicate record —
@@ -1154,7 +1177,7 @@ def revoke_invitation(
         select(BlogInvitation).where(BlogInvitation.id == invitation_id, BlogInvitation.blog_id == blog_id)
     ).first()
     if not invite:
-        raise HTTPException(status_code=404, detail="Invitation not found")
+        raise NotFoundError(ErrorCode.INVITATION_NOT_FOUND)
     session.delete(invite)
     session.commit()
 
@@ -1165,12 +1188,12 @@ def revoke_invitation(
 def get_invitation_info(token: str, session: Session = Depends(get_session)):
     invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
     if not invite:
-        raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
-    if invite.expires_at < datetime.now(timezone.utc) and invite.accepted_at is None:
-        raise HTTPException(status_code=410, detail="This invitation link has expired")
+        raise NotFoundError(ErrorCode.INVITATION_NOT_FOUND)
+    if as_utc(invite.expires_at) < utc_now() and invite.accepted_at is None:
+        raise GoneError(ErrorCode.INVITATION_EXPIRED)
     blog = session.get(Blog, invite.blog_id)
     if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     return BlogInvitationInfo(
         blog_name=blog.name,
         blog_slug=blog.slug,
@@ -1189,16 +1212,17 @@ def accept_invitation(
 ):
     invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
     if not invite:
-        raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
-    if invite.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=410, detail="This invitation link has expired")
+        raise NotFoundError(ErrorCode.INVITATION_NOT_FOUND)
+    if as_utc(invite.expires_at) < utc_now():
+        raise GoneError(ErrorCode.INVITATION_EXPIRED)
     if invite.accepted_at is not None:
-        raise HTTPException(status_code=400, detail="This invitation has already been accepted")
+        raise ConflictError(ErrorCode.INVITATION_ALREADY_ACCEPTED)
 
     if current_user.email.strip().lower() != invite.email.strip().lower():
-        raise HTTPException(
-            status_code=403,
-            detail="This invitation was sent to a different email address. Please log in with the invited account.",
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "This invitation was sent to a different email address. "
+            "Please sign in with the invited account.",
         )
 
     # Check if user is already a member
@@ -1206,7 +1230,10 @@ def accept_invitation(
         select(BlogMember).where(BlogMember.blog_id == invite.blog_id, BlogMember.user_id == current_user.id)
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="You are already a member of this blog")
+        raise ConflictError(
+            ErrorCode.ALREADY_A_MEMBER,
+            "You are already a member of this workspace.",
+        )
 
     membership = BlogMember(
         user_id=current_user.id,
@@ -1257,26 +1284,23 @@ def register_and_accept_invitation(
     """
     invite = session.exec(select(BlogInvitation).where(BlogInvitation.token == token)).first()
     if not invite:
-        raise HTTPException(status_code=404, detail="Invitation not found or has been revoked")
-    if invite.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=410, detail="This invitation link has expired")
+        raise NotFoundError(ErrorCode.INVITATION_NOT_FOUND)
+    if as_utc(invite.expires_at) < utc_now():
+        raise GoneError(ErrorCode.INVITATION_EXPIRED)
     if invite.accepted_at is not None:
-        raise HTTPException(status_code=400, detail="This invitation has already been accepted")
+        raise ConflictError(ErrorCode.INVITATION_ALREADY_ACCEPTED)
 
     existing_user = session.exec(select(User).where(User.email == invite.email)).first()
     if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="An account with this email already exists. Please log in instead.",
+        raise ConflictError(
+            ErrorCode.EMAIL_ALREADY_EXISTS,
+            "An account with this email already exists. Please log in instead.",
         )
 
-    # NOTE: mirrors the frontend's password rules (8+ chars, uppercase,
-    # number, special char) as a floor. Ideally this should reuse whatever
-    # validator UserCreate applies at /users/register, so the two signup
-    # paths can't drift apart — worth consolidating into one shared
-    # validator if UserCreate has this logic already.
-    if len(payload.password) < 8:
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+    # Uses the shared policy in app.core.security rather than a local length
+    # check, so this signup path cannot drift away from /auth/reset-password
+    # and /auth/change-password the way it previously had.
+    ensure_strong_password(payload.password, field="password")
 
     random_handle = _generate_random_handle(invite.email, session)
     hashed = get_password_hash(payload.password)

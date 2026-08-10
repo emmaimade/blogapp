@@ -1,16 +1,29 @@
 import hashlib
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
 from datetime import datetime, timezone
 
 from app.core.audit import add_audit_log
+from app.core.datetimes import as_utc, utc_now
 from app.core.db import get_session
-from app.core.security import get_current_user, get_password_hash, verify_password
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+)
+from app.core.security import (
+    ensure_strong_password,
+    get_current_user,
+    get_password_hash,
+    verify_password,
+)
 from app.models import User, Blog
 from app.models.auth_tokens import EmailVerification, PasswordResetToken
-from app.services.auth_tokens import create_verification_token, create_password_reset_token, TokenCooldownError
+from app.services.auth_tokens import create_verification_token, create_password_reset_token
 from app.core.email import dispatch_email
 from app.core.email_templates import (
     get_verification_template,
@@ -48,7 +61,12 @@ class ChangePasswordSchema(BaseModel):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        # Same response whether the address is unknown or the password is
+        # wrong, so login can't be used to enumerate accounts. Kept at 400
+        # rather than 401: the admin client treats *any* 401 as an expired
+        # session and hard-redirects to /admin/login, which would wipe the
+        # inline "wrong password" message before the user could read it.
+        raise AuthenticationError(ErrorCode.INVALID_CREDENTIALS)
 
     user.last_login = datetime.now(timezone.utc)
     session.add(user)
@@ -103,11 +121,11 @@ def verify_email(
     ).first()
 
     if not db_token:
-        raise HTTPException(status_code=400, detail="Verification link is invalid.")
+        raise BadRequestError(ErrorCode.INVALID_TOKEN)
 
     user = session.get(User, db_token.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
 
     # check if the token has already been used or if the user is already verified
     if db_token.used_at is not None or user.email_verified:
@@ -117,10 +135,10 @@ def verify_email(
         }
 
     # Check if the token has expired
-    if db_token.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification link has expired or is invalid.",
+    if as_utc(db_token.expires_at) < utc_now():
+        raise BadRequestError(
+            ErrorCode.INVALID_TOKEN,
+            "This verification link has expired. Request a new one to continue.",
         )
 
     user.email_verified = True
@@ -158,7 +176,7 @@ def send_verification_email(
         return {"message": "If the account exists, a verification link has been sent."}
         
     if user.email_verified:
-        raise HTTPException(status_code=400, detail="This email is already verified.")
+        raise ConflictError(ErrorCode.EMAIL_ALREADY_VERIFIED)
         
     raw_token = create_verification_token(session, user.id)
     full_name = f"{user.first_name} {user.last_name}"
@@ -189,13 +207,9 @@ def forgot_password(
     if not user:
         return {"message": "If the email is registered, a password reset link has been sent."}
         
-    try:
-        raw_token = create_password_reset_token(session, user.id)
-    except TokenCooldownError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Please wait {e.retry_after_seconds} seconds before requesting another password reset email.",
-        )
+    # TokenCooldownError is an AppError, so it propagates straight to the
+    # central handler as a 429 with Retry-After — no local conversion needed.
+    raw_token = create_password_reset_token(session, user.id)
 
     full_name = f"{user.first_name} {user.last_name}"
     email_html = get_password_reset_template(full_name, raw_token)
@@ -230,21 +244,17 @@ def reset_password(
         )
     ).first()
 
-    if not db_token or db_token.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password reset link is invalid or has expired."
+    if not db_token or as_utc(db_token.expires_at) < utc_now():
+        raise BadRequestError(
+            ErrorCode.INVALID_TOKEN,
+            "This password reset link is invalid or has expired. Please request a new one.",
         )
 
     user = session.get(User, db_token.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
     new_password = payload.new_password or ""
-    if len(new_password) < 8 or not any(c.isalpha() for c in new_password) or not any(c.isdigit() for c in new_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters and include both letters and numbers.",
-        )
+    ensure_strong_password(new_password, field="new_password")
 
     user.hashed_password = get_password_hash(new_password)
     db_token.used_at = datetime.now(timezone.utc)
@@ -278,17 +288,20 @@ def change_password(
 ):
     """Allows a logged-in user to change their own password, verifying their current one first."""
     if not verify_password(payload.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Current password is incorrect.")
-
-    new_password = payload.new_password or ""
-    if len(new_password) < 8 or not any(c.isalpha() for c in new_password) or not any(c.isdigit() for c in new_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters and include both letters and numbers.",
+        raise BadRequestError(
+            ErrorCode.INCORRECT_PASSWORD,
+            errors={"current_password": "This doesn't match your current password."},
         )
 
+    new_password = payload.new_password or ""
+    ensure_strong_password(new_password, field="new_password")
+
     if verify_password(new_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="New password must be different from your current password.")
+        raise BadRequestError(
+            ErrorCode.INVALID_INPUT,
+            "Your new password must be different from your current one.",
+            errors={"new_password": "Choose a password you haven't used here before."},
+        )
 
     current_user.hashed_password = get_password_hash(new_password)
     current_user.must_change_password = False

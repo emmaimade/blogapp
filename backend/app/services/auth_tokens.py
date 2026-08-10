@@ -2,17 +2,34 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
+from app.core.datetimes import as_utc, utc_now
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import RateLimitError
 from app.models.auth_tokens import EmailVerification, PasswordResetToken
 
 TOKEN_EXPIRATION_HOURS = 24
 TOKEN_COOLDOWN_SECONDS = 60
 
 
-class TokenCooldownError(Exception):
-    """Raised when a new token is requested too soon after a previous one for the same user."""
+class TokenCooldownError(RateLimitError):
+    """
+    Raised when a new token is requested too soon after a previous one for the
+    same user.
+
+    An `AppError`, so the three routers that trigger it no longer each convert
+    it to an `HTTPException` with their own wording — the central handler
+    returns 429 with a `Retry-After` header. Callers that want to *ignore* the
+    cooldown (registration, where a fresh account can't realistically be in
+    one) still just catch it.
+    """
+
     def __init__(self, retry_after_seconds: int):
-        self.retry_after_seconds = retry_after_seconds
-        super().__init__(f"Please wait {retry_after_seconds}s before requesting another email.")
+        super().__init__(
+            ErrorCode.RATE_LIMITED,
+            f"We just sent you an email. Please wait {retry_after_seconds} seconds "
+            "before requesting another.",
+            retry_after_seconds=retry_after_seconds,
+        )
 
 
 def generate_secure_token() -> tuple[str, str]:
@@ -34,7 +51,10 @@ def _check_cooldown(db: Session, model, user_id: int) -> None:
     ).first()
 
     if most_recent:
-        elapsed = (datetime.now(timezone.utc) - most_recent.created_at).total_seconds()
+        # as_utc, not a bare subtraction: whether created_at comes back aware
+        # depends on the driver, and a naive value here raised a TypeError that
+        # reached the client as an unexplained 500.
+        elapsed = (utc_now() - as_utc(most_recent.created_at)).total_seconds()
         if elapsed < TOKEN_COOLDOWN_SECONDS:
             raise TokenCooldownError(retry_after_seconds=int(TOKEN_COOLDOWN_SECONDS - elapsed))
 
