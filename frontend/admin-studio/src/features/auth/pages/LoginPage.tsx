@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, LockKeyhole, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { authSession } from '../lib/session';
 import { getCurrentUserRequest, loginRequest } from '../../../shared/api/auth';
@@ -108,11 +108,10 @@ export const LoginView = () => {
             Email Address
           </label>
           <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
             <input
               type="email"
               placeholder="john@example.com"
-              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 pl-12 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
@@ -123,15 +122,23 @@ export const LoginView = () => {
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-zinc-700">
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-zinc-700">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="text-xs font-semibold text-zinc-500 hover:text-violet-600 transition-colors cursor-pointer"
+            >
+              Forgot password?
+            </button>
+          </div>
           <div className="relative">
-            <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
-              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 pl-12 pr-12 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-5 py-3 pr-12 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -147,17 +154,6 @@ export const LoginView = () => {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-        </div>
-
-        {/* Forgot Password Link */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            className="text-xs font-semibold text-zinc-500 hover:text-violet-600 transition-colors cursor-pointer"
-          >
-            Forgot password?
-          </button>
         </div>
 
         {/* Submit Form Action Button */}
