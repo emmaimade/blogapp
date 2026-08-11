@@ -38,6 +38,7 @@ import { MyTicketsPage } from '../../features/support/pages/MyTicketsPage';
 import { SuperAdminSupportPage } from '../../features/superadmin/pages/SuperAdminSupportPage';
 import { SuperAdminBlogDetailPage } from '../../features/superadmin/pages/SuperAdminBlogDetailPage';
 import { JoinInvitationPage } from '../../features/users/pages/JoinInvitationPage';
+import { SearchResultsPage } from '../../features/search/pages/SearchResultsPage';
 
 const DefaultAdminRedirect = () => {
   const { user } = useAuth();
@@ -78,6 +79,8 @@ const router = createBrowserRouter(
           </Route>
 
           <Route path="/admin/profile" element={<UserInfoPage />} />
+
+          <Route path="/admin/search" element={<SearchResultsPage />} />
 
           {/* ======================== */}
 

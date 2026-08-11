@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import selectinload
@@ -217,6 +217,7 @@ blog_router = APIRouter(prefix="/blogs/{blog_id}/comments", tags=["Comments"])
 @blog_router.get("/", response_model=List[CommentAdminRead])
 def get_blog_comments(
     blog_id: int,
+    q: Optional[str] = None,
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_editor),
 ):
@@ -227,6 +228,8 @@ def get_blog_comments(
         .options(selectinload(Comment.user), selectinload(Comment.post))
         .order_by(Comment.created_at.desc())
     )
+    if q:
+        statement = statement.where(Comment.content.ilike(f"%{q}%"))
     return session.exec(statement).all()
 
 
