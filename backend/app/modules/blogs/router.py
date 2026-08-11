@@ -1328,6 +1328,11 @@ def register_and_accept_invitation(
         # proof of ownership — same reasoning Slack/Notion use to skip a
         # redundant "check your email" step right after they just did.
         email_verified=True,
+        # This endpoint hands back a real access token and drops the user
+        # straight onto their dashboard, same as /auth/login does — so it
+        # needs to stamp last_login too, or the Users table wrongly shows
+        # "Never logged in" for members who are actively using the app.
+        last_login=datetime.now(timezone.utc),
     )
     session.add(new_user)
     session.flush()
