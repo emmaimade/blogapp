@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { type Tag } from '../../../shared/types';
+import { useBlog } from '../../../app/providers/BlogProvider';
 
 const TAG_COLORS = [
   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -26,20 +27,22 @@ const getColorForTag = (tagName: string) => {
 
 export const TagManager = () => {
   const queryClient = useQueryClient();
+  const { activeBlog } = useBlog();
   const [newTagName, setNewTagName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null);
 
   const { data: tags, isLoading } = useQuery<Tag[]>({
-    queryKey: ['tags'],
-    queryFn: async () => (await api.get('/tags/')).data
+    queryKey: ['tags', activeBlog?.id],
+    queryFn: async () => (await api.get(`/blogs/${activeBlog!.id}/tags/`)).data,
+    enabled: !!activeBlog?.id,
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => api.post('/tags/', { name }),
+    mutationFn: (name: string) => api.post(`/blogs/${activeBlog!.id}/tags/`, { name }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['tags', activeBlog?.id] });
       setNewTagName('');
       toast.success('Tag added successfully');
     },
@@ -50,10 +53,10 @@ export const TagManager = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) => 
-      api.patch(`/tags/${id}`, { name }),
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      api.patch(`/blogs/${activeBlog!.id}/tags/${id}`, { name }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['tags', activeBlog?.id] });
       setEditingId(null);
       toast.success('Tag updated');
     },
@@ -64,9 +67,9 @@ export const TagManager = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/tags/${id}`),
+    mutationFn: (id: number) => api.delete(`/blogs/${activeBlog!.id}/tags/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['tags', activeBlog?.id] });
       setDeleteTarget(null);
       toast.success('Tag removed');
     },

@@ -34,7 +34,7 @@ export const CommentManager = () => {
 
   const { data: comments, isLoading } = useQuery<Comment[]>({
     queryKey: ['blogComments', activeMembership?.blog_id],
-    queryFn: async () => (await api.get('/comments')).data,
+    queryFn: async () => (await api.get(`/blogs/${activeMembership!.blog_id}/comments/`)).data,
     enabled: !!activeMembership,
   });
 
@@ -54,7 +54,7 @@ export const CommentManager = () => {
   };
 
   const moderateMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/comments/${id}`),
+    mutationFn: (id: number) => api.delete(`/blogs/${activeMembership!.blog_id}/comments/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogComments', activeMembership?.blog_id] });
       toast.success('Comment redacted');
