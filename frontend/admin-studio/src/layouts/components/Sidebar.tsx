@@ -154,6 +154,10 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
   };
 
   const sectionHeaderClass = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400';
+  // Section headers are hidden while collapsed, so the larger pt-4 gap used to
+  // clear them would otherwise make inter-section spacing wider than the
+  // space-y-1 gap between links within a section. Match the two when collapsed.
+  const sectionGapClass = isExpanded || window.innerWidth < 1024 ? 'pt-4' : 'pt-1';
 
   return (
     <>
@@ -278,7 +282,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
 
         {/* Scrollable Navigation Area Links list */}
         <nav
-          className={`flex-1 overflow-y-auto overflow-x-hidden pb-6 transition-all duration-300 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full ${isExpanded || window.innerWidth < 1024 ? "space-y-2 px-2.5" : "space-y-0 px-1.5"}`}
+          className={`flex-1 overflow-y-auto overflow-x-hidden pt-1 pb-6 transition-all duration-300 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full ${isExpanded || window.innerWidth < 1024 ? "space-y-2 px-2.5" : "space-y-0 px-1.5"}`}
         >
           {userIsSuperAdmin ? (
             <>
@@ -299,7 +303,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   />
                 </div>
               </div>
-              <div className="pt-4">
+              <div className={sectionGapClass}>
                 {(isExpanded || window.innerWidth < 1024) && (
                   <div className={sectionHeaderClass}>Management</div>
                 )}
@@ -317,7 +321,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   />
                 </div>
               </div>
-              <div className="pt-4">
+              <div className={sectionGapClass}>
                 {(isExpanded || window.innerWidth < 1024) && (
                   <div className={sectionHeaderClass}>Configuration</div>
                 )}
@@ -359,7 +363,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   />
                 </div>
               </div>
-              <div className="pt-4">
+              <div className={sectionGapClass}>
                 {(isExpanded || window.innerWidth < 1024) && (
                   <div className={sectionHeaderClass}>Content</div>
                 )}
@@ -378,7 +382,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                 </div>
               </div>
               {(activeRole === "owner" || activeRole === "editor") && (
-                <div className="pt-4">
+                <div className={sectionGapClass}>
                   {(isExpanded || window.innerWidth < 1024) && (
                     <div className={sectionHeaderClass}>Management</div>
                   )}
@@ -401,7 +405,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   </div>
                 </div>
               )}
-              <div className="pt-4">
+              <div className={sectionGapClass}>
                 {(isExpanded || window.innerWidth < 1024) && (
                   <div className={sectionHeaderClass}>Help</div>
                 )}
