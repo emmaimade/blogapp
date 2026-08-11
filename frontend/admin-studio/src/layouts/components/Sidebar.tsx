@@ -423,7 +423,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
           {/* Mobile-Only Personal Profile Navigation Link */}
           <div className="block lg:hidden pt-4 mt-2 border-t border-zinc-100 dark:border-zinc-800/60">
             <NavLink
-              to={`/admin/users/${user?.id}`}
+              to="/admin/profile"
               icon={User}
               label="My Profile"
             />
