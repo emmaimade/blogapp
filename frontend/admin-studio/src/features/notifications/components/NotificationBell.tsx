@@ -115,7 +115,7 @@ export const NotificationBell = () => {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full">
               {!notifications?.length && (
                 <div className="flex flex-col items-center justify-center gap-2 py-10 text-zinc-400">
                   <Inbox size={24} />
