@@ -259,8 +259,8 @@ export const SuperAdminBlogsPage = () => {
         />
       </div>
 
-      {/* Mobile Card Layout View */}
-      <div className="block md:hidden space-y-3">
+      {/* Mobile Flat List View */}
+      <div className="block md:hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
         {filteredBlogs && filteredBlogs.length > 0 ? (
           filteredBlogs.map((blog) => {
             const blogName = blog.name ?? blog.blog_name ?? 'Untitled workspace';
@@ -268,7 +268,7 @@ export const SuperAdminBlogsPage = () => {
             const blogPostsCount = blog.posts_count ?? blog.total_posts ?? 0;
             const isBlogActive = blog.is_active ?? true;
             return (
-              <div key={`mobile-${blog.blog_id}`} className="p-4 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+              <div key={`mobile-${blog.blog_id}`} className="px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link to={`/admin/blogs/${blog.blog_id}`} className="font-bold text-zinc-900 dark:text-white truncate block">{blogName}</Link>
