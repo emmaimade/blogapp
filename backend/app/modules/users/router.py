@@ -9,6 +9,7 @@ from slugify import slugify
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
+from app.core.notifications import add_notification
 from app.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -131,6 +132,19 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: 
         actor=new_user,
         details={"username": new_user.username},
     )
+
+    superadmins = session.exec(select(User).where(User.is_super_admin == True)).all()
+    for admin in superadmins:
+        add_notification(
+            session,
+            user_id=admin.id,
+            blog_id=new_blog.id,
+            type="tenant_signup",
+            title="New tenant signed up",
+            body=f'"{new_blog.name}" was just created by {new_user.first_name} {new_user.last_name}',
+            link=f"/admin/blogs/{new_blog.id}",
+        )
+
     session.commit()
     session.refresh(new_user)
 

@@ -413,6 +413,19 @@ def create_blog(
         actor=current_user,
         details={"name": new_blog.name},
     )
+
+    superadmins = session.exec(select(User).where(User.is_super_admin == True)).all()
+    for admin in superadmins:
+        add_notification(
+            session,
+            user_id=admin.id,
+            blog_id=new_blog.id,
+            type="tenant_signup",
+            title="New tenant signed up",
+            body=f'"{new_blog.name}" was just created by {current_user.first_name} {current_user.last_name}',
+            link=f"/admin/blogs/{new_blog.id}",
+        )
+
     session.commit()
     return new_blog
 

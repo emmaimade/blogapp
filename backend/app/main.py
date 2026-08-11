@@ -24,6 +24,7 @@ from app.modules import (
     superadmin_router,
     audit_router,
     support_router,
+    notifications_router,
 )
 
 # ── Lifespan — replaces deprecated @app.on_event ─────────────────────────────
@@ -111,6 +112,7 @@ app.include_router(invitations_router)
 app.include_router(superadmin_router)
 app.include_router(audit_router)
 app.include_router(support_router)
+app.include_router(notifications_router)
 
 
 @app.get("/")

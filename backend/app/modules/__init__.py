@@ -10,6 +10,7 @@ from .blogs.router import invitations_router
 from .blogs.audit_router import router as audit_router
 from .superadmin.router import router as superadmin_router
 from .support.router import router as support_router
+from .notifications.router import router as notifications_router
 
 __all__ = [
     "auth_router",
@@ -24,4 +25,5 @@ __all__ = [
     "audit_router",
     "superadmin_router",
     "support_router",
+    "notifications_router",
 ]
