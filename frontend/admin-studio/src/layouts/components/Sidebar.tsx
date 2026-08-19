@@ -194,7 +194,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
             </div>
             {isExpanded && (
               <div>
-                <div className="text-xl font-bold tracking-tight text-purple-600">
+                <div className="text-xl font-bold tracking-tight text-violet-600">
                   Inko
                 </div>
                 <div className="-mt-0.5 text-[10px] font-mono tracking-[0.22em] text-zinc-500 dark:text-zinc-400">

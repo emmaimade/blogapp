@@ -160,7 +160,7 @@ export const LoginView = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white font-semibold py-3 rounded-2xl text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-purple-900/10 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full bg-violet-600 hover:bg-violet-700 active:scale-[0.99] text-white font-semibold py-3 rounded-2xl text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-violet-900/10 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isLoading ? (
             <>

@@ -249,7 +249,7 @@ if (isLoading) {
               <button
                 type="button"
                 onClick={addFaq}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-all mb-6"
+                className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg font-bold hover:bg-primary-hover transition-all mb-6"
               >
                 <Plus size={18} /> Add FAQ Item
               </button>

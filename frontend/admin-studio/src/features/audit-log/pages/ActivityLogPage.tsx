@@ -276,7 +276,7 @@ const FormattedDiffs = ({ log }: { log: AuditLogEntry }) => {
   if (details.changes?.role) {
     const { from, to } = details.changes.role;
     return (
-      <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+      <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-2 py-1 text-xs text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
         <span>Role changed:</span>
         <span className="font-semibold line-through opacity-70">{roleLabel(from)}</span>
         <span>→</span>

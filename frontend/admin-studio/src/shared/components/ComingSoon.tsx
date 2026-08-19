@@ -19,8 +19,8 @@ export const ComingSoon: React.FC = () => {
 
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-6 text-center">
-      <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-purple-100 to-zinc-100 dark:from-purple-950 dark:to-zinc-900">
-        <Sparkles className="h-12 w-12 text-purple-600 dark:text-purple-400" />
+      <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-zinc-100 dark:from-violet-950 dark:to-zinc-900">
+        <Sparkles className="h-12 w-12 text-violet-600 dark:text-violet-400" />
       </div>
 
       <h1 className="mb-3 text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
@@ -35,7 +35,7 @@ export const ComingSoon: React.FC = () => {
       <div className="flex flex-col sm:flex-row gap-4">
         <Link
           to={location.pathname.includes('superadmin') ? '/admin/superadmin' : '/admin/dashboard'}
-          className="back-to-dashboard-btn flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3.5 text-sm font-semibold text-white bg-purple-700 hover:bg-purple-800 dark:bg-white dark:hover:bg-zinc-100 transition"
+          className="back-to-dashboard-btn flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3.5 text-sm font-semibold text-white hover:bg-primary-hover dark:bg-white dark:hover:bg-zinc-100 transition"
         >
           <ArrowLeft size={18} />
           Back to Dashboard
@@ -43,7 +43,7 @@ export const ComingSoon: React.FC = () => {
 
         <button
           onClick={() => window.location.reload()} // or show feedback modal
-          className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-8 py-3.5 text-sm font-semibold hover:border-purple-300 hover:bg-purple-50 dark:border-zinc-700 dark:hover:border-purple-500 dark:hover:bg-zinc-800 transition"
+          className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-8 py-3.5 text-sm font-semibold hover:border-violet-300 hover:bg-violet-50 dark:border-zinc-700 dark:hover:border-violet-500 dark:hover:bg-zinc-800 transition"
         >
           <Clock size={18} />
           Remind Me Later

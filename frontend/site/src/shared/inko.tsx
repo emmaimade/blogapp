@@ -5,7 +5,7 @@ export const InkoLogo: React.FC<{
   className?: string;
   color?: InkoLogoColor;
 }> = ({ size = 24, className, color = 'purple' }) => {
-  const markColor = color === 'white' ? '#FFFFFF' : '#7C3AED';
+  const markColor = color === 'white' ? '#FFFFFF' : '#7B39ED';
   const circleOpacity = color === 'white' ? 1 : 0.72;
 
   return (

@@ -18,7 +18,7 @@ const planColors: Record<string, string> = {
   FREE:         'bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300',
   STARTER:      'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   PROFESSIONAL: 'bg-accent text-accent-text',
-  ENTERPRISE:   'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  ENTERPRISE:   'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
 };
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {

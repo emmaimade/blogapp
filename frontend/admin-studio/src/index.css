@@ -15,11 +15,11 @@
   
   /* âœ… INKO BRAND COLORS - Logo Gradient (Zinc) */
   --inko-primary: #18181b;
-  --inko-secondary: #9333ea;
-  --inko-accent: #a855f7;
-  --inko-primary-light: #c084fc;
-  --inko-primary-dark: #7e22ce;
-  
+  --inko-secondary: #7b39ed;
+  --inko-accent: #8b5cf6;
+  --inko-primary-light: #a78bfa;
+  --inko-primary-dark: #6d28d9;
+
   /* ============================================================
      LIGHT MODE - Professional & Clean
      ============================================================ */
@@ -27,19 +27,19 @@
   --admin-panel: rgba(255, 255, 255, 0.97); /* Glass panels */
   --admin-panel-solid: #ffffff;           /* Solid panels/cards */
   --admin-line: rgba(24, 24, 27, 0.08);  /* Borders */
-  
+
   /* Text Colors - Proper Hierarchy */
   --admin-text-primary: #18181b;      /* Main headings */
   --admin-text-secondary: #3f3f46;    /* Body text */
   --admin-text-tertiary: #71717a;     /* Muted text */
   --admin-text-quaternary: #a1a1aa;   /* Disabled/placeholder */
-  
+
   /* Brand Colors */
-  --admin-primary: #9333ea;
-  --admin-primary-dark: #7e22ce;
-  --admin-primary-soft: rgba(147, 51, 234, 0.12);
+  --admin-primary: #7b39ed;
+  --admin-primary-dark: #6d28d9;
+  --admin-primary-soft: rgba(123, 57, 237, 0.12);
   --admin-secondary: #27272a;
-  --admin-accent: #a855f7;
+  --admin-accent: #8b5cf6;
   
   --admin-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08);
   --admin-glass-shadow: 0 8px 25px rgba(15, 23, 42, 0.06);
@@ -67,11 +67,11 @@
   --admin-text-quaternary: #a1a1aa;
   
   /* Brand Colors - Adjusted for dark mode */
-  --admin-primary: #a855f7;
-  --admin-primary-dark: #c084fc;
-  --admin-primary-soft: rgba(168, 85, 247, 0.16);
+  --admin-primary: #8b5cf6;
+  --admin-primary-dark: #a78bfa;
+  --admin-primary-soft: rgba(139, 92, 246, 0.16);
   --admin-secondary: #d4d4d8;
-  --admin-accent: #e9d5ff;
+  --admin-accent: #ddd6fe;
   
   --admin-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
   
@@ -194,26 +194,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-nav-link:hover {
-  background-color: rgba(147, 51, 234, 0.08);
-  color: rgb(126, 34, 206);
+  background-color: rgba(123, 57, 237, 0.08);
+  color: rgb(109, 40, 217);
 }
 
 .dark .sidebar-nav-link:hover {
-  background-color: rgba(168, 85, 247, 0.16);
+  background-color: rgba(139, 92, 246, 0.16);
   color: white;
 }
 
 .sidebar-nav-link.active {
-  background-color: rgba(147, 51, 234, 0.08);
-  color: rgb(126, 34, 206);
+  background-color: rgba(123, 57, 237, 0.08);
+  color: rgb(109, 40, 217);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(147, 51, 234, 0.18);
+  border: 1px solid rgba(123, 57, 237, 0.18);
 }
 
 .dark .sidebar-nav-link.active {
-  background-color: rgba(168, 85, 247, 0.16);
-  color: rgb(233, 213, 255);
-  border-color: rgba(168, 85, 247, 0.4);
+  background-color: rgba(139, 92, 246, 0.16);
+  color: rgb(221, 214, 254);
+  border-color: rgba(139, 92, 246, 0.4);
 }
 
 /* ============================================================
@@ -226,8 +226,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-toggle-btn:hover {
-  background-color: rgb(250, 245, 255);
-  border-color: rgb(233, 213, 255);
+  background-color: rgb(245, 243, 255);
+  border-color: rgb(221, 214, 254);
 }
 
 .dark .sidebar-toggle-btn {
@@ -447,7 +447,7 @@ h1, h2, h3, h4, h5, h6 {
 .admin-btn-primary {
   background: linear-gradient(135deg, var(--inko-primary), var(--inko-secondary));
   color: white;
-  box-shadow: 0 4px 14px rgba(147, 51, 234, 0.25);
+  box-shadow: 0 4px 14px rgba(123, 57, 237, 0.25);
 }
 
 .dark .admin-btn-primary {
@@ -457,7 +457,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .admin-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(147, 51, 234, 0.35);
+  box-shadow: 0 8px 20px rgba(123, 57, 237, 0.35);
 }
 
 /* ============================================================

@@ -44,13 +44,13 @@ export const SuperAdminDashboardPage = () => {
         </div>
 
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-4 text-purple-500 mb-4"><Users size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Users</span></div>
+          <div className="flex items-center gap-4 text-violet-500 mb-4"><Users size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Users</span></div>
           <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_users || 0}</div>
           <p className="text-sm text-zinc-500 mt-2">Platform wide</p>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-4 text-purple-400 mb-4"><Layout size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Posts</span></div>
+          <div className="flex items-center gap-4 text-violet-400 mb-4"><Layout size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Posts</span></div>
           <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_posts || 0}</div>
           <p className="text-sm text-zinc-500 mt-2">Published content</p>
         </div>

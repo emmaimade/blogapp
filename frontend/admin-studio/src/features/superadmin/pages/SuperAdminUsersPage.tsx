@@ -373,7 +373,7 @@ export const SuperAdminUsersPage = () => {
                             <span
                               className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium border capitalize ${
                                 accountRow.contextualRole === "Super Admin" || accountRow.contextualRole === "owner"
-                                  ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/50"
+                                  ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200/60 dark:border-violet-800/50"
                                   : accountRow.contextualRole === "editor"
                                     ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
                                     : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800"
@@ -498,7 +498,7 @@ export const SuperAdminUsersPage = () => {
                               <span
                                 className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border shadow-2xs capitalize ${
                                   accountRow.contextualRole === "Super Admin" || accountRow.contextualRole === "owner"
-                                    ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200/60 dark:border-purple-800/50"
+                                    ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200/60 dark:border-violet-800/50"
                                     : accountRow.contextualRole === "editor"
                                       ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-purple-800/50"
                                       : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"

@@ -181,7 +181,7 @@ export const SuperAdminPlatformSettingsPage = () => {
         <button
           onClick={() => mutation.mutate(form)}
           disabled={mutation.isPending}
-          className="hidden sm:flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+          className="hidden sm:flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all shadow-md shadow-primary/20 disabled:opacity-50"
         >
           {mutation.isPending ? (
             <><Loader2 size={15} className="animate-spin" /> Saving…</>
@@ -343,7 +343,7 @@ export const SuperAdminPlatformSettingsPage = () => {
           <button
             onClick={() => mutation.mutate(form)}
             disabled={mutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-all disabled:opacity-50"
           >
             {mutation.isPending ? (
               <><Loader2 size={15} className="animate-spin" /> Saving…</>

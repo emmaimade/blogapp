@@ -303,7 +303,7 @@ export const OnboardingPage = () => {
           </p>
           <button
             onClick={() => navigate('/admin/dashboard', { replace: true })}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition-all shadow-md shadow-primary/20 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white hover:bg-primary-hover transition-all shadow-md shadow-primary/20 cursor-pointer"
           >
             Go to dashboard <ArrowRight size={16} />
           </button>
@@ -342,7 +342,7 @@ export const OnboardingPage = () => {
                 </span>
                 <div className="w-32 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-primary bg-purple-600 transition-all duration-500"
+                    className="h-full rounded-full bg-primary transition-all duration-500"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -393,7 +393,7 @@ export const OnboardingPage = () => {
                       done
                         ? "bg-green-500 text-white dark:bg-green-600"
                         : active
-                          ? "bg-purple-600 text-white"
+                          ? "bg-violet-600 text-white"
                           : locked
                             ? "border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400"
                             : "border-2 border-zinc-300 dark:border-zinc-600 text-zinc-500"
@@ -406,7 +406,7 @@ export const OnboardingPage = () => {
                     <div
                       className={`text-sm font-semibold leading-none ${
                         active
-                          ? "text-purple-600"
+                          ? "text-violet-600"
                           : done
                             ? "text-green-700 dark:text-green-400"
                             : "text-zinc-700 dark:text-zinc-300"
@@ -444,7 +444,7 @@ export const OnboardingPage = () => {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-xl mx-auto px-6 py-10">
             <div className="mb-8">
-              <div className="text-xs font-semibold text-purple-600 uppercase tracking-widest mb-2">
+              <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-2">
                 Step {currentIndex + 1} of {STEP_ORDER.length}
                 {STEP_META[currentStep].optional && (
                   <span className="ml-2 text-zinc-400 normal-case tracking-normal">
@@ -527,7 +527,7 @@ export const OnboardingPage = () => {
                         }
                         className={`rounded-lg border py-3 text-sm font-semibold transition-all cursor-pointer ${
                           aboutForm.team_size === value
-                            ? "border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
+                            ? "border-violet-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
                             : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                         }`}
                       >
@@ -636,7 +636,7 @@ export const OnboardingPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowOptionalProfile(true)}
-                    className="text-xs font-semibold text-purple-600 hover:text-purple-700 transition-colors cursor-pointer"
+                    className="text-xs font-semibold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
                   >
                     + Add logo and favicon (optional)
                   </button>
@@ -712,7 +712,7 @@ export const OnboardingPage = () => {
                         }
                         className={`flex flex-col items-center gap-2 rounded-lg border py-4 text-xs font-semibold transition-all cursor-pointer ${
                           publicationForm.default_post_visibility === value
-                            ? "border-purple-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
+                            ? "border-violet-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
                             : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                         }`}
                       >
@@ -771,7 +771,7 @@ export const OnboardingPage = () => {
                 <label
                   className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-all ${
                     publicationForm.comments_enabled
-                      ? "border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700"
+                      ? "border-violet-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700"
                       : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300"
                   }`}
                 >
@@ -810,7 +810,7 @@ export const OnboardingPage = () => {
               <div className="space-y-5">
                 <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <Users size={16} className="text-purple-600" />
+                    <Users size={16} className="text-violet-600" />
                     <span className="text-sm font-semibold text-zinc-900 dark:text-white">
                       Invite a teammate
                     </span>
@@ -891,7 +891,7 @@ export const OnboardingPage = () => {
                     type="button"
                     onClick={() => completeTeam.mutate(false)}
                     disabled={completeTeam.isPending}
-                    className="flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold bg-purple-600 text-white shadow-md shadow-primary/20 hover:bg-purple-700 transition-all disabled:opacity-50 cursor-pointer"
+                    className="flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold bg-violet-600 text-white shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {completeTeam.isPending ? (
                       <Loader2 className="animate-spin" size={15} />
@@ -918,7 +918,7 @@ export const OnboardingPage = () => {
                 <div className="flex items-start gap-3 rounded-lg border border-accent-border bg-accent/40 dark:bg-violet-950/30 dark:border-violet-800/50 px-4 py-3">
                   <CheckCircle2
                     size={16}
-                    className="text-purple-600 flex-shrink-0 mt-0.5"
+                    className="text-violet-600 flex-shrink-0 mt-0.5"
                   />
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
                     Your{" "}
@@ -964,12 +964,12 @@ export const OnboardingPage = () => {
                         onClick={() => setSelectedPlan(key as SubscriptionPlan)}
                         className={`w-full flex items-start gap-4 rounded-lg border p-4 text-left transition-all cursor-pointer ${
                           selectedPlan === key
-                            ? "border-purple-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10"
+                            ? "border-violet-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10"
                             : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
                         }`}
                       >
                         <div
-                          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? "bg-purple-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+                          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? "bg-violet-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
                         >
                           <Icon size={18} />
                         </div>
@@ -979,12 +979,12 @@ export const OnboardingPage = () => {
                               {title}
                             </span>
                             {recommended && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white">
                                 Popular
                               </span>
                             )}
                           </div>
-                          <div className="text-xs font-semibold text-purple-600 mt-0.5">
+                          <div className="text-xs font-semibold text-violet-600 mt-0.5">
                             {price}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
@@ -994,7 +994,7 @@ export const OnboardingPage = () => {
                         <div
                           className={`flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                             selectedPlan === key
-                              ? "border-purple-600 bg-purple-600"
+                              ? "border-violet-600 bg-violet-600"
                               : "border-zinc-300 dark:border-zinc-600"
                           }`}
                         >
@@ -1019,7 +1019,7 @@ export const OnboardingPage = () => {
                     type="button"
                     onClick={handleLaunch}
                     disabled={savePlan.isPending || checkingVerification}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-purple-600 text-white shadow-md shadow-primary/20 hover:bg-purple-700 transition-all disabled:opacity-50 cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-violet-600 text-white shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {savePlan.isPending ? (
                       <>
@@ -1097,7 +1097,7 @@ const StepActions = ({
       type="button"
       onClick={onContinue}
       disabled={loading || disabled}
-      className="flex items-center gap-2 rounded-lg text-sm font-bold bg-purple-600 text-white px-6 py-3.5 shadow-md shadow-primary/20 hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+      className="flex items-center gap-2 rounded-lg text-sm font-bold bg-violet-600 text-white px-6 py-3.5 shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
     >
       {loading
         ? <><Loader2 className="animate-spin" size={15} /> Saving…</>

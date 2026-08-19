@@ -60,7 +60,7 @@ export const ResetPasswordPage = () => {
         </p>
         <button
           onClick={() => navigate("/admin/login")}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-2xl text-sm transition-all flex items-center justify-center gap-2"
+          className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 rounded-2xl text-sm transition-all flex items-center justify-center gap-2"
         >
           Sign In Now <ArrowRight size={16} />
         </button>
@@ -122,7 +122,7 @@ export const ResetPasswordPage = () => {
         <button
           type="submit"
           disabled={isLoading || !password || !confirmPassword}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-2xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 rounded-2xl text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="animate-spin" size={16} /> : "Update Password"}
         </button>
