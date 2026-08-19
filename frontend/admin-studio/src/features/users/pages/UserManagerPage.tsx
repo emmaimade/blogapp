@@ -75,11 +75,7 @@ export const UserManager = () => {
   }, [openMenuId]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="animate-spin text-violet-600" size={28} />
-      </div>
-    );
+    return <UserManagerSkeleton />;
   }
 
   return (
