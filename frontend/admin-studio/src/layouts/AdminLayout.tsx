@@ -106,8 +106,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
         </button>
 
         {showUserDropdown && (
-          /* Changes implemented: Added pointer-events-auto and viewport-safe alignment offset for mobile header dropdown context */
-          <div className="absolute right-0 lg:right-0 -mr-14 lg:mr-0 z-50 mt-2 w-60 rounded-xl border border-zinc-200 bg-white py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 pointer-events-auto">
+          <div className="fixed right-4 top-16 lg:absolute lg:right-0 lg:top-auto lg:mt-2 z-50 w-60 rounded-xl border border-zinc-200 bg-white py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 pointer-events-auto">
             <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-700">
               <div className="font-medium text-zinc-900 dark:text-white">
                 {user?.first_name} {user?.last_name}
