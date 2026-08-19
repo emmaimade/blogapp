@@ -272,6 +272,7 @@ useEffect(() => {
   const getPageTitle = () => {
     if (location.pathname === "/admin/users") return "Team";
     if (location.pathname === "/admin/platform-users") return "Users";
+    if (location.pathname === "/admin/platform-settings") return "Platform Settings";
 
     const pathSegments = location.pathname.split("/").filter(Boolean);
     const titleSegments = pathSegments.filter((segment) =>
