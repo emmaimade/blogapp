@@ -1,6 +1,51 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats, getBlogAnalytics } from '../api/superadminApi';
-import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp, Loader2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp } from 'lucide-react';
+import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
+
+const SuperAdminAnalyticsSkeleton = () => (
+  <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto space-y-8">
+    <div className="space-y-2">
+      <SkeletonBar className="h-8 w-40" />
+      <SkeletonBar className="h-4 w-72" />
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[...Array(4)].map((_, i) => (
+        <SkeletonStatCard key={i} className="rounded-2xl p-6" />
+      ))}
+    </div>
+
+    <div className="grid md:grid-cols-2 gap-6">
+      {[...Array(2)].map((_, i) => (
+        <div key={i} className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
+          <SkeletonBar className="h-4 w-32" />
+          {[...Array(2)].map((_, j) => (
+            <SkeletonBar key={j} className="h-8 w-full" />
+          ))}
+        </div>
+      ))}
+    </div>
+
+    <div className="grid md:grid-cols-2 gap-6">
+      {[...Array(2)].map((_, i) => (
+        <div key={i} className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+          <div className="p-5 border-b border-zinc-100 dark:border-zinc-700">
+            <SkeletonBar className="h-4 w-36" />
+          </div>
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-700">
+            {[...Array(5)].map((_, j) => (
+              <div key={j} className="flex items-center justify-between px-5 py-3">
+                <SkeletonBar className="h-3.5 w-32" />
+                <SkeletonBar className="h-3.5 w-14" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export const SuperAdminAnalyticsPage = () => {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -13,11 +58,7 @@ export const SuperAdminAnalyticsPage = () => {
     queryFn: getBlogAnalytics,
   });
 
-  if (statsLoading || blogsLoading)  return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-      </div>
-    );;
+  if (statsLoading || blogsLoading) return <SuperAdminAnalyticsSkeleton />;
 
   const topByViews = [...(blogs ?? [])].sort((a, b) => b.total_views - a.total_views).slice(0, 5);
   const topByPosts = [...(blogs ?? [])].sort((a, b) => b.total_posts - a.total_posts).slice(0, 5);

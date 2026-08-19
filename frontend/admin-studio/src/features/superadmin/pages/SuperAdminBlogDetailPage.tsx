@@ -14,6 +14,51 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
+import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
+
+const SuperAdminBlogDetailSkeleton = () => (
+  <div className="space-y-6 p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="space-y-3">
+      <SkeletonBar className="h-4 w-32" />
+      <SkeletonBar className="h-7 w-64" />
+      <SkeletonBar className="h-4 w-48" />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <SkeletonStatCard key={i} />
+      ))}
+    </div>
+
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+        <SkeletonBar className="h-3 w-32" />
+      </div>
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 px-5 py-3.5">
+            <SkeletonBar className="h-3.5 w-24" />
+            <SkeletonBar className="h-3.5 w-40" />
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+        <SkeletonBar className="h-3 w-28" />
+      </div>
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 px-5 py-3.5">
+            <SkeletonBar className="h-3.5 w-48" />
+            <SkeletonBar className="h-3.5 w-16" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 interface RecentPost {
   id: number;
@@ -86,11 +131,7 @@ export const SuperAdminBlogDetailPage = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-      </div>
-    );
+    return <SuperAdminBlogDetailSkeleton />;
   }
 
   if (error || !blog) {

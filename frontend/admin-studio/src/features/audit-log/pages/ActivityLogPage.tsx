@@ -4,6 +4,7 @@ import { Search, RefreshCw, ShieldCheck, MessageSquare } from 'lucide-react';
 import { formatLocalDateTime, formatRelative } from '../../../shared/utils/dates';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
 
 interface AuditLogEntry {
   id: number;
@@ -151,9 +152,8 @@ export const ActivityLogPage = () => {
       {/* Activity Feed */}
       <div className="mt-8">
         {isLoading ? (
-          <div className="rounded-2xl border border-zinc-100 bg-white py-20 text-center dark:border-zinc-800 dark:bg-zinc-950">
-            <RefreshCw className="mx-auto h-7 w-7 animate-spin text-zinc-400" />
-            <p className="mt-3 text-xs font-medium text-zinc-400">Fetching workspace events...</p>
+          <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <ActivityFeedSkeleton rows={6} />
           </div>
         ) : logs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 bg-white py-16 text-center dark:border-zinc-800 dark:bg-zinc-950">

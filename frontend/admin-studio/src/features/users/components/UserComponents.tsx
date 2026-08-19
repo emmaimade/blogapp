@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
+import { Spinner } from "../../../shared/ui/Spinner";
 
 export const ROLES: BlogRole[] = ["owner", "editor", "author"];
 
@@ -68,7 +69,11 @@ export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending, d
         className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none"
       >
         <RoleBadge role={member.role} />
-        <ChevronDown size={12} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        {isPending ? (
+          <Spinner size={12} className="text-zinc-400" />
+        ) : (
+          <ChevronDown size={12} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        )}
       </button>
 
       {open && (

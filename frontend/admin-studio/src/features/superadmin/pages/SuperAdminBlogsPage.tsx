@@ -4,7 +4,6 @@ import {
   CheckCircle,
   Eye,
   Globe,
-  Loader2,
   MoreHorizontal,
   Search,
   Trash2,
@@ -13,6 +12,41 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
+import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
+
+const SuperAdminBlogsSkeleton = () => (
+  <div className="space-y-6 p-6">
+    <div className="space-y-2">
+      <SkeletonBar className="h-7 w-56" />
+      <SkeletonBar className="h-4 w-80" />
+    </div>
+
+    <SkeletonBar className="h-11 w-full max-w-md rounded-xl" />
+
+    <div className="block md:hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+      {[...Array(4)].map((_, i) => (
+        <SkeletonListRow key={i} withAvatar={false} />
+      ))}
+    </div>
+
+    <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 overflow-hidden">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
+            {['Blog Name', 'Routing / Domain', 'Owner Profile', 'Content Size', 'System Status', 'Actions'].map((h) => (
+              <th key={h} className="p-4">
+                <SkeletonBar className="h-3 w-20" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <TableRowSkeleton columns={6} rows={5} cellClassName="p-4" />
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
 
 interface BlogTenantItem {
   blog_id: number;
@@ -185,11 +219,7 @@ export const SuperAdminBlogsPage = () => {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-      </div>
-    );
+    return <SuperAdminBlogsSkeleton />;
   }
 
   if (error) {

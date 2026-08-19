@@ -7,6 +7,41 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/context/AuthContext';
 import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { Modal } from '../../../shared/components/Modal';
+import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
+
+const SuperAdminUsersSkeleton = () => (
+  <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
+    <div className="space-y-2">
+      <SkeletonBar className="h-6 w-56" />
+      <SkeletonBar className="h-4 w-80" />
+    </div>
+
+    <SkeletonBar className="h-16 w-full rounded-xl" />
+
+    <div className="block md:hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+      {[...Array(5)].map((_, i) => (
+        <SkeletonListRow key={i} />
+      ))}
+    </div>
+
+    <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden">
+      <table className="w-full border-collapse text-left">
+        <thead>
+          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50">
+            {['User Profile', 'Role', 'Last Login', 'Status', 'Date Registered', 'Actions'].map((h) => (
+              <th key={h} className="px-6 py-3">
+                <SkeletonBar className="h-3 w-20" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <TableRowSkeleton columns={6} rows={6} />
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -187,12 +222,7 @@ export const SuperAdminUsersPage = () => {
   }, [groupedByWorkspace]);
 
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="h-8 w-48 bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded" />
-        <div className="h-64 bg-zinc-50 dark:bg-zinc-900/50 animate-pulse rounded-xl border border-zinc-100 dark:border-zinc-800" />
-      </div>
-    );
+    return <SuperAdminUsersSkeleton />;
   }
 
   return (

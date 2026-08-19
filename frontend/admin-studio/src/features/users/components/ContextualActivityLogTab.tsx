@@ -5,6 +5,7 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import api from '../../../shared/api/client';
 import { formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { useAuth } from '../../auth/context/AuthContext';
+import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
 
 interface AuditLogEntry {
   id: number;
@@ -116,10 +117,7 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
       {/* Main Ledger Feed Panel */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
         {isLoading && logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <RefreshCw className="h-5 w-5 text-zinc-400 animate-spin" />
-            <p className="text-xs text-zinc-400">Filtering timeline structures...</p>
-          </div>
+          <ActivityFeedSkeleton rows={4} />
         ) : logs.length === 0 ? (
           <div className="p-12 text-center text-xs text-zinc-400">
             No tracked timeline operations match this user identifier scope.

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useBlocker } from 'react-router-dom';
 import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
+import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -162,8 +163,8 @@ export const SuperAdminPlatformSettingsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-64">
-        <Loader2 className="animate-spin text-primary" size={28} />
+      <div className="p-4 sm:p-8 max-w-full sm:max-w-4xl mx-auto">
+        <SettingsSkeleton cardsCount={1} fieldsPerCard={4} />
       </div>
     );
   }

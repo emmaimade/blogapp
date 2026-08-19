@@ -1,11 +1,47 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, Search, Users, Loader2, MoreHorizontal, Trash2, User, Mail, Clock } from "lucide-react";
+import { UserPlus, Search, Users, MoreHorizontal, Trash2, User, Mail, Clock } from "lucide-react";
 import { formatSmart, formatLocalDate } from "../../../shared/utils/dates";
 import { useUserManager } from "../hooks/useUserManager";
 import { InviteModal } from "../components/InviteModal";
 import { Avatar, RoleBadge, RoleDropdown } from "../components/UserComponents";
 import { Modal } from "../../../shared/components/Modal";
+import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from "../../../shared/ui/Skeleton";
+
+const UserManagerSkeleton = () => (
+  <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-2">
+        <SkeletonBar className="h-7 w-48" />
+        <SkeletonBar className="h-4 w-72" />
+      </div>
+      <SkeletonBar className="h-10 w-full sm:w-56 rounded-lg" />
+    </div>
+
+    <div className="block md:hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+      {[...Array(4)].map((_, i) => (
+        <SkeletonListRow key={i} />
+      ))}
+    </div>
+
+    <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 shadow-xs overflow-hidden">
+      <table className="w-full border-collapse text-left">
+        <thead>
+          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50">
+            {["User Profile", "Role", "Last Login", "Status", "Date Registered", "Actions"].map((h) => (
+              <th key={h} className="px-6 py-3">
+                <SkeletonBar className="h-3 w-20" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <TableRowSkeleton columns={6} rows={5} />
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
 
 export const UserManager = () => {
   const {

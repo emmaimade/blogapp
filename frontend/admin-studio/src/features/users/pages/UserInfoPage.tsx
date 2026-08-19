@@ -1,5 +1,5 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { User, Shield, Building2, ShieldCheck, Loader2, MoreHorizontal } from 'lucide-react';
+import { User, Shield, Building2, ShieldCheck, MoreHorizontal } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
@@ -9,6 +9,28 @@ import SecurityTab from '../components/SecurityTab';
 import WorkspacesTab from '../components/WorkspacesTab';
 import ContextualActivityLogTab from '../components/ContextualActivityLogTab';
 import { useState } from 'react';
+import { SkeletonBar } from '../../../shared/ui/Skeleton';
+
+const UserInfoSkeleton = () => (
+  <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto p-4 md:p-6">
+    <aside className="hidden lg:flex w-64 flex-col gap-1.5 border-r border-zinc-200 dark:border-zinc-800 pr-6 shrink-0">
+      {[...Array(4)].map((_, i) => (
+        <SkeletonBar key={i} className="h-10 w-full rounded-xl" />
+      ))}
+    </aside>
+    <main className="flex-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-card p-6 shadow-xs min-h-[450px] space-y-6">
+      <SkeletonBar className="h-4 w-24" />
+      <div className="space-y-3">
+        <SkeletonBar className="h-4 w-1/3" />
+        <SkeletonBar className="h-11 w-full rounded-xl" />
+        <SkeletonBar className="h-4 w-1/4" />
+        <SkeletonBar className="h-11 w-full rounded-xl" />
+        <SkeletonBar className="h-4 w-1/3" />
+        <SkeletonBar className="h-11 w-full rounded-xl" />
+      </div>
+    </main>
+  </div>
+);
 
 type TabId = 'profile' | 'security' | 'workspaces' | 'activity';
 
@@ -71,11 +93,7 @@ export default function UserInfoPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="animate-spin text-violet-600" size={28} />
-      </div>
-    );
+    return <UserInfoSkeleton />;
   }
 
   if (error) {
