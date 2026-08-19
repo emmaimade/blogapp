@@ -197,7 +197,11 @@ def reply_to_ticket(
 
     if is_owner and ticket.status == TicketStatus.RESOLVED:
         ticket.status = TicketStatus.OPEN
-        session.add(ticket)
+
+    # Touch updated_at on every reply (not just status changes) so ticket
+    # lists sorted by updated_at surface the most recently active threads.
+    ticket.updated_at = utcnow()
+    session.add(ticket)
 
     if is_owner:
         # Owner replied — notify all superadmins, same audience as ticket creation
