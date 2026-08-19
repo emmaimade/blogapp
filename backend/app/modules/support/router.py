@@ -8,11 +8,13 @@ from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, BadRequestError, NotFoundError, ValidationError
+from app.core.permissions import Permissions
 from app.core.security import get_current_user
 from app.core.email import dispatch_email
 from app.core.email_templates import get_new_support_ticket_admin_template, get_new_support_ticket_admin_template_text
 from app.core.notifications import add_notification
 from app.models import SupportTicket, SupportMessage, TicketStatus, User
+from app.models.support import utcnow
 
 router = APIRouter(prefix="/support", tags=["Support"])
 
@@ -88,6 +90,12 @@ def create_ticket(
         field_errors["body"] = "This field is required."
     if field_errors:
         raise ValidationError(errors=field_errors)
+
+    if payload.blog_id is not None and not Permissions.can_access_blog(current_user, payload.blog_id, session):
+        raise AuthorizationError(
+            ErrorCode.FORBIDDEN,
+            "You don't have access to that workspace.",
+        )
 
     ticket = SupportTicket(
         user_id=current_user.id,
