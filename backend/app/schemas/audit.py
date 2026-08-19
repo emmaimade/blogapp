@@ -15,6 +15,8 @@ class AuditLogRead(UTCDatetimeMixin, BaseModel):
     target_type: Optional[str] = None
     resource_id: Optional[int] = None
     blog_id: Optional[int] = None
+    blog_name: Optional[str] = None
+    resource_label: Optional[str] = None
     details: Optional[dict] = None
     description: Optional[str] = None
     ip_address: Optional[str] = None

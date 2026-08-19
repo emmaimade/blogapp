@@ -861,7 +861,7 @@ def get_audit_logs(
     statement = statement.order_by(AuditLog.created_at.desc()).offset(skip).limit(safe_limit)
 
     logs = session.exec(statement).all()
-    return [_to_audit_log_read(log) for log in logs]
+    return _to_audit_log_read_list(session, logs)
 
 
 def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
@@ -888,7 +888,11 @@ def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
     )
 
 
-def _to_audit_log_read(log: AuditLog) -> AuditLogRead:
+def _to_audit_log_read(
+    log: AuditLog,
+    blog_name: Optional[str] = None,
+    resource_label: Optional[str] = None,
+) -> AuditLogRead:
     try:
         details = json.loads(log.details) if log.details else {}
     except (TypeError, json.JSONDecodeError):
@@ -904,12 +908,82 @@ def _to_audit_log_read(log: AuditLog) -> AuditLogRead:
         target_type=log.resource_type,
         resource_id=log.resource_id,
         blog_id=log.blog_id,
+        blog_name=blog_name,
+        resource_label=resource_label,
         details=details,
         description=_describe_audit_log(log, details),
         ip_address=log.ip_address,
         user_agent=log.user_agent,
         created_at=log.created_at,
     )
+
+
+# Resource types whose id points at a User row (member-management actions
+# record the target member's user id here, same as plain "user" actions).
+_USER_RESOURCE_TYPES = {"user", "blog_member"}
+
+
+def _to_audit_log_read_list(session: Session, logs: List[AuditLog]) -> List[AuditLogRead]:
+    """
+    Batch-resolves human-readable names for Tenant Scope and Resource so the
+    audit log doesn't force superadmins to cross-reference bare ids — one
+    query per referenced table instead of a per-row join for each of the
+    (possibly 200) rows on the page.
+    """
+    blog_ids = {log.blog_id for log in logs if log.blog_id is not None}
+    blog_ids |= {log.resource_id for log in logs if log.resource_type == "blog" and log.resource_id is not None}
+    blog_names: dict[int, str] = {}
+    if blog_ids:
+        rows = session.exec(select(Blog.id, Blog.name).where(Blog.id.in_(blog_ids))).all()
+        blog_names = {bid: name for bid, name in rows}
+
+    user_ids = {log.resource_id for log in logs if log.resource_type in _USER_RESOURCE_TYPES and log.resource_id is not None}
+    user_names: dict[int, str] = {}
+    if user_ids:
+        rows = session.exec(select(User.id, User.first_name, User.last_name).where(User.id.in_(user_ids))).all()
+        user_names = {uid: f"{fn} {ln}".strip() for uid, fn, ln in rows}
+
+    post_ids = {log.resource_id for log in logs if log.resource_type == "post" and log.resource_id is not None}
+    post_titles: dict[int, str] = {}
+    if post_ids:
+        rows = session.exec(select(Post.id, Post.title).where(Post.id.in_(post_ids))).all()
+        post_titles = {pid: title for pid, title in rows}
+
+    tag_ids = {log.resource_id for log in logs if log.resource_type == "tag" and log.resource_id is not None}
+    tag_names: dict[int, str] = {}
+    if tag_ids:
+        rows = session.exec(select(Tag.id, Tag.name).where(Tag.id.in_(tag_ids))).all()
+        tag_names = {tid: name for tid, name in rows}
+
+    ticket_ids = {log.resource_id for log in logs if log.resource_type == "support_ticket" and log.resource_id is not None}
+    ticket_subjects: dict[int, str] = {}
+    if ticket_ids:
+        rows = session.exec(select(SupportTicket.id, SupportTicket.subject).where(SupportTicket.id.in_(ticket_ids))).all()
+        ticket_subjects = {tid: subject for tid, subject in rows}
+
+    def resource_label(log: AuditLog) -> Optional[str]:
+        if log.resource_id is None:
+            return None
+        if log.resource_type in _USER_RESOURCE_TYPES:
+            return user_names.get(log.resource_id)
+        if log.resource_type == "blog":
+            return blog_names.get(log.resource_id)
+        if log.resource_type == "post":
+            return post_titles.get(log.resource_id)
+        if log.resource_type == "tag":
+            return tag_names.get(log.resource_id)
+        if log.resource_type == "support_ticket":
+            return ticket_subjects.get(log.resource_id)
+        return None
+
+    return [
+        _to_audit_log_read(
+            log,
+            blog_name=blog_names.get(log.blog_id) if log.blog_id is not None else None,
+            resource_label=resource_label(log),
+        )
+        for log in logs
+    ]
 
 
 def _format_datetime_label(value: Any) -> str | None:
