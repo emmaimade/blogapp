@@ -156,6 +156,7 @@ class BlogAnalytics(UTCDatetimeMixin, BaseModel):
 
 class SubscriptionRead(UTCDatetimeMixin, BaseModel):
     blog_id: int
+    blog_name: str
     plan: SubscriptionPlan
     status: str
     trial_ends_at: Optional[datetime] = None

@@ -717,8 +717,20 @@ def get_all_subscriptions(
 ):
     """Get all blog subscriptions."""
     from app.models.blog import BlogSubscription
-    subscriptions = session.exec(select(BlogSubscription)).all()
-    return subscriptions
+    rows = session.exec(
+        select(BlogSubscription, Blog.name).join(Blog, Blog.id == BlogSubscription.blog_id)
+    ).all()
+    return [
+        SubscriptionRead(
+            blog_id=sub.blog_id,
+            blog_name=blog_name,
+            plan=sub.plan,
+            status=sub.status,
+            trial_ends_at=sub.trial_ends_at,
+            current_period_ends_at=sub.current_period_ends_at,
+        )
+        for sub, blog_name in rows
+    ]
 
 
 @router.get("/subscriptions/{blog_id}", response_model=SubscriptionRead)
@@ -729,14 +741,24 @@ def get_blog_subscription(
 ):
     """Get subscription for a specific blog."""
     from app.models.blog import BlogSubscription
-    subscription = session.exec(
-        select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)
+    row = session.exec(
+        select(BlogSubscription, Blog.name)
+        .join(Blog, Blog.id == BlogSubscription.blog_id)
+        .where(BlogSubscription.blog_id == blog_id)
     ).first()
-    
-    if not subscription:
+
+    if not row:
         raise NotFoundError(ErrorCode.SUBSCRIPTION_NOT_FOUND)
-    
-    return subscription
+
+    subscription, blog_name = row
+    return SubscriptionRead(
+        blog_id=subscription.blog_id,
+        blog_name=blog_name,
+        plan=subscription.plan,
+        status=subscription.status,
+        trial_ends_at=subscription.trial_ends_at,
+        current_period_ends_at=subscription.current_period_ends_at,
+    )
 
 
 # ============================================================================
