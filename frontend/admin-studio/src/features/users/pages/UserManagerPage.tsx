@@ -146,20 +146,22 @@ export const UserManager = () => {
                   key={member.id}
                   className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 transition-all space-y-4 shadow-xs"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <Avatar firstName={member.user.first_name} lastName={member.user.last_name} size="md" />
                       <div className="flex flex-col min-w-0">
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
-                          {member.user.first_name} {member.user.last_name}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                            {member.user.first_name} {member.user.last_name}
+                          </span>
                           {isCurrentUser && <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 flex-shrink-0">you</span>}
-                        </span>
+                        </div>
                         <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate">@{member.user.username}</span>
                         <span className="text-xs text-zinc-400 dark:text-zinc-500 truncate mt-0.5">{member.user.email}</span>
                       </div>
                     </div>
 
-                    <div className="relative flex items-center gap-2 flex-shrink-0">
+                    <div className="relative flex items-center gap-1.5 flex-shrink-0">
                       {isOwner ? (
                         <RoleDropdown member={member} currentUserId={currentUser?.id} onRoleChange={(id, role) => updateRoleMutation.mutate({ memberId: id, newRole: role })} isPending={updateRoleMutation.isPending} />
                       ) : (
