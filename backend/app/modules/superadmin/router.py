@@ -1129,7 +1129,30 @@ def list_all_tickets(
     query = select(SupportTicket).order_by(SupportTicket.updated_at.desc())
     if ticket_status:
         query = query.where(SupportTicket.status == ticket_status)
-    return session.exec(query).all()
+    tickets = session.exec(query).all()
+
+    blog_ids = {t.blog_id for t in tickets if t.blog_id is not None}
+    blog_names: dict[int, str] = {}
+    if blog_ids:
+        rows = session.exec(select(Blog.id, Blog.name).where(Blog.id.in_(blog_ids))).all()
+        blog_names = {bid: name for bid, name in rows}
+
+    user_ids = {t.user_id for t in tickets}
+    user_names: dict[int, str] = {}
+    if user_ids:
+        rows = session.exec(
+            select(User.id, User.first_name, User.last_name, User.email).where(User.id.in_(user_ids))
+        ).all()
+        for uid, first_name, last_name, email in rows:
+            full_name = " ".join(part for part in (first_name, last_name) if part)
+            user_names[uid] = full_name or email
+
+    return [
+        SupportTicketRead.model_validate(t).model_copy(
+            update={"blog_name": blog_names.get(t.blog_id), "user_name": user_names.get(t.user_id)}
+        )
+        for t in tickets
+    ]
 
 
 @router.patch("/support/{ticket_id}/status", response_model=SupportTicketRead)
