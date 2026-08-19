@@ -32,9 +32,39 @@ import json
 from typing import Any, Optional
 
 from fastapi import Request
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models.audit import AuditLog
+
+
+def resolve_primary_blog_id(session: Session, user: Any) -> Optional[int]:
+    """
+    Best-effort tenant scope for account-level actions (login, profile edits,
+    password changes) that happen outside any specific blog context — there's
+    no blog_id to pass because the action itself isn't scoped to one blog.
+
+    Only meaningful when the actor IS the resource (self-service actions).
+    For an admin acting on a *different* user, this would resolve the
+    admin's own blog, not the target's, so don't use it there.
+
+    Prefers a blog the user owns; falls back to their first membership;
+    None if they have neither (e.g. a superadmin-only account).
+    """
+    from app.models import Blog, BlogMember
+
+    user_id = getattr(user, "id", None)
+    if user_id is None:
+        return None
+
+    owned = session.exec(
+        select(Blog.id).where(Blog.owner_id == user_id).order_by(Blog.id)
+    ).first()
+    if owned is not None:
+        return owned
+
+    return session.exec(
+        select(BlogMember.blog_id).where(BlogMember.user_id == user_id).order_by(BlogMember.id)
+    ).first()
 
 
 def add_audit_log(
@@ -89,4 +119,10 @@ def add_audit_log(
         user_agent=user_agent,
     )
     session.add(log)
+
+    if request is not None:
+        # Lets AuditLogMiddleware know a specific, correctly-scoped log was
+        # already written for this request, so it skips its generic fallback.
+        request.state.audit_logged = True
+
     return log

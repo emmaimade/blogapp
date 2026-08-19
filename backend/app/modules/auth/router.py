@@ -1,11 +1,11 @@
 import hashlib
-from fastapi import APIRouter, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
 from datetime import datetime, timezone
 
-from app.core.audit import add_audit_log
+from app.core.audit import add_audit_log, resolve_primary_blog_id
 from app.core.datetimes import as_utc, utc_now
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
@@ -58,7 +58,7 @@ class ChangePasswordSchema(BaseModel):
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
         # Same response whether the address is unknown or the password is
@@ -76,9 +76,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
         action="user.login",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
-    
+
     session.commit()
     return build_login_response(user, session)
 
@@ -110,6 +112,7 @@ def check_slug_availability(slug: str, session: Session = Depends(get_session)):
 @router.get("/verify-email")
 def verify_email(
     background_tasks: BackgroundTasks,
+    request: Request,
     token: str = Query(...),
     session: Session = Depends(get_session),
 ):
@@ -151,7 +154,9 @@ def verify_email(
         action="user.email_verified",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
     session.commit()
 
@@ -166,8 +171,9 @@ def verify_email(
 
 @router.post("/send-verification")
 def send_verification_email(
-    payload: ResendVerificationSchema, 
-    background_tasks: BackgroundTasks, 
+    payload: ResendVerificationSchema,
+    background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session)
 ):
     """Resends a verification token to unverified users."""
@@ -189,7 +195,9 @@ def send_verification_email(
         action="user.verification_email_requested",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
     session.commit()
 
@@ -198,8 +206,9 @@ def send_verification_email(
 
 @router.post("/forgot-password")
 def forgot_password(
-    payload: ForgotPasswordSchema, 
-    background_tasks: BackgroundTasks, 
+    payload: ForgotPasswordSchema,
+    background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session)
 ):
     """Generates a secure recovery record and shoots an email link."""
@@ -221,7 +230,9 @@ def forgot_password(
         action="user.forgot_password_requested",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
     session.commit()
     
@@ -232,6 +243,7 @@ def forgot_password(
 def reset_password(
     payload: ResetPasswordSchema,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session),
 ):
     """Verifies the reset token and updates user password credentials securely."""
@@ -267,7 +279,9 @@ def reset_password(
         action="user.password_reset_completed",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
     session.commit()
 
@@ -283,6 +297,7 @@ def reset_password(
 def change_password(
     payload: ChangePasswordSchema,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -312,7 +327,9 @@ def change_password(
         action="user.change_password",
         resource_type="user",
         resource_id=current_user.id,
+        blog_id=resolve_primary_blog_id(session, current_user),
         actor=current_user,
+        request=request,
     )
     session.commit()
 

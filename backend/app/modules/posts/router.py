@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlmodel import Session
 
 from app.core.db import get_session
@@ -28,12 +28,13 @@ def upload_post_image(
 def create_post(
     blog_id: int,
     post_data: PostCreate,
+    request: Request,
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_author),
     __: None = Depends(require_completed_onboarding),
     current_user: User = Depends(get_current_user),
 ):
-    return post_service.create_post(blog_id, post_data, session, current_user)
+    return post_service.create_post(blog_id, post_data, session, current_user, request=request)
 
 
 @router.get("/", response_model=List[PostRead])
@@ -74,24 +75,26 @@ def update_post(
     blog_id: int,
     post_id: int,
     post_data: PostUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_author),
     __: None = Depends(require_completed_onboarding),
     current_user: User = Depends(get_current_user),
 ):
-    return post_service.update_post(blog_id, post_id, post_data, session, current_user)
+    return post_service.update_post(blog_id, post_id, post_data, session, current_user, request=request)
 
 
 @router.delete("/{post_id}")
 def delete_post(
     blog_id: int,
     post_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_author),
     __: None = Depends(require_completed_onboarding),
     current_user: User = Depends(get_current_user),
 ):
-    return post_service.delete_post(blog_id, post_id, session, current_user)
+    return post_service.delete_post(blog_id, post_id, session, current_user, request=request)
 
 
 @router.post("/{post_id}/flag", response_model=ModerationQueueItemRead, status_code=201)
@@ -99,6 +102,7 @@ def flag_post_for_moderation(
     blog_id: int,
     post_id: int,
     payload: FlagContentCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -109,6 +113,7 @@ def flag_post_for_moderation(
         reporter=current_user,
         reason=payload.reason,
         notes=payload.notes,
+        request=request,
     )
     session.commit()
     return ModerationQueueItemRead(

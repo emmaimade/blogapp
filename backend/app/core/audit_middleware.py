@@ -19,6 +19,11 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         return response
 
     def _record_request_action(self, request: Request, status_code: int) -> None:
+        if getattr(request.state, "audit_logged", False):
+            # A router already wrote a specific, correctly-scoped audit log
+            # for this request — skip the generic http.* fallback.
+            return
+
         try:
             with Session(engine) as session:
                 actor = self._get_actor(request, session)

@@ -1,12 +1,12 @@
 import random
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
 
-from app.core.audit import add_audit_log
+from app.core.audit import add_audit_log, resolve_primary_blog_id
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.notifications import add_notification
@@ -74,7 +74,7 @@ def _generate_random_handle(email: str, session: Session) -> str:
 
 
 @router.post("/register")
-def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
+def register(user_data: UserCreate, background_tasks: BackgroundTasks, request: Request, session: Session = Depends(get_session)):
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
     if existing_email:
         raise ConflictError(ErrorCode.EMAIL_ALREADY_EXISTS)
@@ -129,8 +129,10 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: 
         action="user.register",
         resource_type="user",
         resource_id=new_user.id,
+        blog_id=new_blog.id,
         actor=new_user,
         details={"username": new_user.username},
+        request=request,
     )
 
     superadmins = session.exec(select(User).where(User.is_super_admin == True)).all()
@@ -167,7 +169,7 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, session: 
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
         # Identical response for unknown account and wrong password — see the
@@ -179,7 +181,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
         action="user.login",
         resource_type="user",
         resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
         actor=user,
+        request=request,
     )
     session.commit()
     # Same fix as /users/register above — this takes the User, not its id.
@@ -279,6 +283,7 @@ def get_user_profile(user_id: int, current_user: User = Depends(get_current_user
 @router.patch("/me", response_model=UserRead)
 def update_user_profile(
     user_data: UserUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_password_changed),
 ):
@@ -302,8 +307,10 @@ def update_user_profile(
         action="user.update_profile",
         resource_type="user",
         resource_id=db_user.id,
+        blog_id=resolve_primary_blog_id(session, current_user),
         actor=current_user,
         details={"changes": changes} if changes else {"fields": []},
+        request=request,
     )
     session.commit()
     session.refresh(db_user)
@@ -314,6 +321,7 @@ def update_user_profile(
 @router.delete("/me")
 def delete_user_account(
     background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_password_changed),
 ):
@@ -322,7 +330,9 @@ def delete_user_account(
         action="user.delete_account",
         resource_type="user",
         resource_id=current_user.id,
+        blog_id=resolve_primary_blog_id(session, current_user),
         actor=current_user,
+        request=request,
     )
 
     user_email = current_user.email

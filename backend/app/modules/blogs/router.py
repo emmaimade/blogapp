@@ -5,7 +5,7 @@ from typing import List
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, status, BackgroundTasks
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -280,7 +280,7 @@ def _initialize_blog_settings(session: Session, blog_id: int) -> None:
     session.commit()
 
 def _create_welcome_post_on_onboarding_complete(
-    session: Session, blog: Blog, current_user: User
+    session: Session, blog: Blog, current_user: User, request: Request | None = None
 ) -> Post | None:
     """
     Create a personalised welcome post when onboarding completes.
@@ -354,6 +354,7 @@ def _create_welcome_post_on_onboarding_complete(
             "title": welcome_post.title,
             "source": "onboarding_complete",
         },
+        request=request,
     )
 
     return welcome_post
@@ -361,6 +362,7 @@ def _create_welcome_post_on_onboarding_complete(
 @router.post("/", response_model=BlogRead)
 def create_blog(
     blog_data: BlogCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -412,6 +414,7 @@ def create_blog(
         blog_id=new_blog.id,
         actor=current_user,
         details={"name": new_blog.name},
+        request=request,
     )
 
     superadmins = session.exec(select(User).where(User.is_super_admin == True)).all()
@@ -648,6 +651,7 @@ def complete_onboarding_team_step(
 def update_onboarding_plan(
     blog_id: int,
     payload: OnboardingPlanUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_verified_email),
     _: None = Depends(require_blog_owner),
@@ -674,7 +678,7 @@ def update_onboarding_plan(
     summary, subscription = _sync_onboarding_state(session, blog)
 
     # Create personalized welcome post
-    _create_welcome_post_on_onboarding_complete(session, blog, current_user)
+    _create_welcome_post_on_onboarding_complete(session, blog, current_user, request=request)
 
     session.commit()
     session.refresh(blog)
@@ -688,6 +692,7 @@ def update_onboarding_plan(
 def update_blog(
     blog_id: int,
     blog_data: BlogUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
@@ -718,6 +723,7 @@ def update_blog(
         blog_id=blog.id,
         actor=current_user,
         details={"changes": changes} if changes else {"fields": []},
+        request=request,
     )
     session.commit()
     session.refresh(blog)
@@ -744,10 +750,11 @@ def trigger_member_reset_email(
     blog_id: int,
     member_id: int,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
-): 
+):
     """Allows a blog owner to send a password reset link to a member of their own workspace (Tier 1, workspace-scoped)."""
     membership = session.exec(
         select(BlogMember).where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
@@ -776,6 +783,7 @@ def trigger_member_reset_email(
         blog_id=blog_id,
         actor=current_user,
         details={"member_id": membership.id, "target_email": user.email},
+        request=request,
     )
     session.commit()
 
@@ -786,6 +794,7 @@ def trigger_member_reset_email(
 def invite_blog_member(
     blog_id: int,
     payload: BlogMemberCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
@@ -827,6 +836,7 @@ def invite_blog_member(
         blog_id=blog_id,
         actor=current_user,
         details={"role": payload.role, "email": user_to_invite.email},
+        request=request,
     )
     session.commit()
 
@@ -842,6 +852,7 @@ def invite_blog_member(
 def remove_blog_member(
     blog_id: int,
     member_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_owner),
@@ -876,6 +887,7 @@ def remove_blog_member(
             "email": membership.user.email if membership.user else None,
             "role": membership.role,
         },
+        request=request,
     )
     session.delete(membership)
     session.commit()
@@ -886,6 +898,7 @@ def update_blog_member_permissions(
     blog_id: int,
     member_id: int,
     payload: BlogMemberUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -956,6 +969,7 @@ def update_blog_member_permissions(
             "member_id": membership.id,
             "changes": changes,
         },
+        request=request,
     )
     session.commit()
     session.refresh(membership)
@@ -1286,6 +1300,7 @@ def accept_invitation(
 def register_and_accept_invitation(
     token: str,
     payload: InvitationRegisterCreate,
+    request: Request,
     session: Session = Depends(get_session),
 ):
     """
@@ -1357,6 +1372,7 @@ def register_and_accept_invitation(
         actor=new_user,
         blog_id=invite.blog_id,
         details={"role": invite.role.value},
+        request=request,
     )
 
     blog = session.get(Blog, invite.blog_id)

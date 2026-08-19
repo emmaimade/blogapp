@@ -8,7 +8,7 @@ from typing import List, Optional
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
-from fastapi import UploadFile
+from fastapi import Request, UploadFile
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -171,7 +171,7 @@ def upload_post_image(file: UploadFile) -> dict[str, str]:
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
-def create_post(blog_id: int, post_data: PostCreate, session: Session, current_user: User) -> Post:
+def create_post(blog_id: int, post_data: PostCreate, session: Session, current_user: User, request: Request | None = None) -> Post:
     if not Permissions.can_create_post(current_user, blog_id, session):
         raise AuthorizationError(
             ErrorCode.INSUFFICIENT_PERMISSIONS,
@@ -212,6 +212,7 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
             "status": resolved_status.value,
             "published_at": resolved_published_at.isoformat() if resolved_published_at else None,
         },
+        request=request,
     )
 
     session.commit()
@@ -295,6 +296,7 @@ def update_post(
     post_data: PostUpdate,
     session: Session,
     current_user: User,
+    request: Request | None = None,
 ) -> Post:
     db_post = _get_post_or_404(session, blog_id, post_id)
     if not Permissions.can_edit_post(current_user, db_post, session):
@@ -340,13 +342,14 @@ def update_post(
             "fields": sorted(post_data.model_fields_set),
             "status": db_post.status.value,
         },
+        request=request,
     )
     session.commit()
     session.refresh(db_post)
     return db_post
 
 
-def delete_post(blog_id: int, post_id: int, session: Session, current_user: User) -> dict:
+def delete_post(blog_id: int, post_id: int, session: Session, current_user: User, request: Request | None = None) -> dict:
     post = _get_post_or_404(session, blog_id, post_id)
     if not Permissions.can_edit_post(current_user, post, session):
         raise AuthorizationError(
@@ -361,6 +364,7 @@ def delete_post(blog_id: int, post_id: int, session: Session, current_user: User
         blog_id=blog_id,
         actor=current_user,
         details={"title": post.title, "status": post.status.value},
+        request=request,
     )
     session.delete(post)
     session.commit()

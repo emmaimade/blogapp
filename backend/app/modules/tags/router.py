@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import desc, func
 from sqlmodel import Session, select
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/blogs/{blog_id}/tags", tags=["tags"])
 def create_tag(
     blog_id: int,
     tag_data: TagCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_editor),
@@ -43,6 +44,7 @@ def create_tag(
         blog_id=blog_id,
         actor=current_user,
         details={"name": db_tag.name},
+        request=request,
     )
     session.commit()
     session.refresh(db_tag)
@@ -90,6 +92,7 @@ def update_tag(
     blog_id: int,
     tag_id: int,
     tag_data: TagUpdate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_editor),
@@ -120,6 +123,7 @@ def update_tag(
         blog_id=blog_id,
         actor=current_user,
         details={"name": db_tag.name},
+        request=request,
     )
     session.commit()
     session.refresh(db_tag)
@@ -130,6 +134,7 @@ def update_tag(
 def delete_tag(
     blog_id: int,
     tag_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_blog_editor),
@@ -147,6 +152,7 @@ def delete_tag(
         blog_id=blog_id,
         actor=current_user,
         details={"name": tag.name},
+        request=request,
     )
     session.delete(tag)
     session.commit()

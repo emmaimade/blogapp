@@ -1,5 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, BackgroundTasks, status
+from fastapi import APIRouter, Depends, BackgroundTasks, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -74,6 +75,7 @@ def _notify_admins_of_new_ticket(session: Session, background_tasks: BackgroundT
 def create_ticket(
     payload: CreateTicketSchema,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -108,6 +110,7 @@ def create_ticket(
         blog_id=payload.blog_id,
         actor=current_user,
         details={"subject": ticket.subject},
+        request=request,
     )
     session.commit()
     session.refresh(ticket)
@@ -154,6 +157,7 @@ def get_ticket(
 def reply_to_ticket(
     ticket_id: int,
     payload: CreateMessageSchema,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -216,6 +220,7 @@ def reply_to_ticket(
         resource_type="support_ticket",
         resource_id=ticket.id,
         actor=current_user,
+        request=request,
     )
     session.commit()
     session.refresh(message)

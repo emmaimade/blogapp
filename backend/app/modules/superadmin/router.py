@@ -3,7 +3,7 @@ import secrets
 import string
 from typing import Any, List, Optional
 from datetime import datetime, date, timezone
-from fastapi import APIRouter, Depends, status, Response, BackgroundTasks
+from fastapi import APIRouter, Depends, status, Request, Response, BackgroundTasks
 from sqlmodel import Session, select
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import selectinload
@@ -14,22 +14,24 @@ from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import BadRequestError, NotFoundError, ValidationError
 from app.core.moderation import record_moderation_action
+from app.core.notifications import add_notification
 from app.core.permissions import require_super_admin
 from app.core.security import get_current_user, get_password_hash
 from app.core.email import dispatch_email
 from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
 from app.services.auth_tokens import create_password_reset_token
 from app.models import (
-    AuditLog, 
-    Blog, 
-    User, 
-    Post, 
-    Comment, 
-    ModerationItem, 
-    BlogMember, 
-    SupportTicket, 
-    SupportMessage, 
-    TicketStatus, 
+    AuditLog,
+    Blog,
+    User,
+    Post,
+    Tag,
+    Comment,
+    ModerationItem,
+    BlogMember,
+    SupportTicket,
+    SupportMessage,
+    TicketStatus,
     PlatformSettings as PlatformSettingsRecord)
 from app.modules.support.router import SupportTicketRead
 from app.schemas import (
@@ -243,6 +245,7 @@ def get_blog_detail(
 def update_blog_status(
     blog_id: int,
     data: BlogToggleActive,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -263,6 +266,7 @@ def update_blog_status(
         blog_id=blog.id,
         actor=current_user,
         details={"from": previous_is_active, "to": blog.is_active},
+        request=request,
     )
     session.commit()
     session.refresh(blog)
@@ -299,6 +303,7 @@ def update_blog_status(
 @router.delete("/blogs/{blog_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_blog(
     blog_id: int,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -327,6 +332,7 @@ def delete_blog(
         blog_id=blog.id,
         actor=current_user,
         details={"name": blog.name},
+        request=request,
     )
 
     # Delete blog
@@ -373,6 +379,7 @@ def get_all_users(
 def update_user_status(
     user_id: int,
     data: UserSuspendUpdate,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -396,6 +403,7 @@ def update_user_status(
         resource_id=user.id,
         actor=current_user,
         details={"from": previous_is_active, "to": user.is_active},
+        request=request,
     )
     session.commit()
     session.refresh(user)
@@ -407,6 +415,7 @@ def update_user_status(
 def force_temporary_password(
     user_id: int,
     background_tasks: BackgroundTasks,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -434,6 +443,7 @@ def force_temporary_password(
         resource_type="user",
         resource_id=user.id,
         actor=current_user,
+        request=request,
     )
     session.commit()
 
@@ -449,6 +459,7 @@ def force_temporary_password(
 def trigger_reset_email(
     user_id: int,
     background_tasks: BackgroundTasks,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -473,6 +484,7 @@ def trigger_reset_email(
         resource_type="user",
         resource_id=user.id,
         actor=current_user,
+        request=request,
     )
     session.commit()
 
@@ -482,6 +494,7 @@ def trigger_reset_email(
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def superadmin_delete_user(
     user_id: int,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -523,7 +536,8 @@ def superadmin_delete_user(
             "email": user.email,
             "was_superadmin": user.is_super_admin,
             "owned_blogs_count": len(user.owned_blogs) if hasattr(user, "owned_blogs") else 0
-        }
+        },
+        request=request,
     )
 
     # === SOFT DELETE ===
@@ -666,6 +680,7 @@ def get_platform_settings(
 @router.patch("/platform-settings", response_model=PlatformSettingsResponse)
 def update_platform_settings(
     data: PlatformSettingsUpdate,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -685,6 +700,7 @@ def update_platform_settings(
         resource_type="platform_settings",
         actor=current_user,
         details={"changes": changes} if changes else {"fields": []},
+        request=request,
     )
     session.commit()
     return PlatformSettingsResponse.model_validate(saved)
@@ -775,6 +791,7 @@ def get_moderation_queue(
 def moderate_flagged_content(
     item_id: int,
     payload: ModerationActionCreate,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -807,6 +824,7 @@ def moderate_flagged_content(
         actor=current_user,
         action=action,
         notes=payload.notes,
+        request=request,
     )
     session.commit()
     session.refresh(moderation_action)
@@ -1022,6 +1040,7 @@ def list_all_tickets(
 def update_ticket_status(
     ticket_id: int,
     payload: UpdateTicketStatusSchema,
+    request: Request,
     _: None = Depends(require_super_admin),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -1041,6 +1060,7 @@ def update_ticket_status(
         resource_id=ticket.id,
         actor=current_user,
         details={"from": old_status.value, "to": payload.status.value},
+        request=request,
     )
     session.commit()
     session.refresh(ticket)

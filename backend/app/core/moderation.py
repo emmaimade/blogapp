@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from fastapi import Request
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -17,6 +18,7 @@ def flag_comment(
     reporter: User,
     reason: str,
     notes: Optional[str] = None,
+    request: Request | None = None,
 ) -> ModerationItem:
     post = session.get(Post, comment.post_id)
     if not post:
@@ -41,6 +43,7 @@ def flag_comment(
         blog_id=post.blog_id,
         actor=reporter,
         details={"moderation_item_id": item.id, "reason": reason},
+        request=request,
     )
     return item
 
@@ -52,6 +55,7 @@ def flag_post(
     reporter: User,
     reason: str,
     notes: Optional[str] = None,
+    request: Request | None = None,
 ) -> ModerationItem:
     item = _create_or_update_pending_item(
         session,
@@ -72,6 +76,7 @@ def flag_post(
         blog_id=post.blog_id,
         actor=reporter,
         details={"moderation_item_id": item.id, "reason": reason},
+        request=request,
     )
     return item
 
@@ -83,6 +88,7 @@ def record_moderation_action(
     actor: User,
     action: str,
     notes: Optional[str] = None,
+    request: Request | None = None,
 ) -> ModerationAction:
     moderation_action = ModerationAction(
         moderation_item_id=item.id,
@@ -99,6 +105,7 @@ def record_moderation_action(
         blog_id=item.blog_id,
         actor=actor,
         details={"moderation_item_id": item.id, "notes": notes},
+        request=request,
     )
     return moderation_action
 

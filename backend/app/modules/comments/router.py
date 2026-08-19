@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -32,6 +32,7 @@ def _commenter_role_label(current_user: User, blog_id: int, session: Session) ->
 @router.post("/", response_model=CommentRead)
 def create_comment(
     comment_data: CommentCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -59,6 +60,7 @@ def create_comment(
             "post_title": post.title,
             "commenter_role": _commenter_role_label(current_user, post.blog_id, session),
         },
+        request=request,
     )
 
     if post.author_id and post.author_id != current_user.id:
@@ -91,6 +93,7 @@ def get_post_comments(post_id: int, session: Session = Depends(get_session)):
 def update_comment(
     comment_id: int,
     content: str,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -123,6 +126,7 @@ def update_comment(
         blog_id=post.blog_id if post else None,
         actor=current_user,
         details={"post_id": comment.post_id, "post_title": post.title if post else None},
+        request=request,
     )
     session.commit()
     session.refresh(comment)
@@ -132,6 +136,7 @@ def update_comment(
 @router.delete("/{comment_id}")
 def delete_comment(
     comment_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -173,6 +178,7 @@ def delete_comment(
             "post_title": post.title if post else None,
             "deleted_by": "author" if is_author else "moderator",
         },
+        request=request,
     )
     session.commit()
     return {"ok": True, "message": "Comment moderated successfully"}
@@ -182,6 +188,7 @@ def delete_comment(
 def flag_comment_for_moderation(
     comment_id: int,
     payload: FlagContentCreate,
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -192,6 +199,7 @@ def flag_comment_for_moderation(
         reporter=current_user,
         reason=payload.reason,
         notes=payload.notes,
+        request=request,
     )
     session.commit()
     post = session.get(Post, comment.post_id)
@@ -237,6 +245,7 @@ def get_blog_comments(
 def moderate_blog_comment(
     blog_id: int,
     comment_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_editor),
     __: None = Depends(require_completed_onboarding),
@@ -266,6 +275,7 @@ def moderate_blog_comment(
         blog_id=blog_id,
         actor=current_user,
         details={"post_id": comment.post_id, "post_title": post.title if post else None},
+        request=request,
     )
     session.commit()
     return {"ok": True, "message": "Comment moderated successfully"}
