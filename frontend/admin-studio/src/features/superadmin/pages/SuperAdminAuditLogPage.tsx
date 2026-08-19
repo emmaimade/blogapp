@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import api from '../../../shared/api/client';
 import { formatLocalDateTime, formatRelative } from '../../../shared/utils/dates';
+import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
 
 interface AuditLogEntry {
   id: number;
@@ -31,6 +32,8 @@ interface AuditLogEntry {
   target_type: string | null;
   resource_id: number | null;
   blog_id: number | null;
+  blog_name: string | null;
+  resource_label: string | null;
   details: Record<string, unknown> | null;
   description: string | null;
   ip_address: string | null;
@@ -173,6 +176,18 @@ const describeLog = (log: AuditLogEntry, meta: ActionMeta): string => {
   }
 
   return log.description || meta.label;
+};
+
+const formatTenantScope = (log: AuditLogEntry, withId = false): string => {
+  if (!log.blog_id) return 'Platform';
+  if (!log.blog_name) return `Blog #${log.blog_id}`;
+  return withId ? `${log.blog_name} (Blog #${log.blog_id})` : log.blog_name;
+};
+
+const formatResourceLabel = (log: AuditLogEntry, withId = false): string => {
+  const fallback = `${log.resource_type}${log.resource_id ? ` #${log.resource_id}` : ''}`;
+  if (!log.resource_label) return fallback;
+  return withId ? `${log.resource_label} (${fallback})` : log.resource_label;
 };
 
 const stringifyDetail = (value: unknown) => {
@@ -326,73 +341,106 @@ export const SuperAdminAuditLogPage = () => {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="overflow-x-auto">
-            <div className="min-w-full sm:min-w-200">
-            <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <span />
-              <span>Event</span>
-              <span>Actor</span>
-              <span>Tenant</span>
-              <span>Resource</span>
-              <span>Time</span>
+        {isLoading ? (
+          <ActivityFeedSkeleton rows={8} />
+        ) : filteredLogs.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
+            <p className="text-sm font-medium text-zinc-500">No audit entries match these filters.</p>
+          </div>
+        ) : (
+          <>
+            {/* Mobile Card List View */}
+            <div className="block md:hidden divide-y divide-zinc-100 dark:divide-zinc-900">
+              {filteredLogs.map((log) => {
+                const meta = getActionMeta(log);
+                const isExpanded = expandedId === log.id;
+                return (
+                  <div key={`mobile-${log.id}`}>
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                      className="flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
+                    >
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
+                        {meta.icon}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
+                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
+                            {meta.severity}
+                          </span>
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
+                        <span className="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-400">
+                          <span className="truncate">{log.actor_email || log.actor || 'System'}</span>
+                          <span className="shrink-0" title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
+                        </span>
+                      </span>
+                      <ChevronDown size={14} className={`mt-1 shrink-0 text-zinc-400 transition ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isExpanded && <ExpandedLog log={log} meta={meta} />}
+                  </div>
+                );
+              })}
             </div>
 
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-24">
-                <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
-                <span className="text-xs font-medium text-zinc-400">Loading platform audit events...</span>
-              </div>
-            ) : filteredLogs.length === 0 ? (
-              <div className="px-6 py-16 text-center">
-                <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
-                <p className="text-sm font-medium text-zinc-500">No audit entries match these filters.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-                {filteredLogs.map((log) => {
-                  const meta = getActionMeta(log);
-                  const isExpanded = expandedId === log.id;
-                  return (
-                    <div key={log.id}>
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                        className="grid w-full grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
-                      >
-                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
-                          {meta.icon}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
-                              {meta.severity}
-                            </span>
-                          </span>
-                          <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
-                        </span>
-                        <span className="min-w-0 text-xs text-zinc-600 dark:text-zinc-300">
-                          <span className="block truncate font-medium">{log.actor_email || log.actor || 'System'}</span>
-                          {log.actor_user_id && <span className="text-[11px] text-zinc-400">ID {log.actor_user_id}</span>}
-                        </span>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">{log.blog_id ? `Blog #${log.blog_id}` : 'Platform'}</span>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {log.resource_type}
-                          {log.resource_id ? ` #${log.resource_id}` : ''}
-                        </span>
-                        <span className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                          <span title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
-                          <ChevronDown size={14} className={`transition ${isExpanded ? 'rotate-180' : ''}`} />
-                        </span>
-                      </button>
+            {/* Desktop Table Layout View */}
+            <div className="hidden md:block overflow-x-auto">
+              <div className="min-w-full sm:min-w-200">
+                <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <span />
+                  <span>Event</span>
+                  <span>Actor</span>
+                  <span>Tenant</span>
+                  <span>Resource</span>
+                  <span>Time</span>
+                </div>
 
-                      {isExpanded && <ExpandedLog log={log} meta={meta} />}
-                    </div>
-                  );
-                })}
+                <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+                  {filteredLogs.map((log) => {
+                    const meta = getActionMeta(log);
+                    const isExpanded = expandedId === log.id;
+                    return (
+                      <div key={log.id}>
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                          className="grid w-full grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
+                        >
+                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
+                            {meta.icon}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
+                                {meta.severity}
+                              </span>
+                            </span>
+                            <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
+                          </span>
+                          <span className="min-w-0 text-xs text-zinc-600 dark:text-zinc-300">
+                            <span className="block truncate font-medium">{log.actor_email || log.actor || 'System'}</span>
+                            {log.actor_user_id && <span className="text-[11px] text-zinc-400">ID {log.actor_user_id}</span>}
+                          </span>
+                          <span title={formatTenantScope(log)} className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{formatTenantScope(log)}</span>
+                          <span title={formatResourceLabel(log)} className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{formatResourceLabel(log)}</span>
+                          <span className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                            <span title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
+                            <ChevronDown size={14} className={`transition ${isExpanded ? 'rotate-180' : ''}`} />
+                          </span>
+                        </button>
+
+                        {isExpanded && <ExpandedLog log={log} meta={meta} />}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
 
         <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900/50">
           <p className="text-xs text-zinc-400">
@@ -456,8 +504,8 @@ const ExpandedLog = ({ log, meta }: { log: AuditLogEntry; meta: ActionMeta }) =>
           <div className="grid gap-3 sm:grid-cols-2">
             <DetailItem label="Actor" value={log.actor_email || log.actor || 'System'} />
             <DetailItem label="Actor ID" value={log.actor_user_id ?? 'None'} />
-            <DetailItem label="Tenant Scope" value={log.blog_id ? `Blog #${log.blog_id}` : 'Platform'} />
-            <DetailItem label="Resource" value={`${log.resource_type}${log.resource_id ? ` #${log.resource_id}` : ''}`} />
+            <DetailItem label="Tenant Scope" value={formatTenantScope(log, true)} />
+            <DetailItem label="Resource" value={formatResourceLabel(log, true)} />
             <DetailItem label="IP Address" value={log.ip_address || 'Not captured'} />
             <DetailItem label="Created" value={formatLocalDateTime(log.created_at)} />
           </div>
