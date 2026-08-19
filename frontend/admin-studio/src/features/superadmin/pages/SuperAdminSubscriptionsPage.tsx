@@ -106,20 +106,19 @@ export const SuperAdminSubscriptionsPage = () => {
         />
       </div>
 
-      {/* Table */}
-      <div className="block md:hidden">
+      {/* Mobile Flat List View */}
+      <div className="block md:hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
         {filtered.length === 0 ? (
           <div className="p-4 text-center text-sm text-zinc-500">No subscriptions found.</div>
         ) : (
           (filtered.map((sub: any) => (
-            <div key={`mobile-sub-${sub.blog_id}`} className="p-4 mb-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+            <div key={`mobile-sub-${sub.blog_id}`} className="px-4 py-4">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
                   <CreditCard size={13} className="text-primary" />
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold truncate text-sm text-zinc-900 dark:text-white">{sub.blog_name ?? `Blog #${sub.blog_id}`}</p>
-                  <p className="text-xs text-zinc-500">ID: {sub.blog_id}</p>
                 </div>
                 <div className="ml-auto text-right text-xs text-zinc-500">
                   <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${planColors[sub.plan] ?? planColors.FREE}`}>{sub.plan}</div>
