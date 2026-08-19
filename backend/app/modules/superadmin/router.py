@@ -1181,6 +1181,17 @@ def update_ticket_status(
         details={"from": old_status.value, "to": payload.status.value},
         request=request,
     )
+
+    if payload.status != old_status:
+        add_notification(
+            session,
+            user_id=ticket.user_id,
+            type="support_ticket_status_changed",
+            title="Your support ticket status changed",
+            body=f'"{ticket.subject}" is now {payload.status.value.replace("_", " ")}',
+            link=f"/admin/support-tickets?ticket={ticket.id}",
+        )
+
     session.commit()
     session.refresh(ticket)
     return ticket
