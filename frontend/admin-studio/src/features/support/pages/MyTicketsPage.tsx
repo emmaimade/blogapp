@@ -3,6 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
 import api from '../../../shared/api/client';
+import { SkeletonBar } from '../../../shared/ui/Skeleton';
+import { useAuth } from '../../auth/context/AuthContext';
+
+const TicketListSkeleton = () => (
+  <>
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/60 space-y-2">
+        <SkeletonBar className="h-4 w-3/4" />
+        <SkeletonBar className="h-3 w-1/3" />
+      </div>
+    ))}
+  </>
+);
 
 type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
@@ -33,6 +46,7 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const MyTicketsPage = () => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [replyBody, setReplyBody] = useState('');
@@ -40,6 +54,7 @@ export const MyTicketsPage = () => {
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
     queryKey: ['my-support-tickets'],
     queryFn: async () => (await api.get('/support/')).data,
+    refetchInterval: 8000,
   });
 
   const replyMutation = useMutation({
@@ -72,8 +87,8 @@ export const MyTicketsPage = () => {
           </h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {isLoading && <div className="p-4 text-xs text-zinc-400">Loading tickets…</div>}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full">
+          {isLoading && <TicketListSkeleton />}
           {!isLoading && tickets?.length === 0 && (
             <div className="p-4 text-xs text-zinc-400">
               You haven't submitted any support tickets yet.
@@ -119,13 +134,27 @@ export const MyTicketsPage = () => {
               <p className="text-xs text-zinc-400 mt-0.5">Opened {formatDate(selectedTicket.created_at)}</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {selectedTicket.messages.map((message) => (
-                <div key={message.id} className="bg-zinc-50 dark:bg-zinc-900 rounded-xl p-3">
-                  <p className="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">{message.body}</p>
-                  <p className="mt-1.5 text-[11px] text-zinc-400">{formatDate(message.created_at)}</p>
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full">
+              {selectedTicket.messages.map((message) => {
+                const isMine = message.sender_id === user?.id;
+                return (
+                  <div key={message.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                    <span className="mb-1 text-[11px] font-medium text-zinc-400">
+                      {isMine ? 'You' : 'Support'}
+                    </span>
+                    <div
+                      className={`max-w-[85%] rounded-xl p-3 ${
+                        isMine
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200'
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-zinc-400">{formatDate(message.created_at)}</p>
+                  </div>
+                );
+              })}
             </div>
 
             {selectedTicket.status !== 'closed' ? (

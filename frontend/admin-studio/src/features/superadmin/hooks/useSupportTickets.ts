@@ -16,6 +16,8 @@ export interface SupportTicket {
   id: number;
   user_id: number;
   blog_id: number | null;
+  blog_name: string | null;
+  user_name: string | null;
   subject: string;
   status: TicketStatus;
   created_at: string;
@@ -34,6 +36,7 @@ export const useSupportTickets = () => {
       const params = statusFilter !== 'all' ? { ticket_status: statusFilter } : {};
       return (await api.get('/superadmin/support', { params })).data;
     },
+    refetchInterval: 8000,
   });
 
   const updateStatusMutation = useMutation({
