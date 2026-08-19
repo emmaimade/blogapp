@@ -95,10 +95,15 @@ html, body {
   font-family: "Manrope", system-ui, sans-serif;
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
 }
 
-body {
-  overflow-x: hidden;
+/* iOS Safari zooms the page in when a focused input's font-size is below
+   16px. Force 16px on mobile so tapping into a field doesn't trigger it. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 #root {

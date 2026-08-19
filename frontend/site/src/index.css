@@ -51,12 +51,22 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   @apply antialiased font-sans;
   background: var(--color-background);
   color: var(--color-zinc-900);
+  overflow-x: hidden;
+}
+
+/* iOS Safari zooms the page in when a focused input's font-size is below
+   16px. Force 16px on mobile so tapping into a field doesn't trigger it. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 /* ============================================================
