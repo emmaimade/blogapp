@@ -32,6 +32,7 @@ import json
 from typing import Any, Optional
 
 from fastapi import Request
+from sqlalchemy import event
 from sqlmodel import Session, select
 
 from app.models.audit import AuditLog
@@ -123,6 +124,14 @@ def add_audit_log(
     if request is not None:
         # Lets AuditLogMiddleware know a specific, correctly-scoped log was
         # already written for this request, so it skips its generic fallback.
-        request.state.audit_logged = True
+        # Deferred to after_commit: if the caller's transaction never commits
+        # (e.g. a later step in the same request raises before session.commit()),
+        # this log is rolled back along with it — flipping the flag eagerly here
+        # would have suppressed the middleware's fallback too, losing the audit
+        # trail for the request entirely.
+        def _mark_logged(_session: Session) -> None:
+            request.state.audit_logged = True
+
+        event.listen(session, "after_commit", _mark_logged, once=True)
 
     return log
