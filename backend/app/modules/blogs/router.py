@@ -179,6 +179,17 @@ def _load_subscription(session: Session, blog_id: int) -> BlogSubscription | Non
     return session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
 
 
+def _to_subscription_read(subscription: BlogSubscription, blog_name: str) -> SubscriptionRead:
+    return SubscriptionRead(
+        blog_id=subscription.blog_id,
+        blog_name=blog_name,
+        plan=subscription.plan,
+        status=subscription.status,
+        trial_ends_at=subscription.trial_ends_at,
+        current_period_ends_at=subscription.current_period_ends_at,
+    )
+
+
 def _load_team_step_skipped(session: Session, blog_id: int) -> bool:
     setting = session.exec(
         select(SiteSettings).where(SiteSettings.blog_id == blog_id, SiteSettings.setting_key == "onboarding_meta")
@@ -478,7 +489,7 @@ def get_onboarding_state(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -505,7 +516,7 @@ def update_onboarding_about(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -564,7 +575,7 @@ def update_onboarding_profile(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -617,7 +628,7 @@ def update_onboarding_publication(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -642,7 +653,7 @@ def complete_onboarding_team_step(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -684,7 +695,7 @@ def update_onboarding_plan(
     session.refresh(blog)
     return OnboardingState(
         blog=BlogRead.model_validate(blog),
-        subscription=SubscriptionRead.model_validate(subscription) if subscription else None,
+        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
         summary=summary,
     )
 
@@ -1107,7 +1118,7 @@ def get_blog_subscription_endpoint(
         session.add(subscription)
         session.commit()
         session.refresh(subscription)
-    return subscription
+    return _to_subscription_read(subscription, blog.name)
 
 
 # ─── Blog Invitation Routes ────────────────────────────────────────────────────
