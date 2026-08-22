@@ -75,3 +75,18 @@ export const ActivityFeedSkeleton = ({ rows = 6, className = '' }: ActivityFeedS
     ))}
   </div>
 );
+
+interface TicketListSkeletonProps {
+  rows?: number;
+}
+
+export const TicketListSkeleton = ({ rows = 5 }: TicketListSkeletonProps) => (
+  <>
+    {[...Array(rows)].map((_, i) => (
+      <div key={i} className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/60 space-y-2">
+        <SkeletonBar className="h-4 w-3/4" />
+        <SkeletonBar className="h-3 w-1/3" />
+      </div>
+    ))}
+  </>
+);

@@ -1,19 +1,8 @@
 import { useState } from 'react';
 import { MessageSquare, Send, Clock } from 'lucide-react';
 import { useSupportTickets, type TicketStatus } from '../hooks/useSupportTickets';
-import { SkeletonBar } from '../../../shared/ui/Skeleton';
+import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
-
-const TicketListSkeleton = () => (
-  <>
-    {[...Array(5)].map((_, i) => (
-      <div key={i} className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/60 space-y-2">
-        <SkeletonBar className="h-4 w-3/4" />
-        <SkeletonBar className="h-3 w-1/3" />
-      </div>
-    ))}
-  </>
-);
 
 const STATUS_TABS: { key: TicketStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },

@@ -3,19 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
 import api from '../../../shared/api/client';
-import { SkeletonBar } from '../../../shared/ui/Skeleton';
+import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
-
-const TicketListSkeleton = () => (
-  <>
-    {[...Array(5)].map((_, i) => (
-      <div key={i} className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/60 space-y-2">
-        <SkeletonBar className="h-4 w-3/4" />
-        <SkeletonBar className="h-3 w-1/3" />
-      </div>
-    ))}
-  </>
-);
 
 type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
