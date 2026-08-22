@@ -500,7 +500,7 @@ export const SuperAdminUsersPage = () => {
                                   accountRow.contextualRole === "Super Admin" || accountRow.contextualRole === "owner"
                                     ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200/60 dark:border-violet-800/50"
                                     : accountRow.contextualRole === "editor"
-                                      ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-purple-800/50"
+                                      ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
                                       : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"
                                 }`}
                               >
