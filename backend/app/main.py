@@ -21,6 +21,7 @@ from app.modules import (
     tags_router,
     users_router,
     blogs_router,
+    blog_invitations_router,
     invitations_router,
     superadmin_router,
     audit_router,
@@ -101,6 +102,7 @@ app.include_router(comments_router)
 app.include_router(blog_comments_router)
 app.include_router(settings_router)
 app.include_router(blogs_router)
+app.include_router(blog_invitations_router)
 app.include_router(invitations_router)
 app.include_router(superadmin_router)
 app.include_router(audit_router)

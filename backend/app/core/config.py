@@ -50,6 +50,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000"
     )
 
+    # ── Multi-tenant routing ──
+    # A hostname ending in this is treated as one of our own subdomains
+    # ({slug}.{PUBLIC_BLOG_BASE_DOMAIN}); anything else is a candidate
+    # tenant-owned custom domain.
+    PUBLIC_BLOG_BASE_DOMAIN: str = "inko.blog"
+
     # ── Observability ──
     LOG_LEVEL: str = "INFO"
     # SQLAlchemy statement echo. Off by default: it writes every statement and

@@ -6,7 +6,8 @@ from .settings.router import router as settings_router
 from .tags.router import router as tags_router
 from .users.router import router as users_router
 from .blogs.router import router as blogs_router
-from .blogs.router import invitations_router
+from .blogs.invitations_router import router as blog_invitations_router
+from .blogs.invitations_router import invitations_router
 from .blogs.audit_router import router as audit_router
 from .superadmin.router import router as superadmin_router
 from .support.router import router as support_router
@@ -21,6 +22,7 @@ __all__ = [
     "blog_comments_router",
     "settings_router",
     "blogs_router",
+    "blog_invitations_router",
     "invitations_router",
     "audit_router",
     "superadmin_router",
