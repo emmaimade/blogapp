@@ -1,5 +1,6 @@
 from .audit import AuditLogRead, AuditLogQueryParams
 from .errors import ErrorResponse, ValidationErrorResponse
+from .pagination import PaginatedResponse
 from .comments import CommentAdminRead, CommentCreate, CommentRead
 from .moderation import (
     FlagContentCreate,
@@ -71,6 +72,7 @@ __all__ = [
     "UserCreate",
     "ErrorResponse",
     "ValidationErrorResponse",
+    "PaginatedResponse",
     "AuditLogRead",
     "AuditLogQueryParams",
     "FlagContentCreate",

@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from sqlmodel import Session
 
 from app.core.db import get_session
@@ -8,7 +8,7 @@ from app.core.moderation import flag_post, load_post_for_flag
 from app.core.security import get_current_user, get_current_user_optional
 from app.core.permissions import get_public_blog, require_blog_author, require_completed_onboarding
 from app.models import User, Blog
-from app.schemas import FlagContentCreate, ModerationQueueItemRead, PostCreate, PostRead, PostUpdate
+from app.schemas import FlagContentCreate, ModerationQueueItemRead, PaginatedResponse, PostCreate, PostRead, PostUpdate
 from . import service as post_service
 
 router = APIRouter(prefix="/blogs/{blog_id}/posts", tags=["posts"])
@@ -37,15 +37,20 @@ def create_post(
     return post_service.create_post(blog_id, post_data, session, current_user, request=request)
 
 
-@router.get("/", response_model=List[PostRead])
+@router.get("/", response_model=PaginatedResponse[PostRead])
 def read_posts(
     blog_id: int,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
     current_user: Optional[User] = Depends(get_current_user_optional),
     filter: Optional[str] = None,
+    tag: Optional[str] = None,
+    sort: Literal["latest", "popular"] = "latest",
+    skip: int = Query(0, ge=0),
+    limit: int = Query(12, ge=1, le=100),
 ):
-    return post_service.read_posts(blog_id, session, current_user, filter)
+    items, total = post_service.read_posts(blog_id, session, current_user, filter, tag, sort, skip, limit)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 
 
 @router.get("/scheduled", response_model=List[PostRead])
@@ -59,15 +64,19 @@ def get_scheduled_posts(
     return post_service.get_scheduled_posts(blog_id, session, current_user)
 
 
-@router.get("/search", response_model=List[PostRead])
+@router.get("/search", response_model=PaginatedResponse[PostRead])
 def search_posts(
     blog_id: int,
     q: Optional[str] = None,
     tag: Optional[str] = None,
+    sort: Literal["latest", "popular"] = "latest",
+    skip: int = Query(0, ge=0),
+    limit: int = Query(12, ge=1, le=100),
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
 ):
-    return post_service.search_posts(blog_id, session, q, tag)
+    items, total = post_service.search_posts(blog_id, session, q, tag, sort, skip, limit)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 
 
 @router.patch("/{post_id}", response_model=PostRead)

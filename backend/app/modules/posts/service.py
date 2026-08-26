@@ -3,13 +3,13 @@ import secrets
 from pathlib import Path
 from jinja2 import Template
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional, Tuple
 
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import Request, UploadFile
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -44,7 +44,7 @@ cloudinary.config(
 def _generate_welcome_banner_svg(blog_name: str) -> str:
     """Generate a clean, minimal SVG banner."""
     escaped_name = blog_name.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
-    
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
     <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -53,22 +53,22 @@ def _generate_welcome_banner_svg(blog_name: str) -> str:
             <stop offset="100%" stop-color="#A855F7"/>
             </linearGradient>
         </defs>
-        
+
         <!-- Background -->
         <rect width="1200" height="630" fill="url(#grad)"/>
-        
+
         <!-- Very subtle overlay pattern -->
         <rect width="1200" height="630" fill="rgba(255,255,255,0.06)"/>
-        
+
         <!-- Main Title -->
         <text x="600" y="290" text-anchor="middle" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="82" font-weight="700" letter-spacing="-3px">
             Welcome
         </text>
-        
+
         <text x="600" y="380" text-anchor="middle" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="68" font-weight="600" letter-spacing="-2px" opacity="0.95">
             to {escaped_name}
         </text>
-        
+
         <!-- Thin elegant divider -->
         <rect x="360" y="430" width="480" height="3" rx="1.5" fill="rgba(255,255,255,0.65)"/>
     </svg>"""
@@ -76,7 +76,7 @@ def _generate_welcome_banner_svg(blog_name: str) -> str:
 def upload_welcome_banner(blog_name: str) -> str:
     """Generate SVG and upload to Cloudinary. Returns secure URL."""
     svg_content = _generate_welcome_banner_svg(blog_name)
-    
+
     try:
         result = cloudinary.uploader.upload(
             svg_content,
@@ -220,17 +220,42 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
     return new_post
 
 
+def _apply_tag_filter(query, blog_id: int, tag: Optional[str]):
+    if tag:
+        query = query.join(Post.tags).where(Tag.name == tag, Tag.blog_id == blog_id)
+    return query
+
+
+def _apply_sort(query, sort: str):
+    if sort == "popular":
+        return query.order_by(Post.views.desc(), Post.created_at.desc())
+    return query.order_by(Post.created_at.desc())
+
+
+def _paginate(session: Session, query, sort: str, skip: int, limit: int, *options) -> Tuple[List[Post], int]:
+    """
+    Counts the filtered-but-unordered query, then applies eager-load options,
+    ordering, and offset/limit for the page itself. Count is computed before
+    the options/order/offset are added since those are irrelevant to — and in
+    the case of offset/limit, actively wrong for — a row count.
+    """
+    total = session.exec(select(func.count()).select_from(query.subquery())).one()
+    page_query = _apply_sort(query, sort).options(*options).offset(skip).limit(limit)
+    items = session.exec(page_query).all()
+    return items, total
+
+
 def read_posts(
     blog_id: int,
     session: Session,
     current_user: Optional[User],
     filter_value: Optional[str] = None,
-) -> List[Post]:
-    query = (
-        select(Post)
-        .where(Post.blog_id == blog_id)
-        .options(selectinload(Post.tags), selectinload(Post.author))
-    )
+    tag: Optional[str] = None,
+    sort: Literal["latest", "popular"] = "latest",
+    skip: int = 0,
+    limit: int = 12,
+) -> Tuple[List[Post], int]:
+    query = select(Post).where(Post.blog_id == blog_id)
 
     can_view_drafts = False
     role = None
@@ -249,7 +274,9 @@ def read_posts(
     if filter_value and filter_value.lower() == "projects":
         query = query.where(Post.is_project == True)
 
-    return session.exec(query).all()
+    query = _apply_tag_filter(query, blog_id, tag)
+
+    return _paginate(session, query, sort, skip, limit, selectinload(Post.tags), selectinload(Post.author))
 
 
 def get_scheduled_posts(blog_id: int, session: Session, current_user: User) -> List[Post]:
@@ -275,7 +302,10 @@ def search_posts(
     session: Session,
     q: Optional[str] = None,
     tag: Optional[str] = None,
-) -> List[Post]:
+    sort: Literal["latest", "popular"] = "latest",
+    skip: int = 0,
+    limit: int = 12,
+) -> Tuple[List[Post], int]:
     statement = select(Post).where(
         Post.blog_id == blog_id,
         Post.status == PostStatus.PUBLISHED,
@@ -284,10 +314,9 @@ def search_posts(
         statement = statement.where(
             or_(Post.title.contains(q), Post.content.contains(q))
         )
-    if tag:
-        statement = statement.join(Post.tags).where(Tag.name == tag, Tag.blog_id == blog_id)
-    statement = statement.options(selectinload(Post.author))
-    return session.exec(statement).all()
+    statement = _apply_tag_filter(statement, blog_id, tag)
+
+    return _paginate(session, statement, sort, skip, limit, selectinload(Post.author))
 
 
 def update_post(
