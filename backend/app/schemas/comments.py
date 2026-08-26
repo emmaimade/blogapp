@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
-from .users import UserRead
+from .users import PublicAuthorRead
 
 
 class CommentRead(UTCDatetimeMixin, BaseModel):
@@ -15,7 +15,7 @@ class CommentRead(UTCDatetimeMixin, BaseModel):
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
-    user: UserRead
+    user: PublicAuthorRead
     replies: List["CommentRead"] = Field(default_factory=list)
 
     @field_validator("replies", mode="before")

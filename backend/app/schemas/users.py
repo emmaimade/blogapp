@@ -32,6 +32,19 @@ class MembershipBlogRead(UTCDatetimeMixin, BaseModel):
 
     model_config = {"from_attributes": True}
 
+class PublicAuthorRead(BaseModel):
+    """
+    Safe-for-anonymous-visitor author identity — used wherever a user is
+    embedded in a publicly-readable response (a post's author, a comment's
+    poster). No email, role, or account-status fields, unlike UserRead.
+    """
+    id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
 
 class UserBlogMembershipRead(UTCDatetimeMixin, BaseModel):
     id: int

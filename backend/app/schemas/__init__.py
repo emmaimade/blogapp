@@ -34,7 +34,7 @@ from .settings import (
     SocialLinks,
 )
 from .tags import PopularTagRead, TagCreate, TagRead, TagUpdate
-from .users import UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams
+from .users import PublicAuthorRead, UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams
 
 CommentRead.model_rebuild(_types_namespace={"CommentRead": CommentRead})
 CommentAdminRead.model_rebuild(_types_namespace={"PostShort": PostShort, "CommentRead": CommentRead})
@@ -79,6 +79,7 @@ __all__ = [
     "ModerationQueueItemRead",
     "ModerationQueueQueryParams",
     "UserRead",
+    "PublicAuthorRead",
     "UserUpdate",
     "UserBlogMembershipRead",
     "TagCreate",

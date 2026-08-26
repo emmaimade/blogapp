@@ -68,6 +68,22 @@ def test_creating_a_comment_succeeds_when_comments_are_enabled(client):
     assert res.json()["content"] == "Nice post!"
 
 
+def test_comment_response_does_not_expose_commenter_account_details(client):
+    """
+    CommentRead.user used to embed the full UserRead — email, platform_role,
+    is_super_admin, blog_memberships — on every publicly-readable comment.
+    """
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    post_id = _create_post(blog_id, user_id)
+
+    res = client.post("/comments/", json={"content": "Hello", "post_id": post_id}, headers=headers)
+    assert res.status_code == 200, res.text
+    user_payload = res.json()["user"]
+
+    assert set(user_payload.keys()) == {"id", "username", "first_name", "last_name"}
+
+
 def test_creating_a_comment_is_blocked_when_comments_are_disabled(client):
     token, blog_id, user_id = _register_owner(client)
     headers = {"Authorization": f"Bearer {token}"}

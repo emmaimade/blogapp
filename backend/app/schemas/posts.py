@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
 from .tags import TagRead
-from .users import UserRead
+from .users import PublicAuthorRead
 
 
 class PostStatus(str, Enum):
@@ -52,7 +52,7 @@ class PostRead(UTCDatetimeMixin, BaseModel):
     content: str
     blog_id: int
     author_id: Optional[int] = None
-    author: Optional[UserRead] = None
+    author: Optional[PublicAuthorRead] = None
     thumbnail_url: Optional[str] = None
     views: int
     is_project: bool
