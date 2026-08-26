@@ -1,6 +1,9 @@
 """
-Coverage for the public subdomain-resolution endpoint no longer resolving a
-deactivated blog.
+Comment endpoint coverage:
+
+- `comments_enabled` on the owning blog is enforced when creating a comment
+  (it previously existed on the model but was never read).
+- The public subdomain-resolution endpoint stops resolving a deactivated blog.
 """
 
 import uuid
@@ -8,6 +11,8 @@ import uuid
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.models import Post
+from app.models.post import PostStatus
 
 
 def _unique_email() -> str:
@@ -29,6 +34,85 @@ def _register_owner(client) -> tuple[str, int, int]:
     assert resp.status_code == 200, resp.text
     body = resp.json()
     return body["access_token"], body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
+
+
+def _create_post(blog_id: int, author_id: int) -> int:
+    """
+    Inserted directly rather than via POST /blogs/{blog_id}/posts/, since that
+    route requires onboarding to be complete — irrelevant to what these tests
+    are checking (comment creation against an existing post).
+    """
+    with Session(engine) as session:
+        post = Post(
+            title=f"Post {uuid.uuid4().hex[:8]}",
+            slug=f"post-{uuid.uuid4().hex[:8]}",
+            content="Body content.",
+            blog_id=blog_id,
+            author_id=author_id,
+            status=PostStatus.PUBLISHED,
+            published=True,
+        )
+        session.add(post)
+        session.commit()
+        session.refresh(post)
+        return post.id
+
+
+def test_creating_a_comment_succeeds_when_comments_are_enabled(client):
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    post_id = _create_post(blog_id, user_id)
+
+    res = client.post("/comments/", json={"content": "Nice post!", "post_id": post_id}, headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["content"] == "Nice post!"
+
+
+def test_creating_a_comment_is_blocked_when_comments_are_disabled(client):
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    post_id = _create_post(blog_id, user_id)
+
+    disable = client.put(
+        f"/blogs/{blog_id}/onboarding/publication",
+        json={
+            "default_post_visibility": "public",
+            "comments_enabled": False,
+            "posts_per_page": 10,
+            "timezone": "UTC",
+        },
+        headers=headers,
+    )
+    assert disable.status_code == 200, disable.text
+
+    res = client.post("/comments/", json={"content": "Should be blocked", "post_id": post_id}, headers=headers)
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "OPERATION_NOT_ALLOWED"
+
+
+def test_listing_comments_still_works_when_comments_are_disabled(client):
+    """Disabling comments stops new ones, but shouldn't hide the existing thread."""
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    post_id = _create_post(blog_id, user_id)
+
+    posted = client.post("/comments/", json={"content": "Before disabling", "post_id": post_id}, headers=headers)
+    assert posted.status_code == 200, posted.text
+
+    client.put(
+        f"/blogs/{blog_id}/onboarding/publication",
+        json={
+            "default_post_visibility": "public",
+            "comments_enabled": False,
+            "posts_per_page": 10,
+            "timezone": "UTC",
+        },
+        headers=headers,
+    )
+
+    res = client.get(f"/comments/post/{post_id}")
+    assert res.status_code == 200, res.text
+    assert any(c["content"] == "Before disabling" for c in res.json())
 
 
 def test_subdomain_lookup_finds_an_active_blog(client):

@@ -8,12 +8,12 @@ from sqlmodel import Session, select
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
-from app.core.exceptions import AuthorizationError, NotFoundError
+from app.core.exceptions import AuthorizationError, BadRequestError, NotFoundError
 from app.core.moderation import flag_comment, load_comment_for_flag
 from app.core.permissions import Permissions, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user
 from app.core.notifications import add_notification
-from app.models import Comment, Post, User, PlatformRole
+from app.models import Blog, Comment, Post, User, PlatformRole
 from app.schemas import CommentAdminRead, CommentCreate, CommentRead, FlagContentCreate, ModerationQueueItemRead
 
 router = APIRouter(prefix="/comments", tags=["Comments"])
@@ -42,6 +42,13 @@ def create_comment(
     post = session.get(Post, comment_data.post_id)
     if not post:
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
+
+    blog = session.get(Blog, post.blog_id)
+    if not blog or not blog.comments_enabled:
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "Comments are disabled for this blog.",
+        )
 
     new_comment = Comment(**comment_data.model_dump())
     new_comment.user_id = current_user.id

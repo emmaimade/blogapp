@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
-from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep
+from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep, PostVisibility
 from app.models.user import PlatformRole
 
 class UserCreate(BaseModel):
@@ -27,6 +27,8 @@ class MembershipBlogRead(UTCDatetimeMixin, BaseModel):
     onboarding_status: OnboardingStatus
     onboarding_step: OnboardingStep
     onboarding_completed_at: Optional[datetime] = None
+    comments_enabled: bool = True
+    default_post_visibility: PostVisibility = PostVisibility.PUBLIC
 
     model_config = {"from_attributes": True}
 

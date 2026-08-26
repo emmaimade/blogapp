@@ -57,6 +57,8 @@ class BlogUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     custom_domain: Optional[str] = None
+    comments_enabled: Optional[bool] = None
+    default_post_visibility: Optional[PostVisibility] = None
 
 class BlogMemberCreate(BaseModel):
     email: EmailStr
