@@ -16,7 +16,7 @@ from app.core.db import engine
 from app.models import Post
 from app.models.post import PostStatus
 # Import your task logic directly here
-from app.modules.superadmin.tasks import purge_expired_soft_deleted_users
+from app.core.tasks import purge_expired_soft_deleted_users
 
 logger = logging.getLogger(__name__)
 _scheduler = AsyncIOScheduler()
