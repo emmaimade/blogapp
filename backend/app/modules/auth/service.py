@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 from app.core.security import create_access_token, verify_password
 from app.models import BlogMember, User
 from app.schemas import UserRead
+from app.services.auth_tokens import create_refresh_token
 
 
 def authenticate_user(identifier: str, password: str, session: Session) -> User | None:
@@ -29,10 +30,12 @@ def build_user_payload(user_id: int, session: Session) -> UserRead:
 
 def build_login_response(user: User, session: Session) -> dict:
     access_token = create_access_token(data={"sub": user.username})
+    refresh_token = create_refresh_token(session, user.id)
     user_payload = build_user_payload(user.id, session)
     return {
         "message": "Login successful",
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": user_payload.model_dump(mode="json"),
     }

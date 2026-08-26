@@ -2,10 +2,12 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
+from app.core.config import settings
 from app.core.datetimes import as_utc, utc_now
 from app.core.error_codes import ErrorCode
-from app.core.exceptions import RateLimitError
-from app.models.auth_tokens import EmailVerification, PasswordResetToken
+from app.core.exceptions import BadRequestError, GoneError, RateLimitError
+from app.models.auth_tokens import EmailVerification, PasswordResetToken, RefreshToken
+from app.models.user import User
 
 TOKEN_EXPIRATION_HOURS = 24
 TOKEN_COOLDOWN_SECONDS = 60
@@ -116,3 +118,61 @@ def create_password_reset_token(db: Session, user_id: int) -> str:
     db.add(db_token)
     db.commit()
     return raw_token
+
+
+def create_refresh_token(db: Session, user_id: int) -> str:
+    """
+    Unlike the verification/reset tokens above, refresh tokens have no
+    cooldown (a legitimate client may refresh many times) and prior tokens
+    for the user aren't purged here — rotation revokes them one at a time as
+    they're actually used, via verify_and_rotate_refresh_token below.
+    """
+    raw_token, hashed_token = generate_secure_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    db_token = RefreshToken(
+        user_id=user_id,
+        token=hashed_token,
+        expires_at=expires_at,
+    )
+    db.add(db_token)
+    db.commit()
+    return raw_token
+
+
+def verify_and_rotate_refresh_token(db: Session, raw_token: str) -> tuple[User, str]:
+    """
+    Validates a refresh token and rotates it: the presented token is revoked
+    and a new one is issued in the same call. Reuse of an already-revoked
+    token (a theft signal) is rejected the same as an unknown token.
+    """
+    hashed_token = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    record = db.exec(select(RefreshToken).where(RefreshToken.token == hashed_token)).first()
+
+    if not record or record.revoked_at is not None:
+        raise BadRequestError(ErrorCode.INVALID_TOKEN, "This session is no longer valid. Please log in again.")
+
+    if as_utc(record.expires_at) < utc_now():
+        raise GoneError(ErrorCode.LINK_EXPIRED, "Your session has expired. Please log in again.")
+
+    # Deliberately one response for "no such user", "suspended", and
+    # "deleted" — same reasoning as get_current_user in core/security.py.
+    user = db.get(User, record.user_id)
+    if user is None or not user.is_active or user.deleted_at is not None:
+        raise BadRequestError(ErrorCode.INVALID_TOKEN, "This session is no longer valid. Please log in again.")
+
+    record.revoked_at = datetime.now(timezone.utc)
+    db.add(record)
+
+    new_raw_token = create_refresh_token(db, record.user_id)
+    return user, new_raw_token
+
+
+def revoke_refresh_token(db: Session, raw_token: str) -> None:
+    """Logout — revokes the presented refresh token if it exists and isn't already revoked."""
+    hashed_token = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    record = db.exec(select(RefreshToken).where(RefreshToken.token == hashed_token)).first()
+    if record and record.revoked_at is None:
+        record.revoked_at = datetime.now(timezone.utc)
+        db.add(record)
+        db.commit()

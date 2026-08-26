@@ -16,6 +16,7 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.security import (
+    create_access_token,
     ensure_strong_password,
     get_current_user,
     get_password_hash,
@@ -23,7 +24,12 @@ from app.core.security import (
 )
 from app.models import User, Blog
 from app.models.auth_tokens import EmailVerification, PasswordResetToken
-from app.services.auth_tokens import create_verification_token, create_password_reset_token
+from app.services.auth_tokens import (
+    create_verification_token,
+    create_password_reset_token,
+    revoke_refresh_token,
+    verify_and_rotate_refresh_token,
+)
 from app.core.email import dispatch_email
 from app.core.email_templates import (
     get_verification_template,
@@ -56,6 +62,9 @@ class ChangePasswordSchema(BaseModel):
     current_password: str
     new_password: str
 
+class RefreshTokenSchema(BaseModel):
+    refresh_token: str
+
 
 @router.post("/login")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
@@ -83,6 +92,34 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), se
 
     session.commit()
     return build_login_response(user, session)
+
+
+@router.post("/refresh")
+def refresh_access_token(payload: RefreshTokenSchema, session: Session = Depends(get_session)):
+    """
+    Exchanges a still-valid refresh token for a new access token. The refresh
+    token itself rotates on every use — the one presented here is revoked and
+    a new one is returned alongside the new access token, so a client must
+    persist the new refresh_token from the response, not reuse the old one.
+    """
+    user, new_refresh_token = verify_and_rotate_refresh_token(session, payload.refresh_token)
+    access_token = create_access_token(data={"sub": user.username})
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/logout", status_code=204)
+def logout(payload: RefreshTokenSchema, session: Session = Depends(get_session)):
+    """
+    Revokes the presented refresh token. Possession of the token is
+    sufficient — same reasoning as the password-reset flow — since the whole
+    point is to let a client end its own session without needing a still-valid
+    access token to do it.
+    """
+    revoke_refresh_token(session, payload.refresh_token)
 
 
 @router.get("/me", response_model=UserRead)

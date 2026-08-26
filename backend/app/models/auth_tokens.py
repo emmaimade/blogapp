@@ -27,3 +27,20 @@ class PasswordResetToken(SQLModel, table=True):
     expires_at: datetime = Field(sa_column=Column(SQLDateTime(timezone=True), nullable=False))
     used_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))
+
+
+class RefreshToken(SQLModel, table=True):
+    """
+    Unlike EmailVerification/PasswordResetToken, a refresh token must be
+    repeatedly presentable until it's rotated or explicitly revoked — so this
+    carries `revoked_at` rather than a one-shot `used_at`.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", ondelete="CASCADE", nullable=False)
+    token: str = Field(index=True, unique=True, nullable=False)  # Cryptographic SHA-256 hash
+
+    expires_at: datetime = Field(sa_column=Column(SQLDateTime(timezone=True), nullable=False))
+    revoked_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))
