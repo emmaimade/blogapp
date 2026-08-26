@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.audit_middleware import AuditLogMiddleware
+from app.core.config import settings
 from app.core.db import create_db_and_tables
 from app.core.error_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
@@ -66,18 +67,10 @@ app = FastAPI(
 register_exception_handlers(app)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-origins = [
-    "https://blogapp-admin-studio-livid.vercel.app",
-    "https://blogapp-blog.vercel.app",
-    "http://localhost:8000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175",
-    "http://127.0.0.1:8000",
-]
+# Driven by CORS_ORIGINS (comma-separated) so a new environment (e.g. a
+# staging deploy) only needs an env var, not a code change. Defaults to the
+# same production + local-dev set that used to be hardcoded here.
+origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
 
 # Middleware is applied outermost-last, so the effective request order is:
 #   CORS -> RequestContext -> AuditLog -> RequirePasswordChange -> routes

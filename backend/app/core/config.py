@@ -34,6 +34,22 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     DATABASE_URL: Optional[str] = None
 
+    # ── CORS ──
+    # Comma-separated list of allowed origins. Defaults to the current
+    # production + local-dev set, so an unset env var changes nothing.
+    CORS_ORIGINS: str = (
+        "https://blogapp-admin-studio-livid.vercel.app,"
+        "https://blogapp-blog.vercel.app,"
+        "http://localhost:8000,"
+        "http://localhost:5173,"
+        "http://localhost:5174,"
+        "http://localhost:5175,"
+        "http://127.0.0.1:5173,"
+        "http://127.0.0.1:5174,"
+        "http://127.0.0.1:5175,"
+        "http://127.0.0.1:8000"
+    )
+
     # ── Observability ──
     LOG_LEVEL: str = "INFO"
     # SQLAlchemy statement echo. Off by default: it writes every statement and
