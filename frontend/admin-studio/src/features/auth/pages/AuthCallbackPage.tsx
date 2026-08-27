@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { authSession } from '../lib/session';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -15,7 +16,9 @@ export const AuthCallbackPage = () => {
       return;
     }
 
-    localStorage.setItem('token', token);
+    authSession.setToken(token);
+    const refreshToken = searchParams.get('refresh_token');
+    if (refreshToken) authSession.setRefreshToken(refreshToken);
     const next = searchParams.get('next') || '/admin/dashboard';
 
     // If there's a pending invite token, auto-accept it now

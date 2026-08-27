@@ -1,14 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 import toast from 'react-hot-toast';
 import { authSession } from '../lib/session';
 import { type AuthUser } from '../types';
 import { getCurrentUserRequest } from '../../../shared/api/auth';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (token: string, userData: AuthUser) => void;
+  login: (token: string, userData: AuthUser, refreshToken?: string) => void;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
 }
@@ -47,14 +50,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  const login = (token: string, userData: AuthUser) => {
+  const login = (token: string, userData: AuthUser, refreshToken?: string) => {
     authSession.setToken(token);
+    if (refreshToken) authSession.setRefreshToken(refreshToken);
     setUser(userData);
     toast.success(`Welcome back, ${userData.first_name}!`);
   };
 
   const logout = () => {
+    const refreshToken = authSession.getRefreshToken();
+    if (refreshToken) {
+      // Best-effort — local state is cleared either way.
+      axios.post(`${API_URL}/auth/logout`, { refresh_token: refreshToken }).catch(() => {});
+    }
     authSession.clearToken();
+    authSession.clearRefreshToken();
     setUser(null);
     toast.success('Logged out successfully');
   };

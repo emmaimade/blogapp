@@ -34,11 +34,50 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let refreshInFlight: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = authSession.getRefreshToken();
+  if (!refreshToken) throw new Error('No refresh token available');
+
+  if (!refreshInFlight) {
+    refreshInFlight = axios
+      .post(`${api.defaults.baseURL}/auth/refresh`, { refresh_token: refreshToken })
+      .then((res) => {
+        authSession.setToken(res.data.access_token);
+        authSession.setRefreshToken(res.data.refresh_token);
+        return res.data.access_token as string;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    const isRefreshCall = originalRequest?.url?.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && !isRefreshCall && !originalRequest?._retry) {
+      originalRequest._retry = true;
+      try {
+        const newAccessToken = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
+      } catch {
+        authSession.clearToken();
+        authSession.clearRefreshToken();
+        window.location.href = '/admin/login';
+        return Promise.reject(error);
+      }
+    }
+
     if (error.response?.status === 401) {
       authSession.clearToken();
+      authSession.clearRefreshToken();
       window.location.href = '/admin/login';
     }
     return Promise.reject(error);

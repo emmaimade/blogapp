@@ -95,8 +95,8 @@ export const JoinInvitationPage = () => {
         last_name: signupData.lastName.trim(),
         password: signupData.password,
       });
-      const { access_token, user: userData } = res.data;
-      login(access_token, userData);
+      const { access_token, refresh_token, user: userData } = res.data;
+      login(access_token, userData, refresh_token);
       setJustJoined(true);
       setTimeout(() => window.location.assign("/admin/dashboard"), 1400);
     } catch (err: any) {

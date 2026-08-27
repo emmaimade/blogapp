@@ -53,9 +53,10 @@ export const LoginView = () => {
       formData.append('password', password);
 
       const loginResponse = await loginRequest(formData);
-      const { access_token } = loginResponse.data;
+      const { access_token, refresh_token } = loginResponse.data;
 
       authSession.setToken(access_token);
+      if (refresh_token) authSession.setRefreshToken(refresh_token);
 
       const userResponse = await getCurrentUserRequest();
       const userData = userResponse.data;
