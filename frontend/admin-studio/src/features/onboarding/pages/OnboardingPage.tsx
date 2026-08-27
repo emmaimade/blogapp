@@ -220,7 +220,10 @@ export const OnboardingPage = () => {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async () => api.post('/members', { email: inviteEmail, role: inviteRole }),
+    mutationFn: async () => api.post(`/blogs/${activeBlog?.id}/invitations`, { email: inviteEmail, role: inviteRole }),
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || 'Failed to send invitation.');
+    },
     onSuccess: async () => {
       setInviteEmail('');
       toast.success('Invite sent.');
