@@ -16,6 +16,7 @@ from app.modules import (
     auth_router,
     blog_comments_router,
     comments_router,
+    contact_router,
     posts_router,
     settings_router,
     tags_router,
@@ -100,6 +101,7 @@ app.include_router(tags_router)
 app.include_router(users_router)
 app.include_router(comments_router)
 app.include_router(blog_comments_router)
+app.include_router(contact_router)
 app.include_router(settings_router)
 app.include_router(blogs_router)
 app.include_router(blog_invitations_router)

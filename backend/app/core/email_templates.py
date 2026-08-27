@@ -287,3 +287,46 @@ def get_blog_invitation_template_text(inviter_name: str, blog_name: str, role: s
         f"Accept the invitation here:\n{invite_url}\n\n"
         f"This invitation expires in 7 days. If you weren't expecting this, you can safely ignore this email."
     )
+
+
+def get_contact_message_template(
+    recipient_label: str,
+    sender_name: str,
+    sender_email: str,
+    subject: str,
+    message: str,
+    company: str = None,
+) -> str:
+    company_line = f'<p style="margin:0 0 8px 0; color:#6b7280;">Company: {company}</p>' if company else ""
+    body = f"""<p style="margin:0 0 16px 0; color:#4b5563;">
+        New message from <strong>{sender_name}</strong> ({sender_email}) via the {recipient_label} contact form:
+    </p>
+    {company_line}
+    <p style="margin:0 0 8px 0; color:#111827; font-weight:600;">{subject}</p>
+    <p style="margin:0 0 24px 0; color:#374151; white-space:pre-line;">{message}</p>"""
+    return _base_email(
+        preheader=f"New contact message: {subject}",
+        heading="New Contact Message",
+        body_html=body,
+        cta_label="Reply by Email",
+        cta_url=f"mailto:{sender_email}",
+        cta_color="#7c3aed",
+        footer_note=f"You're receiving this because you're listed as the contact recipient for {recipient_label}.",
+    )
+
+
+def get_contact_message_template_text(
+    recipient_label: str,
+    sender_name: str,
+    sender_email: str,
+    subject: str,
+    message: str,
+    company: str = None,
+) -> str:
+    company_line = f"Company: {company}\n" if company else ""
+    return (
+        f"New message from {sender_name} ({sender_email}) via the {recipient_label} contact form:\n\n"
+        f"{company_line}"
+        f"{subject}\n\n{message}\n\n"
+        f"Reply to: {sender_email}"
+    )

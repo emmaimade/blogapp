@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str = Field("no-reply@example.com", validation_alias="EMAIL_FROM")
     EMAILS_FROM_NAME: str = "Inko"
 
+    # Recipient for the marketing site's contact form. Falls back to
+    # EMAILS_FROM_EMAIL when unset, so this isn't required to get a working setup.
+    CONTACT_NOTIFICATION_EMAIL: Optional[str] = None
+
     # ── Cloudinary Media Configurations ──
     CLOUDINARY_NAME: str = Field(..., validation_alias="cloudinary_name")
     CLOUDINARY_API_KEY: str = Field(..., validation_alias="cloudinary_api_key")
