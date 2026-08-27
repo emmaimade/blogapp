@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, BadRequestError, ExternalServiceError
@@ -137,6 +138,11 @@ def upload_branding_asset(file: UploadFile, folder: str, allowed_types: tuple[st
         raise BadRequestError(
             ErrorCode.INVALID_FILE_TYPE,
             "Please upload a PNG, JPEG, WebP, or SVG image.",
+        )
+    if file.size and file.size > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise BadRequestError(
+            ErrorCode.FILE_TOO_LARGE,
+            f"Please choose an image under {settings.MAX_UPLOAD_SIZE_MB}MB.",
         )
 
     try:

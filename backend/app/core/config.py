@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     DATABASE_URL: Optional[str] = None
 
+    # ── Uploads ──
+    MAX_UPLOAD_SIZE_MB: int = 5
+
     # ── CORS ──
     # Comma-separated list of allowed origins. Defaults to the current
     # production + local-dev set, so an unset env var changes nothing.

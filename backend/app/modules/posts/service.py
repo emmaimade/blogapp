@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
+from app.core.config import settings
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import (
     AuthorizationError,
@@ -155,6 +156,11 @@ def upload_post_image(file: UploadFile) -> dict[str, str]:
         raise BadRequestError(
             ErrorCode.INVALID_FILE_TYPE,
             "Please choose an image file.",
+        )
+    if file.size and file.size > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise BadRequestError(
+            ErrorCode.FILE_TOO_LARGE,
+            f"Please choose an image under {settings.MAX_UPLOAD_SIZE_MB}MB.",
         )
     try:
         result = cloudinary.uploader.upload(file.file, folder="blog_images")
