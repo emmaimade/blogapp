@@ -166,11 +166,13 @@ export const AdminLayout: React.FC = () => {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showMobileWorkspaceMenu, setShowMobileWorkspaceMenu] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showQuickJump, setShowQuickJump] = useState(false);
 
   const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const userIsSuperAdmin = isSuperAdmin(user);
 
   // Sync state with HTML class list for theme customization
@@ -243,7 +245,15 @@ useEffect(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
     navigate(`/admin/search?q=${encodeURIComponent(trimmed)}`);
+    setShowMobileSearch(false);
   };
+
+  // Autofocus the mobile search input the moment it expands into view.
+  useEffect(() => {
+    if (showMobileSearch) {
+      mobileSearchInputRef.current?.focus();
+    }
+  }, [showMobileSearch]);
 
   // Handle outside clicks for mobile dropdown overlay stacks
   useEffect(() => {
@@ -370,13 +380,39 @@ useEffect(() => {
       {/* NEW: Integrated Mobile Topbar Sticky Navigation Header */}
       {/* Changes implemented: Explicitly added pointer-events-auto to ensure the sticky header handles clicks cleanly above overlays */}
       <div className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-lg dark:bg-zinc-950/95 dark:border-zinc-800 px-4 h-14 flex items-center justify-between lg:hidden pointer-events-auto">
+        {showMobileSearch ? (
+          <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-2">
+            <Search size={16} className="flex-shrink-0 text-zinc-400" />
+            <input
+              ref={mobileSearchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search posts, comments, tags..."
+              aria-label="Search posts, comments and tags"
+              className="flex-1 min-w-0 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 outline-none dark:text-white"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileSearch(false);
+                setSearchQuery("");
+              }}
+              aria-label="Close search"
+              className="flex-shrink-0 rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              <X size={20} />
+            </button>
+          </form>
+        ) : (
+          <>
         <div className="flex items-center min-w-0 gap-1.5">
           <Link to={userIsSuperAdmin ? '/admin/superadmin' : '/admin/dashboard'} className="flex-shrink-0">
             <div className="flex h-9 w-9 items-center justify-center">
               <InkoLogo size={18} />
             </div>
           </Link>
-          
+
           {/* Workspace contextual switcher display block */}
           {activeBlog?.name && !userIsSuperAdmin ? (
             <div className="flex items-center min-w-0" ref={mobileWorkspaceMenuRef}>
@@ -424,18 +460,27 @@ useEffect(() => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => (userIsSuperAdmin ? setShowQuickJump(true) : setShowMobileSearch(true))}
+            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
+            aria-label="Search"
+          >
+            <Search size={20} />
+          </button>
           {user && renderUserActions()}
-          <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
             aria-label="Toggle navigation drawer"
           >
             {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
+          </>
+        )}
       </div>
 
-      <Sidebar 
+      <Sidebar
         isOpen={isMobileMenuOpen} 
         setIsOpen={setIsMobileMenuOpen} 
         renderUserActions={renderUserActions}
