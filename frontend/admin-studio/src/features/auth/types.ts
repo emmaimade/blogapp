@@ -22,6 +22,8 @@ export interface MembershipBlog {
   onboarding_status: OnboardingStatus;
   onboarding_step: OnboardingStep;
   onboarding_completed_at?: string | null;
+  comments_enabled?: boolean;
+  default_post_visibility?: 'public' | 'members_only' | 'paid_only';
 }
 
 export interface UserBlogMembership {

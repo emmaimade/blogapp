@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap } from 'lucide-react';
+import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
@@ -34,6 +34,9 @@ export const GeneralSettings: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [savingDomain, setSavingDomain] = useState(false);
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [defaultPostVisibility, setDefaultPostVisibility] = useState<'public' | 'members_only' | 'paid_only'>('public');
+  const [savingPublication, setSavingPublication] = useState(false);
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', activeBlog?.id],
@@ -71,6 +74,8 @@ export const GeneralSettings: React.FC = () => {
 
   useEffect(() => {
     if (activeBlog?.custom_domain) setCustomDomainInput(activeBlog.custom_domain);
+    if (activeBlog?.comments_enabled !== undefined) setCommentsEnabled(activeBlog.comments_enabled);
+    if (activeBlog?.default_post_visibility) setDefaultPostVisibility(activeBlog.default_post_visibility);
   }, [activeBlog]);
 
   const saveMutation = useMutation({
@@ -84,6 +89,24 @@ export const GeneralSettings: React.FC = () => {
       toast.error(error.response?.data?.detail || 'Failed to save settings');
     },
   });
+
+  const savePublicationSettings = async () => {
+    if (!activeBlog?.id) return;
+    setSavingPublication(true);
+    try {
+      await api.patch(`/blogs/${activeBlog.id}`, {
+        comments_enabled: commentsEnabled,
+        default_post_visibility: defaultPostVisibility,
+      });
+      queryClient.invalidateQueries({ queryKey: ['blog', activeBlog.id] });
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      toast.success('Publication settings saved');
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to save publication settings');
+    } finally {
+      setSavingPublication(false);
+    }
+  };
 
   const saveDomain = async () => {
     if (!activeBlog?.id) return;
@@ -349,6 +372,64 @@ export const GeneralSettings: React.FC = () => {
                 {/* options */}
               </select>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* PUBLICATION */}
+      <div className="admin-card overflow-hidden rounded-[1.5rem]">
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
+              <MessageSquare size={18} className="text-violet-500" />
+              Publication
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">Set during onboarding — change them here any time.</p>
+          </div>
+          <button
+            onClick={savePublicationSettings}
+            disabled={savingPublication}
+            className="flex-shrink-0 flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all disabled:opacity-50"
+          >
+            {savingPublication ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
+            Save
+          </button>
+        </div>
+
+        <div className="space-y-6 p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Comments</label>
+              <p className="mt-0.5 text-xs text-zinc-500">Let readers comment on your posts.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={commentsEnabled}
+              onClick={() => setCommentsEnabled((prev) => !prev)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                commentsEnabled ? 'bg-violet-600' : 'bg-zinc-300 dark:bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  commentsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Default post visibility</label>
+            <select
+              value={defaultPostVisibility}
+              onChange={(e) => setDefaultPostVisibility(e.target.value as typeof defaultPostVisibility)}
+              className={inputClass}
+            >
+              <option value="public">Public — anyone can read</option>
+              <option value="members_only">Members only — signed-in readers</option>
+              <option value="paid_only">Paid only — subscribers</option>
+            </select>
           </div>
         </div>
       </div>
