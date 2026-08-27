@@ -6,12 +6,14 @@ from typing import Any, Dict
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.config import settings
 from app.core.db import get_session
+from app.core.email import dispatch_email
+from app.core.email_templates import get_contact_message_template, get_contact_message_template_text
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, BadRequestError, ExternalServiceError
 from app.core.logging_config import get_logger
@@ -24,6 +26,7 @@ from app.schemas import (
     AllSiteSettings,
     BrandingSettings,
     BrandingSettingsResponse,
+    ContactMessageCreate,
     ContactSettings,
     ContactSettingsResponse,
     FooterSettings,
@@ -336,6 +339,33 @@ def update_contact_settings(
     __: None = Depends(require_completed_onboarding),
 ):
     return update_setting(session, blog_id, "contact", settings, current_user, request=request)
+
+
+@router.post("/contact/message", status_code=202)
+def send_contact_message(
+    blog_id: int,
+    payload: ContactMessageCreate,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_public_blog),
+):
+    contact_settings = ContactSettings(**get_setting(session, blog_id, "contact", ContactSettings))
+    email_html = get_contact_message_template(
+        recipient_label=blog.name,
+        sender_name=payload.name,
+        sender_email=payload.email,
+        subject=payload.subject,
+        message=payload.message,
+    )
+    email_text = get_contact_message_template_text(
+        recipient_label=blog.name,
+        sender_name=payload.name,
+        sender_email=payload.email,
+        subject=payload.subject,
+        message=payload.message,
+    )
+    dispatch_email(background_tasks, contact_settings.contact_email, f"New message: {payload.subject}", email_html, email_text)
+    return {"ok": True, "message": "Message sent successfully."}
 
 
 @router.get("/all", response_model=AllSiteSettings)

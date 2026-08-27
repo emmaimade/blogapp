@@ -124,6 +124,13 @@ class ContactSettingsResponse(ContactSettings):
         from_attributes = True
 
 
+class ContactMessageCreate(BaseModel):
+    name: str
+    email: EmailStr
+    subject: str
+    message: str
+
+
 class AllSiteSettings(BaseModel):
     general: GeneralSettings
     about: AboutPageSettings
