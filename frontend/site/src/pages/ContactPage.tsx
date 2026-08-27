@@ -1,7 +1,10 @@
 import { Mail, Phone, MapPin, Send, ArrowRight, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -43,13 +46,12 @@ export const ContactPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
-      // In production, this would send to your backend
-      console.log('Form submitted:', formData);
+      await axios.post(`${API_URL}/contact/`, formData);
       setSubmitStatus('success');
       setFormData({ name: '', email: '', company: '', subject: '', message: '' });
-      
+
       // Reset after 3 seconds
       setTimeout(() => setSubmitStatus('idle'), 3000);
     } catch (error) {
