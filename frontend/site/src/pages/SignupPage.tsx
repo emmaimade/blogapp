@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Loader2,
   ArrowRight,
@@ -7,13 +8,23 @@ import {
   X,
   Eye,
   EyeOff,
+  AlertCircle,
 } from "lucide-react";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || "http://localhost:5173";
 
+interface InviteInfo {
+  blog_name: string;
+  email: string;
+  role: string;
+}
+
 export const SignupPage = () => {
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("invite");
+
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,8 +45,37 @@ export const SignupPage = () => {
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
 
+  // Invite-flow state: joining an existing workspace instead of creating one
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(!!inviteToken);
+  const [inviteError, setInviteError] = useState("");
+
+  useEffect(() => {
+    if (!inviteToken) return;
+
+    const fetchInvite = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/invitations/${inviteToken}`);
+        if (res.data.already_accepted) {
+          setInviteError("This invite link has already been used.");
+        } else {
+          setInviteInfo(res.data);
+          setFormData((prev) => ({ ...prev, email: res.data.email }));
+        }
+      } catch (err: any) {
+        setInviteError(
+          err.response?.data?.detail || "This invite link is invalid or has expired."
+        );
+      } finally {
+        setInviteLoading(false);
+      }
+    };
+    fetchInvite();
+  }, [inviteToken]);
+
   // Automatic Workspace URL Slug Generation Hook
   useEffect(() => {
+    if (inviteToken) return;
     if (formData.workspaceName) {
       const generated = formData.workspaceName
         .toLowerCase()
@@ -45,10 +85,11 @@ export const SignupPage = () => {
     } else {
       setFormData((prev) => ({ ...prev, workspaceSlug: "" }));
     }
-  }, [formData.workspaceName]);
+  }, [formData.workspaceName, inviteToken]);
 
   // Debounced API Availability Check (Points directly to your new Auth router endpoint)
   useEffect(() => {
+    if (inviteToken) return;
     if (!formData.workspaceSlug) {
       setSlugAvailable(null);
       return;
@@ -73,7 +114,7 @@ export const SignupPage = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [formData.workspaceSlug]);
+  }, [formData.workspaceSlug, inviteToken]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -96,7 +137,7 @@ export const SignupPage = () => {
   };
 
   const validateStep1 = () => {
-    const isPasswordValid = 
+    const isPasswordValid =
       passwordRequirements.hasMinLength &&
       passwordRequirements.hasUppercase &&
       passwordRequirements.hasNumber &&
@@ -119,6 +160,39 @@ export const SignupPage = () => {
     );
   };
 
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateStep1() || !inviteToken) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await axios.post(
+        `${API_URL}/invitations/${inviteToken}/register-and-accept`,
+        {
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          password: formData.password,
+        }
+      );
+
+      const { access_token, refresh_token } = res.data;
+      window.location.href = `${ADMIN_STUDIO_URL}/auth/callback?token=${access_token}&refresh_token=${refresh_token}&next=/admin/dashboard`;
+    } catch (err: any) {
+      const backendDetail = err.response?.data?.detail;
+
+      if (Array.isArray(backendDetail)) {
+        setError(backendDetail[0]?.msg || "Validation error occurred.");
+      } else if (typeof backendDetail === "string") {
+        setError(backendDetail);
+      } else {
+        setError("An unexpected error occurred while joining the workspace.");
+      }
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit()) return;
@@ -136,8 +210,8 @@ export const SignupPage = () => {
         workspace_slug: formData.workspaceSlug.trim(),
       });
 
-      const { access_token } = res.data;
-      window.location.href = `${ADMIN_STUDIO_URL}/auth/callback?token=${access_token}&next=/admin/onboarding`;
+      const { access_token, refresh_token } = res.data;
+      window.location.href = `${ADMIN_STUDIO_URL}/auth/callback?token=${access_token}&refresh_token=${refresh_token}&next=/admin/onboarding`;
     } catch (err: any) {
       const backendDetail = err.response?.data?.detail;
 
@@ -153,9 +227,177 @@ export const SignupPage = () => {
     }
   };
 
+  const passwordRequirementsPanel = (
+    <>
+      {isPasswordFocused || formData.password.length > 0 ? (
+        <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl space-y-1.5 mt-1.5 transition-all">
+          <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">Password Requirements</p>
+          <div className="grid grid-col gap-x-2 gap-y-1 text-xs font-medium">
+            <span className={`flex items-center gap-1 ${passwordRequirements.hasMinLength ? "text-emerald-600" : "text-zinc-400"}`}>
+              <Check size={10} className={passwordRequirements.hasMinLength ? "opacity-100" : "opacity-40"} /> 8+ Characters
+            </span>
+            <span className={`flex items-center gap-1 ${passwordRequirements.hasUppercase ? "text-emerald-600" : "text-zinc-400"}`}>
+              <Check size={10} className={passwordRequirements.hasUppercase ? "opacity-100" : "opacity-40"} /> Uppercase Letter
+            </span>
+            <span className={`flex items-center gap-1 ${passwordRequirements.hasNumber ? "text-emerald-600" : "text-zinc-400"}`}>
+              <Check size={10} className={passwordRequirements.hasNumber ? "opacity-100" : "opacity-40"} /> One Number
+            </span>
+            <span className={`flex items-center gap-1 ${passwordRequirements.hasSpecial ? "text-emerald-600" : "text-zinc-400"}`}>
+              <Check size={10} className={passwordRequirements.hasSpecial ? "opacity-100" : "opacity-40"} /> Special Character
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-zinc-400 leading-normal pl-1">
+          Must be 8 characters with uppercase, number and special character
+        </p>
+      )}
+    </>
+  );
+
+  // Invited user — joining an existing workspace, not creating one
+  if (inviteToken) {
+    if (inviteLoading) {
+      return (
+        <div className="w-full max-w-[460px] bg-white rounded-2xl border border-zinc-200/80 p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-violet-600" size={28} />
+          <p className="text-sm text-zinc-500">Loading invite...</p>
+        </div>
+      );
+    }
+
+    if (inviteError) {
+      return (
+        <div className="w-full max-w-[460px] bg-white rounded-2xl border border-zinc-200/80 p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] flex flex-col items-center gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            <AlertCircle className="text-red-600" size={24} />
+          </div>
+          <h2 className="text-lg font-bold text-zinc-900">Invalid invite</h2>
+          <p className="text-sm text-zinc-500">{inviteError}</p>
+          <a href="/" className="mt-2 text-sm font-semibold text-violet-600 hover:underline">Back to home</a>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full max-w-[460px] bg-white rounded-2xl border border-zinc-200/80 p-8 md:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] transition-all">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+            Join {inviteInfo?.blog_name}
+          </h1>
+          <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
+            You've been invited as <strong className="capitalize">{inviteInfo?.role}</strong>. Create your account to accept.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-600">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleInviteSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-700">First Name</label>
+              <input
+                type="text"
+                name="firstName"
+                required
+                value={formData.firstName}
+                onChange={handleChange}
+                placeholder="Enter your first name"
+                className="w-full px-4 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-700">Last Name</label>
+              <input
+                type="text"
+                name="lastName"
+                required
+                value={formData.lastName}
+                onChange={handleChange}
+                placeholder="Enter your last name"
+                className="w-full px-4 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-700">Email Address</label>
+            <input
+              type="email"
+              value={formData.email}
+              readOnly
+              className="w-full px-4 py-2.5 bg-zinc-100 border border-zinc-200 rounded-xl text-sm text-zinc-500 cursor-not-allowed"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-700">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                onFocus={() => setIsPasswordFocused(true)}
+                placeholder="Min. 8 characters"
+                className="w-full px-4 pr-11 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {passwordRequirementsPanel}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-700">Confirm password</label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Re-enter your password"
+                className="w-full px-4 pr-11 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              >
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+              <p className="text-xs text-red-500 pl-1">Passwords do not match.</p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !validateStep1()}
+            className="w-full bg-violet-600 hover:bg-violet-700 active:scale-[0.99] text-white font-semibold py-3 px-4 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 mt-2"
+          >
+            {isLoading ? <Loader2 className="animate-spin" size={16} /> : "Join workspace"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-[460px] bg-white rounded-2xl border border-zinc-200/80 p-8 md:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] transition-all">
-      
+
       {/* Flow Stepper Tracker Line */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-2xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
@@ -163,8 +405,8 @@ export const SignupPage = () => {
           <span>Step {step} of 2</span>
         </div>
         <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-violet-600 transition-all duration-300 rounded-full" 
+          <div
+            className="h-full bg-violet-600 transition-all duration-300 rounded-full"
             style={{ width: `${step * 50}%` }}
           />
         </div>
@@ -176,8 +418,8 @@ export const SignupPage = () => {
           {step === 1 ? "Create your account" : "Configure your workspace"}
         </h1>
         <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
-          {step === 1 
-            ? "Provide your details to build your administrator identity." 
+          {step === 1
+            ? "Provide your details to build your administrator identity."
             : "Specify your public directory URL parameters below."}
         </p>
       </div>
@@ -263,29 +505,7 @@ export const SignupPage = () => {
               </div>
 
               {/* Requirement Matrix Dashboard Popover */}
-              {isPasswordFocused || formData.password.length > 0 ? (
-                <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl space-y-1.5 mt-1.5 transition-all">
-                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">Password Requirements</p>
-                  <div className="grid grid-col gap-x-2 gap-y-1 text-xs font-medium">
-                    <span className={`flex items-center gap-1 ${passwordRequirements.hasMinLength ? "text-emerald-600" : "text-zinc-400"}`}>
-                      <Check size={10} className={passwordRequirements.hasMinLength ? "opacity-100" : "opacity-40"} /> 8+ Characters
-                    </span>
-                    <span className={`flex items-center gap-1 ${passwordRequirements.hasUppercase ? "text-emerald-600" : "text-zinc-400"}`}>
-                      <Check size={10} className={passwordRequirements.hasUppercase ? "opacity-100" : "opacity-40"} /> Uppercase Letter
-                    </span>
-                    <span className={`flex items-center gap-1 ${passwordRequirements.hasNumber ? "text-emerald-600" : "text-zinc-400"}`}>
-                      <Check size={10} className={passwordRequirements.hasNumber ? "opacity-100" : "opacity-40"} /> One Number
-                    </span>
-                    <span className={`flex items-center gap-1 ${passwordRequirements.hasSpecial ? "text-emerald-600" : "text-zinc-400"}`}>
-                      <Check size={10} className={passwordRequirements.hasSpecial ? "opacity-100" : "opacity-40"} /> Special Character
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-400 leading-normal pl-1">
-                  Must be 8 characters with uppercase, number and special character
-                </p>
-              )}
+              {passwordRequirementsPanel}
             </div>
 
             {/* Confirm Password Field */}
