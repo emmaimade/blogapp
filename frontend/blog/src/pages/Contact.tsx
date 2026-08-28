@@ -57,14 +57,17 @@ export const Contact: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call (replace with real endpoint later)
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await api.post('/settings/contact/message', formData);
       setIsSuccess(true);
       toast.success('Message sent successfully!');
       setFormData({ name: '', email: '', subject: '', message: '' });
       setTimeout(() => setIsSuccess(false), 5000);
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
