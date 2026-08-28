@@ -26,18 +26,16 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     const fetchTenant = async () => {
       try {
         const hostname = window.location.hostname;
-        const parts = hostname.split('.');
-        
-        let subdomain = parts[0];
-        // simple localhost fallback to 'myblog' unless overriden by hosts file
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            subdomain = import.meta.env.VITE_BLOG_SLUG || 'myblog';
-        } else if (parts.length > 2 && parts[0] === 'www') {
-            subdomain = parts[1];
-        }
+
+        // Local dev has no meaningful hostname to resolve against — the backend
+        // can't know about that convention, so this fallback stays client-side.
+        const effectiveHost =
+          hostname === 'localhost' || hostname === '127.0.0.1'
+            ? `${import.meta.env.VITE_BLOG_SLUG || 'myblog'}.inko.blog`
+            : hostname;
 
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const res = await axios.get(`${API_URL}/blogs/by-subdomain/${subdomain}`);
+        const res = await axios.get(`${API_URL}/blogs/resolve`, { params: { host: effectiveHost } });
         setBlog(res.data);
         localStorage.setItem('public_blog_id', res.data.id.toString());
       } catch (err) {
