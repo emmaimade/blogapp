@@ -178,8 +178,8 @@ export const Home: React.FC = () => {
               onClick={() => setFilter("all")}
               className={
                 filter === "all"
-                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-purple-600 text-white shadow-sm"
-                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-purple-600 hover:bg-zinc-50"
+                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-primary text-white shadow-sm"
+                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-primary hover:bg-zinc-50"
               }
             >
               All Posts
@@ -188,8 +188,8 @@ export const Home: React.FC = () => {
               onClick={() => setFilter("projects")}
               className={
                 filter === "projects"
-                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-purple-600 text-white shadow-sm"
-                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-purple-600 hover:bg-zinc-50"
+                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-primary text-white shadow-sm"
+                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-primary hover:bg-zinc-50"
               }
             >
               Projects

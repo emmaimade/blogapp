@@ -131,7 +131,7 @@ export const BlogList = () => {
                   onClick={() => setFilter('all')}
                   className={
                     filterParam === 'all'
-                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-purple-600 text-white'
+                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-primary text-white'
                       : 'px-4 py-2 rounded-md font-bold text-sm transition-all text-zinc-600 hover:bg-zinc-50'
                   }
                 >
@@ -141,7 +141,7 @@ export const BlogList = () => {
                   onClick={() => setFilter('projects')}
                   className={
                     filterParam === 'projects'
-                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-purple-600 text-white'
+                      ? 'px-4 py-2 rounded-md font-bold text-sm transition-all bg-primary text-white'
                       : 'px-4 py-2 rounded-md font-bold text-sm transition-all text-zinc-600 hover:bg-zinc-50'
                   }
                 >
@@ -168,7 +168,7 @@ export const BlogList = () => {
               >
                 <Filter size={16} />
                 Tags
-                {tagParam && <span className="w-2 h-2 bg-purple-600 rounded-full"></span>}
+                {tagParam && <span className="w-2 h-2 bg-primary rounded-full"></span>}
                 <ChevronDown size={16} className={`transition-transform ${showTagDropdown ? 'rotate-180' : ''}`} />
               </button>
 
@@ -179,7 +179,7 @@ export const BlogList = () => {
                     onClick={() => setTag('')}
                     className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
                       !tagParam
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'text-zinc-700 hover:bg-zinc-50'
                     }`}
                   >
@@ -191,7 +191,7 @@ export const BlogList = () => {
                       onClick={() => setTag(t)}
                       className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
                         tagParam === t
-                          ? 'bg-purple-600 text-white'
+                          ? 'bg-primary text-white'
                           : 'text-zinc-700 hover:bg-zinc-50'
                       }`}
                     >
@@ -252,7 +252,7 @@ export const BlogList = () => {
                   {hasActiveFilters && (
                     <button
                       onClick={clearFilters}
-                      className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10"
+                      className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10"
                     >
                       <X size={18} />
                       Clear All Filters

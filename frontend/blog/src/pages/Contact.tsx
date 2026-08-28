@@ -138,7 +138,7 @@ export const Contact: React.FC = () => {
                   onChange={handleChange}
                   placeholder="What's this about?"
                   required
-                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-purple-600 focus:bg-white outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all"
 
                 />
               </div>
@@ -152,14 +152,14 @@ export const Contact: React.FC = () => {
                   placeholder="Tell me more..."
                   rows={8}
                   required
-                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-purple-600 focus:bg-white outline-none transition-all resize-none"
+                  className="w-full px-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all resize-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-primary text-white py-4 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -200,7 +200,7 @@ export const Contact: React.FC = () => {
           </div>
 
           {/* Location */}
-          <div className="bg-gradient-to-br from-zinc-50 to-purple-50 rounded-3xl p-6 border border-zinc-300">
+          <div className="bg-gradient-to-br from-zinc-50 to-primary/10 rounded-3xl p-6 border border-zinc-300">
             <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center mb-4">
               <MapPin className="text-white" size={24} />
             </div>
@@ -210,12 +210,12 @@ export const Contact: React.FC = () => {
 
           {/* Phone (if provided) */}
           {settings.phone && (
-            <div className="bg-gradient-to-br from-purple-50 to-zinc-50 rounded-3xl p-6 border border-purple-100">
-              <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-br from-primary/10 to-zinc-50 rounded-3xl p-6 border border-primary/20">
+              <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
                 <Phone className="text-white" size={24} />
               </div>
               <h3 className="text-lg font-bold text-zinc-900 mb-2">Phone</h3>
-              <a href={`tel:${settings.phone}`} className="text-purple-600 hover:text-purple-700 font-medium">
+              <a href={`tel:${settings.phone}`} className="text-primary hover:text-primary-hover font-medium">
                 {settings.phone}
               </a>
             </div>

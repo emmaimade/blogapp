@@ -263,7 +263,7 @@ export const AuthPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10 hover:shadow-xl flex items-center justify-center gap-2"
+                className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10 hover:shadow-xl flex items-center justify-center gap-2"
               >
                 Continue
                 <ArrowRight size={20} />
@@ -337,7 +337,7 @@ export const AuthPage: React.FC = () => {
                   </div>
                   <input
                     autoFocus
-                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-purple-600 focus:bg-white outline-none transition-all text-base"
+                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
                     value={formData.username}
                     onChange={(e) =>
                       setFormData({ ...formData, username: e.target.value })
@@ -352,7 +352,7 @@ export const AuthPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10 hover:shadow-xl flex items-center justify-center gap-2"
+                className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10 hover:shadow-xl flex items-center justify-center gap-2"
               >
                 Continue
                 <ArrowRight size={20} />
@@ -373,7 +373,7 @@ export const AuthPage: React.FC = () => {
                   </div>
                   <input
                     autoFocus
-                    className="w-full pl-12 pr-12 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-purple-600 focus:bg-white outline-none transition-all text-base"
+                    className="w-full pl-12 pr-12 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
                     placeholder="••••••••"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
@@ -412,7 +412,7 @@ export const AuthPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
