@@ -19,8 +19,7 @@ api.interceptors.request.use((config) => {
     const isMultitenantEndpoint =
       config.url.startsWith('/posts') ||
       config.url.startsWith('/tags') ||
-      config.url.startsWith('/settings') ||
-      config.url.startsWith('/comments');
+      config.url.startsWith('/settings');
 
     if (isMultitenantEndpoint) {
       config.url = `/blogs/${blogId}${config.url}`;
