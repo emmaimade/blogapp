@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Trash2, X, Check, MoreVertical } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
 import { useAuth } from '../contexts/AuthContext';
+import { useTenant } from '../contexts/TenantContext';
 
 interface Comment {
   id: number;
@@ -28,6 +29,9 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
 
   const { isAuthenticated: isLoggedIn, user } = useAuth();
   const currentUserId = user?.id;
+
+  const { blog } = useTenant();
+  const commentsEnabled = blog?.comments_enabled ?? true;
 
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -124,7 +128,11 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       </h3>
 
       {/* Comment Input */}
-      {isLoggedIn ? (
+      {!commentsEnabled ? (
+        <div className="p-8 bg-zinc-50 rounded-2xl text-center mb-10 border border-zinc-300">
+          <p className="text-zinc-600">Comments are disabled for this blog.</p>
+        </div>
+      ) : isLoggedIn ? (
         <div className="mb-10">
           <textarea
             className="w-full p-4 bg-zinc-50 rounded-2xl border-2 border-transparent focus:border-primary focus:bg-white outline-none mb-4 transition-all"

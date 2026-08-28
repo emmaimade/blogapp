@@ -6,6 +6,7 @@ interface Blog {
   name: string;
   slug: string;
   subdomain: string;
+  comments_enabled: boolean;
 }
 
 interface TenantContextType {
