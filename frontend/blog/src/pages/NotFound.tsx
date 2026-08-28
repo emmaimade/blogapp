@@ -1,14 +1,24 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Home, Search, ArrowLeft, TrendingUp } from 'lucide-react';
 
 export const NotFound: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+
   const popularLinks = [
     { title: 'Home', path: '/', icon: Home },
     { title: 'About Me', path: '/about', icon: TrendingUp },
     { title: 'All Posts', path: '/', icon: Search },
-    { title: 'Projects', path: '/projects', icon: TrendingUp }
+    { title: 'Projects', path: '/blog?filter=projects', icon: TrendingUp }
   ];
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 px-6">
@@ -33,16 +43,21 @@ export const NotFound: React.FC = () => {
 
         {/* Search Box */}
         <div className="mb-12">
-          <div className="relative max-w-md mx-auto">
+          <form onSubmit={handleSearch} className="relative max-w-md mx-auto">
             <input
               type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search for posts..."
               className="w-full px-6 py-4 pr-12 rounded-full border-2 border-zinc-200 focus:border-primary outline-none transition-all"
             />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white p-3 rounded-full hover:bg-primary-hover transition-all">
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white p-3 rounded-full hover:bg-primary-hover transition-all"
+            >
               <Search size={20} />
             </button>
-          </div>
+          </form>
         </div>
 
         {/* Action Buttons */}
