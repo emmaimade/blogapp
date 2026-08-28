@@ -12,7 +12,8 @@ import { SearchResults } from './pages/SearchResults';
 import { NotFound } from './pages/NotFound';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
-import { NewsletterPopup } from './components/NewsletterPopup';
+// NewsletterPopup is unmounted below until an email-list provider is wired up.
+// import { NewsletterPopup } from './components/NewsletterPopup';
 import { useSiteSettings } from './hooks/useSiteSettings';
 import { upsertHeadElement } from './utils/seo';
 
@@ -133,7 +134,8 @@ function App() {
           </Routes>
         </main>
         <Footer />
-        <NewsletterPopup />
+        {/* No email-list provider is wired up yet — re-enable once one is chosen. */}
+        {/* <NewsletterPopup /> */}
       </div>
     </Router>
   );

@@ -160,7 +160,10 @@ export const Footer: React.FC = () => {
             </div>
           )}
 
-          {settings?.show_newsletter !== false && (
+          {/* No email-list provider is wired up yet, so this stays hidden until
+              one is chosen — flip back to `settings?.show_newsletter !== false`
+              once the subscribe button actually does something. */}
+          {false && settings?.show_newsletter !== false && (
             <div>
               <h3 className="font-bold text-lg text-zinc-900 mb-4">
                 {settings?.newsletter_title || 'Newsletter'}
