@@ -5,17 +5,28 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css';
-import { Calendar, ChevronRight, Eye } from 'lucide-react';
+import { AlertTriangle, Calendar, ChevronRight, Eye, FileQuestion, Loader2 } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
 import api from '../api/blogApi';
 import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';
-import type { PaginatedPosts } from '../types/post';
+import { useSiteSettings } from '../hooks/useSiteSettings';
+import { applyPageMeta, captureCurrentMeta } from '../utils/seo';
+import type { PaginatedPosts, PostAuthor } from '../types/post';
 
-type PostAuthor = {
-  id: number;
-  username: string;
-  role?: string;
+const getPlainExcerpt = (content: string, length: number = 160) => {
+  if (!content) return '';
+  const clean = content
+    .replace(/^#+\s/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/!\[.*?\]\(.+?\)/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+  return clean.slice(0, length) + (clean.length > length ? '...' : '');
 };
 
 type PostDetailResponse = {
@@ -38,11 +49,12 @@ export const PostDetail = () => {
   const location = useLocation();
   const initialPost = location.state?.post as PostDetailResponse | undefined;
 
-  const { data: post, isLoading } = useQuery<PostDetailResponse>({
+  const { data: post, isLoading, isError, error } = useQuery<PostDetailResponse>({
     queryKey: ['post', slug],
     queryFn: async () => (await api.get(`/posts/slug/${slug}`)).data,
     initialData: initialPost,
-    staleTime: initialPost ? 1000 * 60 * 5 : 0 // keep initial data fresh for 5 minutes
+    staleTime: initialPost ? 1000 * 60 * 5 : 0, // keep initial data fresh for 5 minutes
+    retry: (failureCount, err: any) => err?.response?.status !== 404 && failureCount < 2,
   });
 
   // Reuse a bounded posts fetch to provide sidebar tags/popular posts and
@@ -89,10 +101,71 @@ export const PostDetail = () => {
       .map((item) => item.candidate);
   }, [post, postsCache]);
 
-  if (isLoading) return <div className="h-screen flex items-center justify-center">Loading Story...</div>;
-  if (!post) return <div className="h-screen flex items-center justify-center">Post not found.</div>;
+  const { data: siteSettings } = useSiteSettings();
 
-  const authorName = post.author?.username ?? 'Unknown author';
+  React.useEffect(() => {
+    if (!post) return;
+    const previous = captureCurrentMeta();
+    const siteName = siteSettings?.general?.site_name || 'Inko';
+    applyPageMeta({
+      title: `${post.title} · ${siteName}`,
+      description: getPlainExcerpt(post.content),
+      ogImage: post.thumbnail_url,
+    });
+    return () => applyPageMeta(previous);
+  }, [post, siteSettings]);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
+        <p className="text-zinc-400 font-medium tracking-widest uppercase text-xs">
+          Loading Story
+        </p>
+      </div>
+    );
+  }
+
+  if (!post) {
+    const isNetworkError = isError && (error as any)?.response?.status !== 404;
+
+    return (
+      <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+        <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-4">
+          {isNetworkError ? (
+            <AlertTriangle className="text-zinc-400" size={28} />
+          ) : (
+            <FileQuestion className="text-zinc-400" size={28} />
+          )}
+        </div>
+        <h1 className="text-xl font-bold text-zinc-900 mb-2">
+          {isNetworkError ? 'Something went wrong' : 'Post not found'}
+        </h1>
+        <p className="text-zinc-600 mb-6 max-w-sm">
+          {isNetworkError
+            ? "We couldn't load this post. Check your connection and try again."
+            : 'This post may have been moved or no longer exists.'}
+        </p>
+        {isNetworkError ? (
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2.5 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
+          >
+            Try again
+          </button>
+        ) : (
+          <Link
+            to="/blog"
+            className="px-6 py-2.5 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
+          >
+            Browse all posts
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  const authorName = post.author?.first_name || post.author?.last_name ? `${post.author?.first_name} ${post.author?.last_name}` : 'Unknown author';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -230,6 +303,8 @@ export const PostDetail = () => {
               img: ({ node, ...props }) => (
                 <img
                   className="max-w-full h-auto rounded-3xl my-4 shadow-md"
+                  loading="lazy"
+                  decoding="async"
                   {...props}
                 />
               ),
@@ -280,6 +355,8 @@ export const PostDetail = () => {
                       src={relatedPost.thumbnail_url || '/placeholder.jpg'}
                       alt={relatedPost.title}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
 

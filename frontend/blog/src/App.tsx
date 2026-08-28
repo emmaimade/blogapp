@@ -14,28 +14,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { NewsletterPopup } from './components/NewsletterPopup';
 import { useSiteSettings } from './hooks/useSiteSettings';
-
-const upsertHeadElement = (
-  selector: string,
-  tagName: 'meta' | 'link',
-  attributes: Record<string, string>
-) => {
-  let element = document.head.querySelector(selector) as HTMLElement | null;
-
-  if (!element) {
-    element = document.createElement(tagName);
-    Object.entries(attributes).forEach(([key, value]) => {
-      if (key !== 'content' && key !== 'href') {
-        element!.setAttribute(key, value);
-      }
-    });
-    document.head.appendChild(element);
-  }
-
-  Object.entries(attributes).forEach(([key, value]) => {
-    element!.setAttribute(key, value);
-  });
-};
+import { upsertHeadElement } from './utils/seo';
 
 const applyFontLink = (fontHeading: string, fontBody: string) => {
   const families = Array.from(new Set([fontHeading, fontBody].filter(Boolean)));
