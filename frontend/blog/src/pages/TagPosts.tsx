@@ -1,22 +1,20 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Tag as TagIcon, ArrowLeft, Loader2 } from 'lucide-react';
-import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
+import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
 
 export const TagPosts: React.FC = () => {
   const { tag } = useParams<{ tag: string }>();
 
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['tagPosts', tag],
-    queryFn: async () => {
-      const res = await api.get('/posts/search', {
-        params: { tag }
-      });
-      return res.data;
-    }
-  });
+  const {
+    posts,
+    total,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts(['tagPosts', tag], '/posts/search', { tag }, !!tag);
 
   if (isLoading) {
     return (
@@ -50,17 +48,32 @@ export const TagPosts: React.FC = () => {
           </h1>
         </div>
         <p className="text-zinc-600">
-          {posts?.length || 0} {posts?.length === 1 ? 'post' : 'posts'} tagged with <span className="font-bold text-zinc-900">#{tag}</span>
+          {total} {total === 1 ? 'post' : 'posts'} tagged with <span className="font-bold text-zinc-900">#{tag}</span>
         </p>
       </div>
 
       {/* Posts */}
-      {posts && posts.length > 0 ? (
-        <div className="space-y-8">
-          {posts.map((post: any) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
+      {posts.length > 0 ? (
+        <>
+          <div className="space-y-8">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+
+          {hasNextPage && (
+            <div className="mt-12 flex justify-center">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                {isFetchingNextPage && <Loader2 className="animate-spin" size={16} />}
+                Load More Posts
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-20 bg-zinc-50 rounded-3xl border border-dashed border-zinc-200">
           <TagIcon className="mx-auto mb-4 text-zinc-300" size={64} />

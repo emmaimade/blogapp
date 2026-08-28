@@ -10,6 +10,7 @@ import { formatLocalDate } from '../utils/dates';
 import api from '../api/blogApi';
 import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';
+import type { PaginatedPosts } from '../types/post';
 
 type PostAuthor = {
   id: number;
@@ -44,24 +45,27 @@ export const PostDetail = () => {
     staleTime: initialPost ? 1000 * 60 * 5 : 0 // keep initial data fresh for 5 minutes
   });
 
-  // Reuse posts cache to provide popular posts in the sidebar
-  const { data: postsCache } = useQuery({
-    queryKey: ['posts'],
-    queryFn: async () => (await api.get('/posts/')).data,
+  // Reuse a bounded posts fetch to provide sidebar tags/popular posts and
+  // compute "related" via tag overlap — a deliberately bounded 100 posts is
+  // plenty for this best-effort feature without fetching the whole archive.
+  const { data: postsCacheData } = useQuery<PaginatedPosts>({
+    queryKey: ['posts', 'related-sidebar'],
+    queryFn: async () => (await api.get('/posts/', { params: { limit: 100, sort: 'latest' } })).data,
     // we don't need to block rendering for sidebar; keep default options
   });
+  const postsCache = postsCacheData?.items;
 
   const allTags = React.useMemo(() => {
     const set = new Set<string>();
-    postsCache?.forEach((p: any) =>
-      p.tags?.forEach((t: any) => set.add(t.name)),
+    postsCache?.forEach((p) =>
+      p.tags?.forEach((t) => set.add(t.name)),
     );
     return Array.from(set).sort();
   }, [postsCache]);
 
   const popularPosts = React.useMemo(() => {
     return [...(postsCache || [])]
-      .sort((a: any, b: any) => (b.views || 0) - (a.views || 0))
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
       .slice(0, 5);
   }, [postsCache]);
 
@@ -71,18 +75,18 @@ export const PostDetail = () => {
     const currentTagNames = new Set(post.tags.map((tag) => tag.name));
 
     return postsCache
-      .filter((candidate: any) => candidate.slug !== post.slug)
-      .map((candidate: any) => {
-        const sharedTags = candidate.tags?.filter((tag: any) => currentTagNames.has(tag.name)).length || 0;
+      .filter((candidate) => candidate.slug !== post.slug)
+      .map((candidate) => {
+        const sharedTags = candidate.tags?.filter((tag) => currentTagNames.has(tag.name)).length || 0;
         return { candidate, sharedTags };
       })
-      .filter((item: any) => item.sharedTags > 0)
-      .sort((a: any, b: any) => {
+      .filter((item) => item.sharedTags > 0)
+      .sort((a, b) => {
         if (b.sharedTags !== a.sharedTags) return b.sharedTags - a.sharedTags;
         return new Date(b.candidate.created_at).getTime() - new Date(a.candidate.created_at).getTime();
       })
       .slice(0, 3)
-      .map((item: any) => item.candidate);
+      .map((item) => item.candidate);
   }, [post, postsCache]);
 
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading Story...</div>;

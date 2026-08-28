@@ -1,26 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, Loader2, ArrowLeft } from 'lucide-react';
-import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
+import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
 
 export const SearchResults: React.FC = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(query);
 
-  const { data: results, isLoading } = useQuery({
-    queryKey: ['search', query],
-    queryFn: async () => {
-      if (!query) return [];
-      const res = await api.get('/posts/search', {
-        params: { q: query }
-      });
-      return res.data;
-    },
-    enabled: !!query
-  });
+  const {
+    posts: results,
+    total,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts(['search', query], '/posts/search', { q: query || undefined }, !!query);
 
   useEffect(() => {
     setSearchTerm(query);
@@ -76,8 +72,8 @@ export const SearchResults: React.FC = () => {
                   'Searching...'
                 ) : (
                   <>
-                    Found <span className="font-bold text-zinc-900">{results?.length || 0}</span> result
-                    {results?.length !== 1 ? 's' : ''} for "{query}"
+                    Found <span className="font-bold text-zinc-900">{total}</span> result
+                    {total !== 1 ? 's' : ''} for "{query}"
                   </>
                 )}
               </p>
@@ -93,15 +89,30 @@ export const SearchResults: React.FC = () => {
               <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
               <p className="text-zinc-400">Searching posts...</p>
             </div>
-          ) : results && results.length > 0 ? (
-            <div className="space-y-8">
-              {results.map((post: any) => (
-                <div key={post.id} className="relative">
-                  <PostCard post={post} />
-                  {/* Highlight search term in title/content if needed */}
+          ) : results.length > 0 ? (
+            <>
+              <div className="space-y-8">
+                {results.map((post) => (
+                  <div key={post.id} className="relative">
+                    <PostCard post={post} />
+                    {/* Highlight search term in title/content if needed */}
+                  </div>
+                ))}
+              </div>
+
+              {hasNextPage && (
+                <div className="mt-12 flex justify-center">
+                  <button
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                  >
+                    {isFetchingNextPage && <Loader2 className="animate-spin" size={16} />}
+                    Load More Results
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-20 bg-zinc-50 rounded-3xl border border-dashed border-zinc-200">
               <Search className="mx-auto mb-4 text-zinc-300" size={64} />

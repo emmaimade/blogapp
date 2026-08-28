@@ -2,17 +2,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, User } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
+import type { Post } from '../types/post';
 
 interface PostProps {
-  post: {
-    id: number;
-    title: string;
-    slug: string;
-    thumbnail_url: string;
-    created_at: string;
-    tags: { name: string }[];
-  };
+  post: Post;
 }
+
+const getAuthorName = (author: Post['author']) => {
+  const fullName = [author?.first_name, author?.last_name].filter(Boolean).join(' ');
+  return fullName || author?.username || 'Anonymous';
+};
 
 export const PostCard: React.FC<PostProps> = ({ post }) => {
   const visibleTags = post.tags.slice(0, 3);
@@ -23,10 +22,12 @@ export const PostCard: React.FC<PostProps> = ({ post }) => {
       {/* Image Container */}
       <div className="md:w-1/3 overflow-hidden rounded-2xl aspect-[4/3]">
         <Link to={`/post/${post.slug}`}>
-          <img 
-            src={post.thumbnail_url || '/placeholder.jpg'} 
+          <img
+            src={post.thumbnail_url || '/placeholder.jpg'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             alt={post.title}
+            loading="lazy"
+            decoding="async"
           />
         </Link>
       </div>
@@ -49,7 +50,7 @@ export const PostCard: React.FC<PostProps> = ({ post }) => {
           <Link to={`/post/${post.slug}`}>{post.title}</Link>
         </h2>
         <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-zinc-500 text-sm">
-          <span className="flex items-center gap-1"><User size={14}/> Admin</span>
+          <span className="flex items-center gap-1"><User size={14}/> {getAuthorName(post.author)}</span>
           <span className="flex items-center gap-1"><Calendar size={14}/> {formatLocalDate(post.created_at)}</span>
         </div>
       </div>

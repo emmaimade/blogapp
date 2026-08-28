@@ -1,26 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search, Filter, ChevronDown, TrendingUp } from 'lucide-react';
+import { X, Search, Filter, ChevronDown, TrendingUp, Loader2 } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
-// import { formatLocalDate } from '../utils/dates';
-
-type PostTag = {
-  name: string;
-};
-
-type Post = {
-  id: number;
-  slug: string;
-  title: string;
-  created_at: string;
-  views?: number;
-  thumbnail_url: string;
-  is_project?: boolean;
-  tags: PostTag[];
-};
+import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
+import type { PaginatedPosts } from '../types/post';
 
 export const BlogList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,40 +15,40 @@ export const BlogList = () => {
   const filterParam = searchParams.get('filter') || 'all';
   const tagParam = searchParams.get('tag') || '';
 
-  const { data: posts, isLoading } = useQuery<Post[]>({
-    queryKey: ['posts'],
-    queryFn: async () => (await api.get('/posts/')).data
+  const {
+    posts: filteredPosts,
+    total,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPosts(
+    ['posts', filterParam, tagParam, sortBy],
+    '/posts/',
+    {
+      filter: filterParam !== 'all' ? filterParam : undefined,
+      tag: tagParam || undefined,
+      sort: sortBy,
+    },
+  );
+
+  // Tags and "popular" sidebar content are independent of the current page of
+  // results — deriving them from `filteredPosts` (as before pagination) would
+  // only reflect whatever page happens to be loaded, not the whole blog.
+  const { data: tagsData } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => (await api.get('/tags/')).data,
   });
+  const tags = useMemo(
+    () => Array.from(new Set((tagsData || []).map((t: { name: string }) => t.name))).sort() as string[],
+    [tagsData],
+  );
 
-  // Extract unique tags
-  const tags = useMemo(() => {
-    const set = new Set<string>();
-    posts?.forEach((post) => post.tags?.forEach((tag) => set.add(tag.name)));
-    return Array.from(set).sort();
-  }, [posts]);
-
-  const popularPosts = useMemo(() => {
-    return [...(posts || [])]
-      .sort((a, b) => (b.views || 0) - (a.views || 0))
-      .slice(0, 5);
-  }, [posts]);
-
-  // Filter posts
-  let filteredPosts = useMemo(() => {
-    if (!posts) return [];
-    let items = posts;
-    if (filterParam === 'projects') items = items.filter((post) => post.is_project);
-    if (tagParam) items = items.filter((post) => post.tags?.some((tag) => tag.name === tagParam));
-    
-    // Sort posts
-    if (sortBy === 'popular') {
-      items = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
-    } else {
-      items = [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    
-    return items;
-  }, [posts, filterParam, tagParam, sortBy]);
+  const { data: popularData } = useQuery<PaginatedPosts>({
+    queryKey: ['posts', 'sidebar-popular'],
+    queryFn: async () => (await api.get('/posts/', { params: { sort: 'popular', limit: 5 } })).data,
+  });
+  const popularPosts = popularData?.items ?? [];
 
   const setFilter = (f: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -72,7 +58,7 @@ export const BlogList = () => {
 
   const setTag = (t: string) => {
     const next = new URLSearchParams(searchParams.toString());
-    if (!t) next.delete('tag'); 
+    if (!t) next.delete('tag');
     else next.set('tag', t);
     setSearchParams(next);
     setShowTagDropdown(false);
@@ -100,7 +86,7 @@ export const BlogList = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
-      
+
       {/* Compact Header Section */}
       <div className="border-b border-zinc-200 bg-white sticky top-20 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
@@ -110,7 +96,7 @@ export const BlogList = () => {
                 {filterParam === 'projects' ? 'Projects' : 'Articles'}
               </h1>
               <p className="text-sm text-zinc-600 mt-1">
-                {filteredPosts.length} {filteredPosts.length === 1 ? 'item' : 'items'} {tagParam && `tagged "${tagParam}"`}
+                {total} {total === 1 ? 'item' : 'items'} {tagParam && `tagged "${tagParam}"`}
               </p>
             </div>
           </div>
@@ -118,11 +104,11 @@ export const BlogList = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        
+
         {/* Controls Bar */}
         <div className="mb-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            
+
             {/* Left: Type & Sorting */}
             <div className="flex gap-3 flex-wrap">
               {/* Type Toggle */}
@@ -222,7 +208,7 @@ export const BlogList = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          
+
           {/* Posts List */}
           <div className="lg:col-span-8">
             {filteredPosts && filteredPosts.length > 0 ? (
@@ -242,7 +228,7 @@ export const BlogList = () => {
                     No posts found
                   </h3>
                   <p className="text-zinc-600 mb-8 max-w-md mx-auto">
-                    {tagParam 
+                    {tagParam
                       ? `We couldn't find any posts tagged with "${tagParam}". Try a different tag or view all posts.`
                       : filterParam === 'projects'
                         ? 'No projects have been published yet. Check back soon!'
@@ -263,9 +249,14 @@ export const BlogList = () => {
             )}
 
             {/* Load More */}
-            {filteredPosts.length >= 10 && (
+            {hasNextPage && (
               <div className="mt-12 flex justify-center">
-                <button className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all">
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  {isFetchingNextPage && <Loader2 className="animate-spin" size={16} />}
                   Load More Posts
                 </button>
               </div>

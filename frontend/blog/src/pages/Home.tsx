@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Clock, Eye, Loader2, TrendingUp, Zap } from 'lucide-react';
+import { Clock, Eye, Loader2, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
 import { formatLocalDate } from '../utils/dates';
+import type { PaginatedPosts } from '../types/post';
+
+// The homepage is a bounded teaser (featured + trending + a handful of
+// recent posts), not the full archive — /blog is the real paginated listing.
+const HOME_POST_LIMIT = 20;
 
 export const Home: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'projects'>('all');
 
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['posts'],
+  const { data, isLoading } = useQuery<PaginatedPosts>({
+    queryKey: ['posts', 'home'],
     queryFn: async () => {
-      const res = await api.get('/posts/');
+      const res = await api.get('/posts/', { params: { limit: HOME_POST_LIMIT, sort: 'latest' } });
       return res.data;
     }
   });
@@ -21,8 +26,8 @@ export const Home: React.FC = () => {
   // Exclude sample/welcome posts from all public display.
   // They exist to show owners the dashboard has content — readers shouldn't see them.
   const displayPosts = React.useMemo(
-    () => (posts ?? []).filter((p: any) => !p.is_sample),
-    [posts]
+    () => (data?.items ?? []).filter((p) => !p.is_sample),
+    [data]
   );
 
   const tags = React.useMemo(() => {
@@ -102,7 +107,6 @@ export const Home: React.FC = () => {
 
                   <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
                     <span className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 bg-white/95 backdrop-blur-sm rounded-full text-xs sm:text-sm font-bold text-zinc-900 shadow-lg">
-                      <Zap size={16} />
                       Featured Story
                     </span>
                   </div>
@@ -218,6 +222,8 @@ export const Home: React.FC = () => {
                           src={post.thumbnail_url || "/placeholder.jpg"}
                           alt={post.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
+                          decoding="async"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                       </div>
@@ -293,9 +299,12 @@ export const Home: React.FC = () => {
 
             {regularPosts.length >= 8 && (
               <div className="flex justify-center pt-6">
-                <button className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all">
+                <Link
+                  to="/blog"
+                  className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all"
+                >
                   Load More Posts
-                </button>
+                </Link>
               </div>
             )}
           </div>
