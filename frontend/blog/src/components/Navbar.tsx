@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search, User, X } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const token = localStorage.getItem('token');
+  const { isAuthenticated, logout } = useAuth();
   const { data: siteSettings } = useSiteSettings();
   const general = siteSettings?.general;
   const branding = siteSettings?.branding;
@@ -58,7 +59,7 @@ export const Navbar: React.FC = () => {
     ].join(' ');
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    logout();
     closeMenu();
     navigate('/auth');
   };
@@ -116,7 +117,7 @@ export const Navbar: React.FC = () => {
 
           <div className="h-6 w-[1px] bg-zinc-100 hidden sm:block"></div>
 
-          {token ? (
+          {isAuthenticated ? (
             <button
               onClick={handleLogout}
               className="hidden sm:flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-zinc-900 transition"
@@ -163,7 +164,7 @@ export const Navbar: React.FC = () => {
               </NavLink>
             ))}
 
-            {token ? (
+            {isAuthenticated ? (
               <button
                 onClick={handleLogout}
                 className="mt-2 inline-flex items-center justify-center gap-2 bg-zinc-900 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-900 transition"

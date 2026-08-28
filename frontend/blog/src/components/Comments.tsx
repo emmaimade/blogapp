@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Trash2, X, Check, MoreVertical } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Comment {
   id: number;
@@ -24,10 +25,10 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
-  
-  const isLoggedIn = !!localStorage.getItem('token');
-  const currentUserId = Number(localStorage.getItem('userId'));
-  
+
+  const { isAuthenticated: isLoggedIn, user } = useAuth();
+  const currentUserId = user?.id;
+
   const queryClient = useQueryClient();
   const location = useLocation();
 
@@ -43,7 +44,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       toast.error('Comment cannot be empty');
       return;
     }
-    
+
     try {
       await api.post('/comments/', { content: text, post_id: postId });
       setText('');
@@ -133,14 +134,14 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
             onChange={(e) => setText(e.target.value)}
           />
           <div className="flex gap-3">
-            <button 
-              onClick={postComment} 
+            <button
+              onClick={postComment}
               className="bg-primary text-white px-8 py-2.5 rounded-full font-bold hover:bg-purple-700 transition-all"
             >
               Post Comment
             </button>
             {text && (
-              <button 
+              <button
                 onClick={() => setText('')}
                 className="px-6 py-2.5 text-zinc-600 hover:text-zinc-900 font-bold transition-all"
               >
@@ -176,11 +177,11 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
             const isDeleted = comment.is_deleted || comment.content.includes('[This comment has been removed');
 
             return (
-              <div 
-                key={comment.id} 
+              <div
+                key={comment.id}
                 className={`p-6 rounded-2xl border transition-all ${
- isDeleted 
- ? 'bg-zinc-50 border-zinc-200' 
+ isDeleted
+ ? 'bg-zinc-50 border-zinc-200'
  : 'bg-white border-zinc-100 hover:border-zinc-200'
  }`}
               >
@@ -219,11 +220,11 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                           {menuOpen === comment.id && (
                             <>
                               {/* Backdrop */}
-                              <div 
-                                className="fixed inset-0 z-10" 
+                              <div
+                                className="fixed inset-0 z-10"
                                 onClick={() => setMenuOpen(null)}
                               />
-                              
+
                               {/* Menu */}
                               <div className="absolute right-0 top-10 z-20 bg-white rounded-xl shadow-lg border border-zinc-200 py-2 w-40">
                                 <button
