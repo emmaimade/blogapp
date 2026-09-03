@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import SimpleMDE from 'react-simplemde-editor';
-import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Layout, FileText } from 'lucide-react';
+import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Layout, FileText, Star } from 'lucide-react';
 
 import { usePostEditor } from '../hooks/usePostEditor';
 import { TagSelector } from '../components/TagSelector';
@@ -19,7 +19,7 @@ export const PostEditor: React.FC = () => {
   const {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
-    currentPubAt, isProject, allTags, filteredAvailableTags, exactMatchExists,
+    currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate
   } = usePostEditor();
@@ -85,6 +85,28 @@ export const PostEditor: React.FC = () => {
                 <Layout size={14} /> Showcase Project
               </button>
             </div>
+          </div>
+
+          {/* Homepage Featured Story Toggle */}
+          <div className="flex flex-wrap items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-fit">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-2">Homepage</span>
+            <button
+              type="button"
+              onClick={() => setValue("is_featured", !isFeatured)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                isFeatured
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                  : "bg-zinc-200/70 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              }`}
+            >
+              <Star size={14} className={isFeatured ? "fill-amber-500 text-amber-500" : ""} />
+              {isFeatured ? "Featured Story" : "Set as Featured Story"}
+            </button>
+            {isFeatured && (
+              <span className="text-xs text-zinc-400 px-1">
+                Replaces the current featured post on the homepage.
+              </span>
+            )}
           </div>
 
           {/* Featured Image Block */}

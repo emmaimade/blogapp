@@ -13,6 +13,7 @@ export interface PostForm {
   content: string;
   thumbnail_url: string;
   is_project: boolean;
+  is_featured: boolean;
   status: PostStatus;
   published_at: string | null;
   tag_ids: number[];
@@ -32,6 +33,7 @@ export const usePostEditor = () => {
   const { control, register, handleSubmit, reset, watch, setValue } = useForm<PostForm>({
     defaultValues: {
       is_project: false,
+      is_featured: false,
       status: 'draft',
       published_at: null,
       tag_ids: [],
@@ -45,6 +47,7 @@ export const usePostEditor = () => {
   const currentStatus = watch('status');
   const currentPubAt = watch('published_at');
   const isProject = watch('is_project', false);
+  const isFeatured = watch('is_featured', false);
 
   const { data: allTags = [] } = useQuery({
     queryKey: ['tags', activeBlog?.id],
@@ -185,7 +188,7 @@ export const usePostEditor = () => {
   return {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
-    currentPubAt, isProject, allTags, filteredAvailableTags, exactMatchExists,
+    currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate
   };

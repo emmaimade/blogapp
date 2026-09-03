@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import {
   ArrowLeft, Edit, Calendar, Tag as TagIcon,
-  Eye, Clock, CheckCircle2, FileText,
+  Eye, Clock, CheckCircle2, FileText, Star,
 } from 'lucide-react';
 import 'highlight.js/styles/atom-one-dark.css';
 import api from '../../../shared/api/client';
@@ -167,6 +167,11 @@ export const PostView = () => {
           {post.is_project && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               <FileText size={12} /> Project
+            </span>
+          )}
+          {post.is_featured && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
+              <Star size={12} className="fill-amber-500 text-amber-500" /> Featured
             </span>
           )}
         </div>

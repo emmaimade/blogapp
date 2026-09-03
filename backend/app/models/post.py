@@ -48,6 +48,7 @@ class Post(SQLModel, table=True):
     views:         int            = Field(default=0)
     is_project:    bool           = Field(default=False)
     is_sample:     bool           = Field(default=False, nullable=False)
+    is_featured:   bool           = Field(default=False, nullable=False)
 
     status:       PostStatus      = Field(default=PostStatus.DRAFT)
     published:    bool            = Field(default=False)

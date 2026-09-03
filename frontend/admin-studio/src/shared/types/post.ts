@@ -9,6 +9,7 @@ export interface Post {
   content: string;
   blog_id: number;
   is_project: boolean;
+  is_featured: boolean;
   published: boolean;          // kept for backward compat — prefer `status`
   status: PostStatus;          // draft | scheduled | published
   published_at: string | null; // ISO datetime — set when scheduled or published

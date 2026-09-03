@@ -27,7 +27,8 @@ class PostCreate(UTCDatetimeMixin, BaseModel):
     content: str
     thumbnail_url: Optional[str] = None
     is_project: bool = False
-    published: bool = True                        
+    is_featured: bool = False
+    published: bool = True
     status: PostStatus = PostStatus.DRAFT         
     published_at: Optional[datetime] = None       
     tag_ids: List[int] = Field(default_factory=list)
@@ -39,7 +40,8 @@ class PostUpdate(UTCDatetimeMixin, BaseModel):
     content: Optional[str] = None
     thumbnail_url: Optional[str] = None
     is_project: Optional[bool] = None
-    published: Optional[bool] = None             
+    is_featured: Optional[bool] = None
+    published: Optional[bool] = None
     status: Optional[PostStatus] = None          
     published_at: Optional[datetime] = None      
     tag_ids: Optional[List[int]] = None
@@ -57,6 +59,7 @@ class PostRead(UTCDatetimeMixin, BaseModel):
     views: int
     is_project: bool
     is_sample: bool = False
+    is_featured: bool = False
     published: bool
     status: PostStatus
     published_at: Optional[datetime] = None

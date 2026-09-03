@@ -206,6 +206,9 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
     session.add(new_post)
     session.flush()
 
+    if new_post.is_featured:
+        _clear_other_featured_posts(session, blog_id, keep_post_id=new_post.id)
+
     add_audit_log(
         session,
         action=f"post.{resolved_status.value}",
@@ -226,6 +229,20 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
     return new_post
 
 
+def _clear_other_featured_posts(session: Session, blog_id: int, keep_post_id: int) -> None:
+    """Only one post per blog can be featured — unfeature the rest."""
+    other_featured = session.exec(
+        select(Post).where(
+            Post.blog_id == blog_id,
+            Post.is_featured == True,
+            Post.id != keep_post_id,
+        )
+    ).all()
+    for post in other_featured:
+        post.is_featured = False
+        session.add(post)
+
+
 def _apply_tag_filter(query, blog_id: int, tag: Optional[str]):
     if tag:
         query = query.join(Post.tags).where(Tag.name == tag, Tag.blog_id == blog_id)
@@ -233,9 +250,12 @@ def _apply_tag_filter(query, blog_id: int, tag: Optional[str]):
 
 
 def _apply_sort(query, sort: str):
+    # Featured post always leads, regardless of recency/popularity — the
+    # homepage hero picks filteredPosts[0], so this is what makes a
+    # manually-featured post win that slot instead of just the latest one.
     if sort == "popular":
-        return query.order_by(Post.views.desc(), Post.created_at.desc())
-    return query.order_by(Post.created_at.desc())
+        return query.order_by(Post.is_featured.desc(), Post.views.desc(), Post.created_at.desc())
+    return query.order_by(Post.is_featured.desc(), Post.created_at.desc())
 
 
 def _paginate(session: Session, query, sort: str, skip: int, limit: int, *options) -> Tuple[List[Post], int]:
@@ -352,6 +372,9 @@ def update_post(
     # Apply scalar fields
     for key, value in update_dict.items():
         setattr(db_post, key, value)
+
+    if update_dict.get("is_featured"):
+        _clear_other_featured_posts(session, blog_id, keep_post_id=db_post.id)
 
     # Resolve status change if any scheduling field was touched
     if any(f in post_data.model_fields_set for f in ("status", "published", "published_at")):

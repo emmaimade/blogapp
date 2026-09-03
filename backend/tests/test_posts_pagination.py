@@ -8,8 +8,10 @@ import uuid
 from sqlmodel import Session
 
 from app.core.db import engine
-from app.models import Post, Tag
+from app.models import Post, Tag, User
 from app.models.post import PostStatus
+from app.modules.posts import service as post_service
+from app.schemas import PostUpdate
 
 
 def _unique_email() -> str:
@@ -161,3 +163,44 @@ def test_search_endpoint_is_paginated(client):
     assert len(body["items"]) == 12
     assert body["total"] == 15
     assert body["has_more"] is True
+
+
+# update_post's HTTP route additionally requires completed onboarding
+# (require_completed_onboarding); driving these through the router would mean
+# onboarding a whole workspace just to reach logic that doesn't touch that at
+# all, so — matching the upload_post_image tests above — these call the
+# service function directly instead.
+
+def _feature_post(blog_id: int, post_id: int, user_id: int) -> None:
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        post_service.update_post(blog_id, post_id, PostUpdate(is_featured=True), session, user)
+
+
+def test_featured_post_sorts_first_regardless_of_recency(client):
+    """A manually-featured post outranks newer posts — it's what lets the
+    homepage's `filteredPosts[0]` pick it as the hero regardless of age."""
+    _, blog_id, user_id = _register_owner(client)
+    old_ids = _create_posts(blog_id, user_id, 3)
+    oldest_id = old_ids[0]
+
+    _feature_post(blog_id, oldest_id, user_id)
+
+    res = client.get(f"/blogs/{blog_id}/posts/?limit=10")
+    assert res.status_code == 200, res.text
+    items = res.json()["items"]
+    assert items[0]["id"] == oldest_id
+    assert items[0]["is_featured"] is True
+
+
+def test_setting_a_post_featured_unfeatures_the_others(client):
+    _, blog_id, user_id = _register_owner(client)
+    first_id, second_id = _create_posts(blog_id, user_id, 2)
+
+    _feature_post(blog_id, first_id, user_id)
+    _feature_post(blog_id, second_id, user_id)
+
+    res = client.get(f"/blogs/{blog_id}/posts/?limit=10")
+    featured_flags = {p["id"]: p["is_featured"] for p in res.json()["items"]}
+    assert featured_flags[first_id] is False
+    assert featured_flags[second_id] is True

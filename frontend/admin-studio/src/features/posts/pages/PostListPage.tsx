@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Edit, Trash2, FolderOpen, FileText, Plus, Search,
-  Eye, Tag as TagIcon, Feather, Clock,
+  Eye, Tag as TagIcon, Feather, Clock, Star,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -270,6 +270,11 @@ export const PostList = () => {
               <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                 {post.is_project ? <><FolderOpen size={12} /> Project</> : <><FileText size={12} /> Post</>}
               </span>
+              {post.is_featured && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                  <Star size={12} className="fill-amber-500 text-amber-500" /> Featured
+                </span>
+              )}
             </div>
 
             {post.tags && post.tags.length > 0 && (
@@ -331,12 +336,17 @@ export const PostList = () => {
                       {/* Post title + meta */}
                       <td className="p-4 align-top">
                         <div className="flex flex-col gap-1.5">
-                          <button
-                            onClick={() => navigate(`/admin/posts/view/${post.id}`)}
-                            className="text-left text-base font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-1"
-                          >
-                            {post.title}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => navigate(`/admin/posts/view/${post.id}`)}
+                              className="text-left text-base font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-1"
+                            >
+                              {post.title}
+                            </button>
+                            {post.is_featured && (
+                              <Star size={14} className="shrink-0 fill-amber-500 text-amber-500" aria-label="Featured" />
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                               {post.is_project ? <><FolderOpen size={10} /> Project</> : <><FileText size={10} /> Post</>}
