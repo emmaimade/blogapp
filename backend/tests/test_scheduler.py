@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from app.core.db import engine
 from app.core.scheduler import publish_scheduled_posts
-from app.models import AuditLog, Post
+from app.models import AuditLog, Notification, Post
 from app.models.post import PostStatus
 
 
@@ -75,6 +75,27 @@ def test_publish_scheduled_posts_promotes_due_posts(client):
         assert audit.actor_user_id is None  # system action, no human actor
 
 
+def test_publish_scheduled_posts_notifies_the_author(client):
+    _, blog_id, user_id = _register_owner(client)
+    past = datetime.now(timezone.utc) - timedelta(minutes=5)
+    post_id = _create_scheduled_post(blog_id, user_id, past)
+
+    publish_scheduled_posts()
+
+    with Session(engine) as session:
+        post = session.get(Post, post_id)
+        notification = session.exec(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.type == "post_published",
+            )
+        ).first()
+        assert notification is not None
+        assert post.title in notification.title
+        assert notification.blog_id == blog_id
+        assert notification.link == f"/admin/posts/view/{post_id}?blog={blog_id}"
+
+
 def test_publish_scheduled_posts_leaves_future_posts_alone(client):
     _, blog_id, user_id = _register_owner(client)
     future = datetime.now(timezone.utc) + timedelta(days=1)
@@ -86,6 +107,11 @@ def test_publish_scheduled_posts_leaves_future_posts_alone(client):
         post = session.get(Post, post_id)
         assert post.status == PostStatus.SCHEDULED
         assert post.published is False
+
+        notification = session.exec(
+            select(Notification).where(Notification.user_id == user_id)
+        ).first()
+        assert notification is None
 
 
 def test_publish_scheduled_posts_is_a_no_op_with_nothing_due(client):

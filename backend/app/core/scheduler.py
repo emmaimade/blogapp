@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
 from app.core.db import engine
+from app.core.notifications import add_notification
 from app.models import Post
 from app.models.post import PostStatus
 # Import your task logic directly here
@@ -61,6 +62,17 @@ def publish_scheduled_posts() -> None:
                     "source":       "scheduler",
                 },
             )
+
+            if post.author_id:
+                add_notification(
+                    session,
+                    user_id=post.author_id,
+                    blog_id=post.blog_id,
+                    type="post_published",
+                    title=f'"{post.title}" is now live',
+                    body="Your scheduled post has been published.",
+                    link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
+                )
 
         session.commit()
         logger.info(f"[scheduler] Done — {len(due_posts)} post(s) published.")
