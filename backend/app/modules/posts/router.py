@@ -48,9 +48,22 @@ def read_posts(
     sort: Literal["latest", "popular"] = "latest",
     skip: int = Query(0, ge=0),
     limit: int = Query(12, ge=1, le=100),
+    status: Optional[str] = None,
+    q: Optional[str] = None,
 ):
-    items, total = post_service.read_posts(blog_id, session, current_user, filter, tag, sort, skip, limit)
+    items, total = post_service.read_posts(blog_id, session, current_user, filter, tag, sort, skip, limit, status, q)
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
+
+
+@router.get("/counts")
+def get_post_status_counts(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+    current_user: User = Depends(get_current_user),
+):
+    """Total post counts per status, for the admin post-list tab badges."""
+    return post_service.get_post_status_counts(blog_id, session, current_user)
 
 
 @router.get("/scheduled", response_model=List[PostRead])

@@ -271,16 +271,8 @@ def _paginate(session: Session, query, sort: str, skip: int, limit: int, *option
     return items, total
 
 
-def read_posts(
-    blog_id: int,
-    session: Session,
-    current_user: Optional[User],
-    filter_value: Optional[str] = None,
-    tag: Optional[str] = None,
-    sort: Literal["latest", "popular"] = "latest",
-    skip: int = 0,
-    limit: int = 12,
-) -> Tuple[List[Post], int]:
+def _scope_posts_to_viewer(blog_id: int, session: Session, current_user: Optional[User]):
+    """Base query for a blog's posts, scoped to what the viewer is allowed to see."""
     query = select(Post).where(Post.blog_id == blog_id)
 
     can_view_drafts = False
@@ -297,12 +289,50 @@ def read_posts(
         # Authors see only their own posts, across all statuses
         query = query.where(Post.author_id == current_user.id)
 
+    return query
+
+
+def read_posts(
+    blog_id: int,
+    session: Session,
+    current_user: Optional[User],
+    filter_value: Optional[str] = None,
+    tag: Optional[str] = None,
+    sort: Literal["latest", "popular"] = "latest",
+    skip: int = 0,
+    limit: int = 12,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+) -> Tuple[List[Post], int]:
+    query = _scope_posts_to_viewer(blog_id, session, current_user)
+
     if filter_value and filter_value.lower() == "projects":
         query = query.where(Post.is_project == True)
+
+    if status and status.lower() in (PostStatus.PUBLISHED, PostStatus.SCHEDULED, PostStatus.DRAFT):
+        query = query.where(Post.status == status.lower())
+
+    if q:
+        query = query.where(or_(Post.title.contains(q), Post.content.contains(q)))
 
     query = _apply_tag_filter(query, blog_id, tag)
 
     return _paginate(session, query, sort, skip, limit, selectinload(Post.tags), selectinload(Post.author))
+
+
+def get_post_status_counts(blog_id: int, session: Session, current_user: Optional[User]) -> dict:
+    """Total post counts per status, scoped to what the viewer is allowed to see."""
+    base = _scope_posts_to_viewer(blog_id, session, current_user)
+
+    def _count(query) -> int:
+        return session.exec(select(func.count()).select_from(query.subquery())).one()
+
+    return {
+        "all": _count(base),
+        "published": _count(base.where(Post.status == PostStatus.PUBLISHED)),
+        "scheduled": _count(base.where(Post.status == PostStatus.SCHEDULED)),
+        "draft": _count(base.where(Post.status == PostStatus.DRAFT)),
+    }
 
 
 def get_scheduled_posts(blog_id: int, session: Session, current_user: User) -> List[Post]:

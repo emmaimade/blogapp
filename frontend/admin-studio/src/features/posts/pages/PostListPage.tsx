@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Edit, Trash2, FolderOpen, FileText, Plus, Search,
-  Eye, Tag as TagIcon, Feather, Clock, Star,
+  Eye, Tag as TagIcon, Feather, Clock, ChevronLeft, ChevronRight, Star,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -13,6 +13,23 @@ import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
 
 type FilterTab = 'all' | 'published' | 'scheduled' | 'draft';
+
+const PAGE_SIZE = 20;
+
+interface PaginatedPosts {
+  items: Post[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+}
+
+interface PostCounts {
+  all: number;
+  published: number;
+  scheduled: number;
+  draft: number;
+}
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({
@@ -81,13 +98,53 @@ export const PostList = () => {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: posts, isLoading } = useQuery<Post[]>({
-    queryKey: ['adminPosts', activeBlog?.id],
-    queryFn: async () => (await api.get(`/blogs/${activeBlog!.id}/posts`)).data,
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Any change to what's being viewed resets pagination to the first page.
+  const viewKey = `${filter}|${debouncedSearch}|${activeBlog?.id}`;
+  const [prevViewKey, setPrevViewKey] = useState(viewKey);
+  if (viewKey !== prevViewKey) {
+    setPrevViewKey(viewKey);
+    setPage(1);
+  }
+
+  const postsQueryKey = ['adminPosts', activeBlog?.id, filter, debouncedSearch, page] as const;
+
+  const { data, isLoading, isFetching } = useQuery<PaginatedPosts>({
+    queryKey: postsQueryKey,
+    queryFn: async () =>
+      (await api.get(`/blogs/${activeBlog!.id}/posts`, {
+        params: {
+          status: filter === 'all' ? undefined : filter,
+          q: debouncedSearch || undefined,
+          skip: (page - 1) * PAGE_SIZE,
+          limit: PAGE_SIZE,
+        },
+      })).data,
+    enabled: !!activeBlog?.id,
+    placeholderData: keepPreviousData,
+  });
+
+  const posts = data?.items ?? [];
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+
+  const { data: counts = { all: 0, published: 0, scheduled: 0, draft: 0 } } = useQuery<PostCounts>({
+    queryKey: ['adminPostCounts', activeBlog?.id],
+    queryFn: async () => (await api.get(`/blogs/${activeBlog!.id}/posts/counts`)).data,
     enabled: !!activeBlog?.id,
   });
+
+  const invalidatePosts = () => {
+    queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] });
+    queryClient.invalidateQueries({ queryKey: ['adminPostCounts', activeBlog?.id] });
+  };
 
   // ── Toggle published/draft (not scheduled) ───────────────────────────────
   const togglePublish = useMutation({
@@ -96,52 +153,37 @@ export const PostList = () => {
       return api.patch(`/blogs/${activeBlog!.id}/posts/${post.id}`, { status: newStatus });
     },
     onMutate: async (updatedPost) => {
-      await queryClient.cancelQueries({ queryKey: ['adminPosts', activeBlog?.id] });
-      const prev = queryClient.getQueryData(['adminPosts', activeBlog?.id]);
-      queryClient.setQueryData(['adminPosts', activeBlog?.id], (old: Post[]) =>
-        old.map((p) =>
-          p.id === updatedPost.id
-            ? { ...p, status: p.status === 'published' ? 'draft' : 'published', published: p.status !== 'published' }
-            : p
-        )
+      await queryClient.cancelQueries({ queryKey: postsQueryKey });
+      const prev = queryClient.getQueryData<PaginatedPosts>(postsQueryKey);
+      queryClient.setQueryData<PaginatedPosts | undefined>(postsQueryKey, (old) =>
+        old && {
+          ...old,
+          items: old.items.map((p) =>
+            p.id === updatedPost.id
+              ? { ...p, status: p.status === 'published' ? 'draft' : 'published', published: p.status !== 'published' }
+              : p
+          ),
+        }
       );
       return { prev };
     },
     onSuccess: () => toast.success('Status updated'),
     onError: (_err, __, ctx) => {
-      queryClient.setQueryData(['adminPosts', activeBlog?.id], ctx?.prev);
+      queryClient.setQueryData(postsQueryKey, ctx?.prev);
       toast.error('Failed to update status');
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] }),
+    onSettled: invalidatePosts,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/blogs/${activeBlog!.id}/posts/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] });
+      invalidatePosts();
       setDeleteId(null);
       toast.success('Post deleted');
     },
     onError: () => toast.error('Could not delete post'),
   });
-
-  // ── Filtering ─────────────────────────────────────────────────────────────
-  const filteredPosts = posts?.filter((post) => {
-    const matchesFilter =
-      filter === 'all' ? true :
-      filter === 'published' ? post.status === 'published' :
-      filter === 'scheduled' ? post.status === 'scheduled' :
-      post.status === 'draft';
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
-  const counts = {
-    all:       posts?.length ?? 0,
-    published: posts?.filter((p) => p.status === 'published').length ?? 0,
-    scheduled: posts?.filter((p) => p.status === 'scheduled').length ?? 0,
-    draft:     posts?.filter((p) => p.status === 'draft').length ?? 0,
-  };
 
   const TABS: { key: FilterTab; label: string }[] = [
     { key: 'all',       label: 'All' },
@@ -243,7 +285,7 @@ export const PostList = () => {
 
       {/* ─── Mobile View ─── */}
       <div className="space-y-4 md:hidden">
-        {filteredPosts?.map((post) => (
+        {posts?.map((post) => (
           <article key={post.id} className="admin-card space-y-4 rounded-[1.7rem] p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1 min-w-0">
@@ -296,7 +338,7 @@ export const PostList = () => {
           </article>
         ))}
 
-        {filteredPosts?.length === 0 && (
+        {posts?.length === 0 && (
           <div className="admin-card flex flex-col items-center gap-4 p-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
               <Feather size={24} className="text-zinc-400" />
@@ -329,7 +371,7 @@ export const PostList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {filteredPosts?.map((post) => {
+                {posts?.map((post) => {
                   const postStatus = post.status ?? (post.published ? 'published' : 'draft');
                   return (
                     <tr key={post.id} className="group transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
@@ -427,7 +469,7 @@ export const PostList = () => {
             </table>
           </div>
 
-          {filteredPosts?.length === 0 && (
+          {posts?.length === 0 && (
             <div className="flex flex-col items-center gap-4 p-16 text-center bg-zinc-50/30 dark:bg-zinc-900/30">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700">
                 <Feather size={24} className="text-zinc-400" />
@@ -447,6 +489,32 @@ export const PostList = () => {
           )}
         </div>
       </div>
+
+      {/* ─── Pagination ─── */}
+      {posts.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Page {page} of {totalPages}
+            {isFetching && <span className="ml-2 text-zinc-400">Loading…</span>}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-all hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:disabled:hover:bg-zinc-900"
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-all hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:disabled:hover:bg-zinc-900"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <Modal
         isOpen={!!deleteId}

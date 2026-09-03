@@ -165,6 +165,69 @@ def test_search_endpoint_is_paginated(client):
     assert body["has_more"] is True
 
 
+def _create_post_with_status(blog_id: int, author_id: int, title: str, status: PostStatus) -> int:
+    with Session(engine) as session:
+        post = Post(
+            title=title,
+            slug=f"post-{uuid.uuid4().hex[:8]}",
+            content="Body content.",
+            blog_id=blog_id,
+            author_id=author_id,
+            status=status,
+            published=status == PostStatus.PUBLISHED,
+        )
+        session.add(post)
+        session.commit()
+        session.refresh(post)
+        return post.id
+
+
+def test_status_filter_on_posts_endpoint(client):
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    _create_post_with_status(blog_id, user_id, "A draft", PostStatus.DRAFT)
+    _create_post_with_status(blog_id, user_id, "A live post", PostStatus.PUBLISHED)
+
+    res = client.get(f"/blogs/{blog_id}/posts/?status=draft", headers=headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["total"] == 1
+    assert body["items"][0]["status"] == "draft"
+
+
+def test_q_filter_on_posts_endpoint(client):
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    _create_post_with_status(blog_id, user_id, "Unique Zebra Title", PostStatus.PUBLISHED)
+    _create_post_with_status(blog_id, user_id, "Something else entirely", PostStatus.PUBLISHED)
+
+    res = client.get(f"/blogs/{blog_id}/posts/?q=Zebra", headers=headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["total"] == 1
+    assert body["items"][0]["title"] == "Unique Zebra Title"
+
+
+def test_post_counts_endpoint_reflects_all_statuses(client):
+    token, blog_id, user_id = _register_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    _create_post_with_status(blog_id, user_id, "Draft one", PostStatus.DRAFT)
+    _create_post_with_status(blog_id, user_id, "Draft two", PostStatus.DRAFT)
+    _create_post_with_status(blog_id, user_id, "Scheduled one", PostStatus.SCHEDULED)
+    _create_post_with_status(blog_id, user_id, "Live one", PostStatus.PUBLISHED)
+
+    res = client.get(f"/blogs/{blog_id}/posts/counts", headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json() == {"all": 4, "published": 1, "scheduled": 1, "draft": 2}
+
+
+def test_post_counts_endpoint_requires_author_access(client):
+    _, blog_id, _ = _register_owner(client)
+
+    res = client.get(f"/blogs/{blog_id}/posts/counts")
+    assert res.status_code == 401
+
+
 # update_post's HTTP route additionally requires completed onboarding
 # (require_completed_onboarding); driving these through the router would mean
 # onboarding a whole workspace just to reach logic that doesn't touch that at
