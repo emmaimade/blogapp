@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Loader2, ArrowLeft } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, Filter, ChevronDown, Loader2, ArrowLeft, X } from 'lucide-react';
+import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
+import { PageLoader } from '../components/PageLoader';
 import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
 
 export const SearchResults: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const tagParam = searchParams.get('tag') || '';
   const [searchTerm, setSearchTerm] = useState(query);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
 
   const {
     posts: results,
@@ -16,7 +21,25 @@ export const SearchResults: React.FC = () => {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = usePaginatedPosts(['search', query], '/posts/search', { q: query || undefined }, !!query);
+  } = usePaginatedPosts(
+    ['search', query, tagParam],
+    '/posts/search',
+    { q: query || undefined, tag: tagParam || undefined },
+    !!query,
+  );
+
+  const { data: tagsData } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => (await api.get('/tags/')).data,
+  });
+  const availableTags: string[] = Array.from(
+    new Set((tagsData || []).map((t: { name: string }) => t.name)),
+  ).sort() as string[];
+
+  const { data: popularTags } = useQuery({
+    queryKey: ['popularTags'],
+    queryFn: async () => (await api.get('/tags/popular?limit=6')).data,
+  });
 
   useEffect(() => {
     setSearchTerm(query);
@@ -25,8 +48,18 @@ export const SearchResults: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchTerm)}`;
+      const next = new URLSearchParams(searchParams);
+      next.set('q', searchTerm.trim());
+      setSearchParams(next);
     }
+  };
+
+  const setTagFilter = (tag: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tag) next.set('tag', tag);
+    else next.delete('tag');
+    setSearchParams(next);
+    setShowTagDropdown(false);
   };
 
   return (
@@ -65,7 +98,7 @@ export const SearchResults: React.FC = () => {
       {/* Results */}
       {query && (
         <>
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <div>
               <p className="text-zinc-600">
                 {isLoading ? (
@@ -74,21 +107,59 @@ export const SearchResults: React.FC = () => {
                   <>
                     Found <span className="font-bold text-zinc-900">{total}</span> result
                     {total !== 1 ? 's' : ''} for "{query}"
+                    {tagParam && <> tagged "{tagParam}"</>}
                   </>
                 )}
               </p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-xl text-sm font-medium hover:bg-zinc-200 transition-all">
-              <Filter size={16} />
-              Filters
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowTagDropdown((open) => !open)}
+                className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-xl text-sm font-medium hover:bg-zinc-200 transition-all"
+              >
+                <Filter size={16} />
+                {tagParam || 'Filter by tag'}
+                {tagParam && (
+                  <X
+                    size={14}
+                    className="hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTagFilter('');
+                    }}
+                  />
+                )}
+                <ChevronDown size={16} className={`transition-transform ${showTagDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showTagDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                  <button
+                    onClick={() => setTagFilter('')}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
+                      !tagParam ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50'
+                    }`}
+                  >
+                    All Tags
+                  </button>
+                  {availableTags.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTagFilter(t)}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
+                        tagParam === t ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
-              <p className="text-zinc-400">Searching posts...</p>
-            </div>
+            <PageLoader label="Searching posts" minHeight="18rem" />
           ) : results.length > 0 ? (
             <>
               <div className="space-y-8">
@@ -153,18 +224,18 @@ export const SearchResults: React.FC = () => {
         </div>
       )}
 
-      {/* Popular Searches */}
-      {!query && (
+      {/* Popular Tags — real tags for this blog, not placeholder topics */}
+      {!query && popularTags?.length > 0 && (
         <div className="mt-12 bg-white rounded-3xl p-8 border border-zinc-100">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Popular Searches</h3>
+          <h3 className="text-lg font-bold text-zinc-900 mb-4">Popular Tags</h3>
           <div className="flex flex-wrap gap-3">
-            {['React', 'TypeScript', 'FastAPI', 'Python', 'Web Development'].map((term) => (
+            {popularTags.map((tag: { id: number; name: string }) => (
               <Link
-                key={term}
-                to={`/search?q=${term}`}
+                key={tag.id}
+                to={`/tag/${tag.name}`}
                 className="px-4 py-2 bg-zinc-50 hover:bg-zinc-50 hover:text-primary rounded-full text-sm font-medium transition-all"
               >
-                {term}
+                {tag.name}
               </Link>
             ))}
           </div>
