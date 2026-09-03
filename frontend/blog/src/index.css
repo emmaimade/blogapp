@@ -1,4 +1,15 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  /* Falls back to the static brand purple until App.tsx sets --brand-primary
+     from the tenant's site settings, then tracks that color everywhere. */
+  --color-primary: var(--brand-primary, #9333EA);
+  /* Derived, not a second setting — a fixed hover/darker step off whatever
+     --color-primary currently is, so hover states stay in sync per tenant
+     instead of hard-coding a second brand color. */
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 82%, black);
+}
 
 html {
   scroll-behavior: smooth;
