@@ -1,28 +1,31 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search, Filter, ChevronDown, TrendingUp, Loader2 } from 'lucide-react';
+import { X, Search, Inbox, Filter, ChevronDown } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
-import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
+import { PageLoader } from '../components/PageLoader';
+import { Pagination } from '../components/Pagination';
+import { usePagedPosts } from '../hooks/usePagedPosts';
 import type { PaginatedPosts } from '../types/post';
 
 export const BlogList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [sortBy, setSortBy] = useState<'latest' | 'popular'>('latest');
   const filterParam = searchParams.get('filter') || 'all';
   const tagParam = searchParams.get('tag') || '';
+  const sortBy = (searchParams.get('sort') === 'popular' ? 'popular' : 'latest') as 'latest' | 'popular';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const {
     posts: filteredPosts,
     total,
+    totalPages,
+    pageSize,
     isLoading,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-  } = usePaginatedPosts(
+    isFetching,
+  } = usePagedPosts(
     ['posts', filterParam, tagParam, sortBy],
     '/posts/',
     {
@@ -30,6 +33,7 @@ export const BlogList = () => {
       tag: tagParam || undefined,
       sort: sortBy,
     },
+    page,
   );
 
   // Tags and "popular" sidebar content are independent of the current page of
@@ -38,6 +42,7 @@ export const BlogList = () => {
   const { data: tagsData } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => (await api.get('/tags/')).data,
+    staleTime: 5 * 60 * 1000,
   });
   const tags = useMemo(
     () => Array.from(new Set((tagsData || []).map((t: { name: string }) => t.name))).sort() as string[],
@@ -47,12 +52,16 @@ export const BlogList = () => {
   const { data: popularData } = useQuery<PaginatedPosts>({
     queryKey: ['posts', 'sidebar-popular'],
     queryFn: async () => (await api.get('/posts/', { params: { sort: 'popular', limit: 5 } })).data,
+    staleTime: 5 * 60 * 1000,
   });
   const popularPosts = popularData?.items ?? [];
 
+  // Changing filter, tag, or sort restarts pagination — page 3 of the old
+  // result set has no guaranteed meaning against a new one.
   const setFilter = (f: string) => {
     const next = new URLSearchParams(searchParams.toString());
     next.set('filter', f);
+    next.delete('page');
     setSearchParams(next);
   };
 
@@ -60,49 +69,37 @@ export const BlogList = () => {
     const next = new URLSearchParams(searchParams.toString());
     if (!t) next.delete('tag');
     else next.set('tag', t);
+    next.delete('page');
     setSearchParams(next);
     setShowTagDropdown(false);
   };
 
+  const setSortBy = (s: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set('sort', s);
+    next.delete('page');
+    setSearchParams(next);
+  };
+
+  const setPage = (p: number) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set('page', String(p));
+    setSearchParams(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const clearFilters = () => {
     setSearchParams({});
-    setSortBy('latest');
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <TrendingUp className="text-zinc-900" size={24} />
-          </div>
-          <p className="text-zinc-400 font-medium">Loading articles...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Loading articles" />;
   }
 
   const hasActiveFilters = filterParam !== 'all' || tagParam;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
-
-      {/* Compact Header Section */}
-      <div className="border-b border-zinc-200 bg-white sticky top-20 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-zinc-900">
-                {filterParam === 'projects' ? 'Projects' : 'Articles'}
-              </h1>
-              <p className="text-sm text-zinc-600 mt-1">
-                {total} {total === 1 ? 'item' : 'items'} {tagParam && `tagged "${tagParam}"`}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
         {/* Controls Bar */}
@@ -121,7 +118,7 @@ export const BlogList = () => {
                       : 'px-4 py-2 rounded-md font-bold text-sm transition-all text-zinc-600 hover:bg-zinc-50'
                   }
                 >
-                  All
+                  All Posts
                 </button>
                 <button
                   onClick={() => setFilter('projects')}
@@ -150,6 +147,8 @@ export const BlogList = () => {
             <div className="relative">
               <button
                 onClick={() => setShowTagDropdown(!showTagDropdown)}
+                aria-expanded={showTagDropdown}
+                aria-haspopup="menu"
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-lg font-medium text-sm text-zinc-700 hover:bg-zinc-50 transition-all shadow-sm whitespace-nowrap"
               >
                 <Filter size={16} />
@@ -160,31 +159,43 @@ export const BlogList = () => {
 
               {/* Tag Dropdown Menu */}
               {showTagDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                  <button
-                    onClick={() => setTag('')}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
-                      !tagParam
-                        ? 'bg-primary text-white'
-                        : 'text-zinc-700 hover:bg-zinc-50'
-                    }`}
+                <>
+                  {/* Backdrop — closes the menu on outside click */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowTagDropdown(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
                   >
-                    All Tags
-                  </button>
-                  {tags.map((t) => (
                     <button
-                      key={t}
-                      onClick={() => setTag(t)}
-                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
-                        tagParam === t
+                      role="menuitem"
+                      onClick={() => setTag('')}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
+                        !tagParam
                           ? 'bg-primary text-white'
                           : 'text-zinc-700 hover:bg-zinc-50'
                       }`}
                     >
-                      {t}
+                      All Tags
                     </button>
-                  ))}
-                </div>
+                    {tags.map((t) => (
+                      <button
+                        key={t}
+                        role="menuitem"
+                        onClick={() => setTag(t)}
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
+                          tagParam === t
+                            ? 'bg-primary text-white'
+                            : 'text-zinc-700 hover:bg-zinc-50'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -192,7 +203,7 @@ export const BlogList = () => {
           {/* Active Filters Indicator */}
           {hasActiveFilters && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-200">
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-sm font-medium border border-primary/20">
                 <Filter size={14} />
                 <span>Filters active</span>
               </div>
@@ -212,7 +223,7 @@ export const BlogList = () => {
           {/* Posts List */}
           <div className="lg:col-span-8">
             {filteredPosts && filteredPosts.length > 0 ? (
-              <div className="space-y-8">
+              <div className={`space-y-8 transition-opacity ${isFetching ? 'opacity-50' : 'opacity-100'}`}>
                 {filteredPosts.map((post) => (
                   <PostCard key={post.id} post={post} />
                 ))}
@@ -222,7 +233,11 @@ export const BlogList = () => {
                 {/* Enhanced Empty State */}
                 <div className="bg-white rounded-3xl border border-zinc-200 p-8 sm:p-16 text-center shadow-sm">
                   <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Search className="text-zinc-400" size={32} />
+                    {tagParam ? (
+                      <Search className="text-zinc-400" size={32} />
+                    ) : (
+                      <Inbox className="text-zinc-400" size={32} />
+                    )}
                   </div>
                   <h3 className="text-2xl font-bold text-zinc-900 mb-3">
                     No posts found
@@ -248,24 +263,20 @@ export const BlogList = () => {
               </>
             )}
 
-            {/* Load More */}
-            {hasNextPage && (
-              <div className="mt-12 flex justify-center">
-                <button
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                >
-                  {isFetchingNextPage && <Loader2 className="animate-spin" size={16} />}
-                  Load More Posts
-                </button>
+            {/* Pagination */}
+            {filteredPosts.length > 0 && (
+              <div className="mt-12 flex flex-col items-center gap-4">
+                <p className="text-sm text-zinc-500">
+                  Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of {total}
+                </p>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
               </div>
             )}
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-4">
-            <div className="sticky top-8">
+            <div className="lg:sticky lg:top-24">
               <Sidebar popularPosts={popularPosts} tags={tags} />
             </div>
           </div>
