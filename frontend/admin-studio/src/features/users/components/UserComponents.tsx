@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronDown, MoreHorizontal, Trash2, User } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -96,6 +97,89 @@ export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending, d
               </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface MemberActionsMenuProps {
+  profileHref: string;
+  canRemove: boolean;
+  onRemoveClick: () => void;
+  direction?: "up" | "down";
+}
+
+// The "..." member-actions menu, rendered once per row for both the mobile
+// card list and the desktop table (which are both mounted at once - Tailwind's
+// block/hidden classes only toggle CSS display, not mounting). It owns its
+// own open state and ref rather than taking one from a shared parent: an
+// earlier version used a single ref shared across every row and both
+// breakpoints, so on mobile the outside-click check ended up comparing
+// against the hidden desktop row's node instead of the visible mobile one,
+// closing the menu on mousedown before the tap's click ever reached "View
+// Profile" / "Remove Member". Same fix as UserMenu in AdminLayout.tsx.
+export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, direction = "down" }: MemberActionsMenuProps) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (open && containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [open]);
+
+  const positionClasses = direction === "up"
+    ? "bottom-full mb-1 origin-bottom-right"
+    : "top-full mt-2 origin-top-right";
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        aria-label="Member actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+      >
+        <MoreHorizontal size={15} />
+      </button>
+
+      {open && (
+        <div role="menu" className={`absolute right-0 z-50 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium ${positionClasses}`}>
+          <Link
+            to={profileHref}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+          >
+            <User size={14} /> View Profile
+          </Link>
+          {canRemove ? (
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onRemoveClick();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
+            >
+              <Trash2 size={14} /> Remove Member
+            </button>
+          ) : (
+            <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
+              <Trash2 size={14} /> Remove Member
+            </div>
+          )}
         </div>
       )}
     </div>

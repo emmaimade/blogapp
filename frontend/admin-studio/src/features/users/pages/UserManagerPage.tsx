@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, Search, Users, MoreHorizontal, Trash2, User, Mail, Clock } from "lucide-react";
+import { UserPlus, Search, Users, Mail, Clock } from "lucide-react";
 import { formatSmart, formatLocalDate } from "../../../shared/utils/dates";
 import { useUserManager } from "../hooks/useUserManager";
 import { InviteModal } from "../components/InviteModal";
-import { Avatar, RoleBadge, RoleDropdown } from "../components/UserComponents";
+import { Avatar, RoleBadge, RoleDropdown, MemberActionsMenu } from "../components/UserComponents";
 import { Modal } from "../../../shared/components/Modal";
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from "../../../shared/ui/Skeleton";
 
@@ -59,20 +59,6 @@ export const UserManager = () => {
     isDanger?: boolean;
     action: () => void;
   } | null>(null);
-
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (openMenuId !== null && dropdownContainerRef.current && !dropdownContainerRef.current.contains(event.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [openMenuId]);
 
   if (isLoading) {
     return <UserManagerSkeleton />;
@@ -168,47 +154,20 @@ export const UserManager = () => {
                         <RoleBadge role={member.role} />
                       )}
 
-                      <div className="relative" ref={openMenuId === member.id ? dropdownContainerRef : null}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === member.id ? null : member.id);
-                          }}
-                          className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
-                        >
-                          <MoreHorizontal size={15} />
-                        </button>
-
-                        {openMenuId === member.id && (
-                          <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium">
-                            <Link to={`/admin/users/${member.user.id}`} onClick={() => setOpenMenuId(null)} className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                             <User size={14} /> View Profile
-                            </Link>
-                            {canRemove ? (
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  setModalConfig({
-                                    isOpen: true,
-                                    title: "Remove Team Member",
-                                    message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
-                                    confirmText: "Remove Member",
-                                    isDanger: true,
-                                    action: () => removeMutation.mutate(member.id),
-                                  });
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
-                              >
-                                <Trash2 size={14} /> Remove Member
-                              </button>
-                            ) : (
-                              <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
-                                <Trash2 size={14} /> Remove Member
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <MemberActionsMenu
+                        profileHref={`/admin/users/${member.user.id}`}
+                        canRemove={canRemove}
+                        onRemoveClick={() =>
+                          setModalConfig({
+                            isOpen: true,
+                            title: "Remove Team Member",
+                            message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
+                            confirmText: "Remove Member",
+                            isDanger: true,
+                            action: () => removeMutation.mutate(member.id),
+                          })
+                        }
+                      />
                     </div>
                   </div>
 
@@ -292,51 +251,22 @@ export const UserManager = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500">{formatLocalDate(member.user.created_at)}</td>
                         
                         <td className="px-6 py-4 text-right whitespace-nowrap relative z-10">
-                          <div className="relative inline-block text-left" ref={openMenuId === member.id ? dropdownContainerRef : null}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuId(openMenuId === member.id ? null : member.id);
-                              }}
-                              className="p-1.5 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors inline-flex items-center justify-center"
-                            >
-                              <MoreHorizontal size={15} />
-                            </button>
-
-                            {openMenuId === member.id && (
-                              /* Dynamic context classes to handle first row vs subsequent rows */
-                              <div className={`absolute right-0 z-50 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium text-left ${
-                                isFirstRow 
-                                  ? "top-full mt-1 origin-top-right" 
-                                  : "bottom-full mb-1 origin-bottom-right"
-                              }`}>
-                                <Link to={`/admin/users/${member.user.id}`} onClick={() => setOpenMenuId(null)} className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
-                                  <User size={14} /> View Profile
-                                </Link>
-                                {canRemove ? (
-                                  <button
-                                    onClick={() => {
-                                      setOpenMenuId(null);
-                                      setModalConfig({
-                                        isOpen: true,
-                                        title: "Remove Team Member",
-                                        message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
-                                        confirmText: "Remove Member",
-                                        isDanger: true,
-                                        action: () => removeMutation.mutate(member.id),
-                                      });
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
-                                  >
-                                    <Trash2 size={14} /> Remove Member
-                                  </button>
-                                ) : (
-                                  <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
-                                    <Trash2 size={14} /> Remove Member
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                          <div className="inline-block text-left">
+                            <MemberActionsMenu
+                              profileHref={`/admin/users/${member.user.id}`}
+                              canRemove={canRemove}
+                              direction={isFirstRow ? "down" : "up"}
+                              onRemoveClick={() =>
+                                setModalConfig({
+                                  isOpen: true,
+                                  title: "Remove Team Member",
+                                  message: `Are you sure you want to remove ${member.user.first_name} ${member.user.last_name} from this workspace?`,
+                                  confirmText: "Remove Member",
+                                  isDanger: true,
+                                  action: () => removeMutation.mutate(member.id),
+                                })
+                              }
+                            />
                           </div>
                         </td>
                       </tr>
