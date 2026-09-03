@@ -21,7 +21,6 @@ interface FooterSettingsData {
     facebook: string;
   };
   copyright_text: string;
-  show_quick_links: boolean;
   show_categories: boolean;
 }
 
@@ -40,7 +39,6 @@ const defaultFooterSettings: FooterSettingsData = {
     facebook: '',
   },
   copyright_text: 'Powered by INKO',
-  show_quick_links: true,
   show_categories: true,
 };
 
@@ -84,7 +82,6 @@ export const FooterSettings: React.FC = () => {
           facebook: data.social_links?.facebook ?? '',
         },
         copyright_text: data.copyright_text ?? 'Powered by INKO',
-        show_quick_links: data.show_quick_links ?? true,
         show_categories: data.show_categories ?? true,
       };
     },
@@ -353,19 +350,6 @@ export const FooterSettings: React.FC = () => {
           <h2 className="text-lg font-bold text-zinc-900 mb-4">Footer Sections</h2>
           
           <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer p-3 hover:bg-zinc-50 rounded-lg transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.show_quick_links !== false}
-                onChange={(e) => handleChange('show_quick_links', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary mt-0.5"
-              />
-              <div>
-                <div className="font-bold text-zinc-900">Show Quick Links</div>
-                <div className="text-sm text-zinc-600">Display navigation links (Home, Blog, About, Contact)</div>
-              </div>
-            </label>
-
             <label className="flex items-start gap-3 cursor-pointer p-3 hover:bg-zinc-50 rounded-lg transition-colors">
               <input
                 type="checkbox"

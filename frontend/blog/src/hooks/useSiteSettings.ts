@@ -28,9 +28,6 @@ const defaultSiteSettings = {
   },
   footer: {
     footer_text: 'Your ideas, amplified.',
-    show_newsletter: true,
-    newsletter_title: 'Newsletter',
-    newsletter_description: 'Get the latest posts delivered to your inbox.',
     show_social_links: true,
     social_links: {
       github: null,
@@ -41,7 +38,6 @@ const defaultSiteSettings = {
       facebook: null,
     },
     copyright_text: '© {year} Inko. All rights reserved.',
-    show_quick_links: true,
     show_categories: true,
   },
   branding: {
@@ -69,11 +65,18 @@ export const useSiteSettings = () =>
     queryKey: ['allSettings'],
     queryFn: async () => {
       try {
-        const res = await api.get('/settings/all');
+        const res = await api.get('/settings/public');
         return res.data;
       } catch (error) {
         return defaultSiteSettings;
       }
     },
-    initialData: defaultSiteSettings,
+    // placeholderData (not initialData) so this still triggers a real fetch
+    // on first mount — initialData marks the query as already-fetched, which
+    // combined with staleTime below meant the real request never fired and
+    // Navbar/Footer were stuck on these defaults for the first 5 minutes.
+    placeholderData: defaultSiteSettings,
+    // Branding/copy rarely changes mid-session — avoid refetching on every
+    // Navbar/Footer remount across client-side navigations.
+    staleTime: 5 * 60 * 1000,
   });

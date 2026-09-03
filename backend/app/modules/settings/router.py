@@ -368,6 +368,23 @@ def send_contact_message(
     return {"ok": True, "message": "Message sent successfully."}
 
 
+@router.get("/public", response_model=AllSiteSettings)
+def get_public_settings(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_public_blog),
+):
+    """Aggregate settings for the live public blog site — anonymous visitors included."""
+    return AllSiteSettings(
+        general=get_setting(session, blog_id, "general", GeneralSettings),
+        about=get_setting(session, blog_id, "about_page", AboutPageSettings),
+        footer=get_setting(session, blog_id, "footer", FooterSettings),
+        branding=get_setting(session, blog_id, "branding", BrandingSettings),
+        seo=get_setting(session, blog_id, "seo", SEOSettings),
+        contact=get_setting(session, blog_id, "contact", ContactSettings),
+    )
+
+
 @router.get("/all", response_model=AllSiteSettings)
 def get_all_settings(
     blog_id: int,
