@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Clock, Eye, Loader2, TrendingUp } from 'lucide-react';
+import { Clock, Eye, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { Sidebar } from '../components/Sidebar';
+import { PageLoader } from '../components/PageLoader';
 import { formatLocalDate } from '../utils/dates';
+import { getReadingTime, getPlainExcerpt } from '../utils/posts';
+import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import type { PaginatedPosts } from '../types/post';
 
 // The homepage is a bounded teaser (featured + trending + a handful of
@@ -20,7 +23,8 @@ export const Home: React.FC = () => {
     queryFn: async () => {
       const res = await api.get('/posts/', { params: { limit: HOME_POST_LIMIT, sort: 'latest' } });
       return res.data;
-    }
+    },
+    staleTime: 60 * 1000,
   });
 
   // Exclude sample/welcome posts from all public display.
@@ -42,31 +46,6 @@ export const Home: React.FC = () => {
       .slice(0, 5);
   }, [displayPosts]);
 
-  const calculateReadingTime = (content: string) => {
-    if (!content) return 1;
-    const words = content.split(/\s+/).length;
-    return Math.max(1, Math.ceil(words / 200));
-  };
-
-  const getCleanExcerpt = (content: string, length: number = 150) => {
-    if (!content) return '';
-
-    const clean = content
-      .replace(/^#+\s/gm, '')
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/`(.+?)`/g, '$1')
-      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-      .replace(/!\[.*?\]\(.+?\)/g, '')
-      .replace(/```[\s\S]*?```/g, '')
-      .replace(/^\s*[-*+]\s/gm, '')
-      .replace(/^\s*\d+\.\s/gm, '')
-      .replace(/\n+/g, ' ')
-      .trim();
-
-    return clean.slice(0, length) + (clean.length > length ? '...' : '');
-  };
-
   const getVisibleTags = (post: any, limit: number) => post.tags?.slice(0, limit) || [];
   const getRemainingTagCount = (post: any, limit: number) => Math.max((post.tags?.length || 0) - limit, 0);
 
@@ -78,15 +57,13 @@ export const Home: React.FC = () => {
   const trendingPosts = filteredPosts?.slice(1, 5) || [];
   const regularPosts = filteredPosts?.slice(5) || [];
 
+  // The featured-post hero (rendered only when featuredPost exists) carries
+  // the page's <h1>. Without it, this section heading needs to be the <h1>
+  // instead, so the page always has exactly one.
+  const SectionHeading = featuredPost ? 'h2' : 'h1';
+
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
-        <p className="text-zinc-400 font-medium tracking-widest uppercase text-xs">
-          Loading Stories
-        </p>
-      </div>
-    );
+    return <PageLoader label="Loading stories" />;
   }
 
   return (
@@ -98,7 +75,8 @@ export const Home: React.FC = () => {
               <article className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-2xl transition-all duration-500">
                 <div className="relative overflow-hidden h-[440px] sm:h-[500px] md:h-[600px]">
                   <img
-                    src={featuredPost.thumbnail_url || "/placeholder.jpg"}
+                    src={getThumbnailUrl(featuredPost.thumbnail_url, 1200)}
+                    onError={handleThumbnailError}
                     alt={featuredPost.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
@@ -134,14 +112,14 @@ export const Home: React.FC = () => {
                       </h1>
 
                       <p className="text-white/95 text-sm sm:text-lg md:text-xl mb-5 sm:mb-6 line-clamp-3 sm:line-clamp-2 leading-relaxed">
-                        {getCleanExcerpt(featuredPost.content, 160)}
+                        {getPlainExcerpt(featuredPost.content, 160)}
                       </p>
 
                       <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base text-white/90">
                         <div className="flex items-center gap-2">
                           <Clock size={18} className="text-white/80" />
                           <span className="font-medium">
-                            {calculateReadingTime(featuredPost.content)} min
+                            {getReadingTime(featuredPost.content)} min
                             read
                           </span>
                         </div>
@@ -168,9 +146,9 @@ export const Home: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <h2 className="text-2xl md:text-3xl font-black text-zinc-900">
+            <SectionHeading className="text-2xl md:text-3xl font-black text-zinc-900">
               {filter === "all" ? "Latest Articles" : "Featured Projects"}
-            </h2>
+            </SectionHeading>
             <p className="text-zinc-600 mt-1">
               {filteredPosts?.length || 0}{" "}
               {filter === "all" ? "posts" : "projects"} &bull; Updated daily
@@ -219,7 +197,8 @@ export const Home: React.FC = () => {
                     >
                       <div className="relative h-52 overflow-hidden">
                         <img
-                          src={post.thumbnail_url || "/placeholder.jpg"}
+                          src={getThumbnailUrl(post.thumbnail_url, 500)}
+                          onError={handleThumbnailError}
                           alt={post.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           loading="lazy"
@@ -250,13 +229,13 @@ export const Home: React.FC = () => {
                         </h3>
 
                         <p className="text-sm text-zinc-600 mb-4 line-clamp-2 leading-relaxed">
-                          {getCleanExcerpt(post.content, 100)}
+                          {getPlainExcerpt(post.content, 100)}
                         </p>
 
                         <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
                           <span className="flex items-center gap-1.5">
                             <Clock size={14} />
-                            {calculateReadingTime(post.content)} min
+                            {getReadingTime(post.content)} min
                           </span>
                           <span>&bull;</span>
                           <span>
@@ -310,7 +289,7 @@ export const Home: React.FC = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <div className="sticky top-8">
+            <div className="lg:sticky lg:top-24">
               <Sidebar popularPosts={popularPosts} tags={tags} />
             </div>
           </div>

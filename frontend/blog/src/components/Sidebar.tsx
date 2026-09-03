@@ -41,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <h4 className="text-sm font-bold leading-snug group-hover:text-primary transition-colors">
                     {post.title}
                   </h4>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] uppercase text-zinc-400">
+                  <div className="mt-1 flex items-center gap-2 text-[10px] uppercase text-zinc-500">
                     <span>{formatLocalDate(post.created_at)}</span>
                     <span>&bull;</span>
                     <span className="inline-flex items-center gap-1">

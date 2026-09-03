@@ -5,29 +5,17 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css';
-import { AlertTriangle, Calendar, ChevronRight, Eye, FileQuestion, Loader2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, Eye, FileQuestion } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
+import { getPlainExcerpt, getReadingTime } from '../utils/posts';
+import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import api from '../api/blogApi';
 import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';
+import { PageLoader } from '../components/PageLoader';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { applyPageMeta, captureCurrentMeta } from '../utils/seo';
 import type { PaginatedPosts, PostAuthor } from '../types/post';
-
-const getPlainExcerpt = (content: string, length: number = 160) => {
-  if (!content) return '';
-  const clean = content
-    .replace(/^#+\s/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`(.+?)`/g, '$1')
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-    .replace(/!\[.*?\]\(.+?\)/g, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/\n+/g, ' ')
-    .trim();
-  return clean.slice(0, length) + (clean.length > length ? '...' : '');
-};
 
 type PostDetailResponse = {
   id: number;
@@ -64,6 +52,7 @@ export const PostDetail = () => {
     queryKey: ['posts', 'related-sidebar'],
     queryFn: async () => (await api.get('/posts/', { params: { limit: 100, sort: 'latest' } })).data,
     // we don't need to block rendering for sidebar; keep default options
+    staleTime: 5 * 60 * 1000,
   });
   const postsCache = postsCacheData?.items;
 
@@ -115,15 +104,32 @@ export const PostDetail = () => {
     return () => applyPageMeta(previous);
   }, [post, siteSettings]);
 
+  // Reading progress, measured against the article body itself (not the
+  // whole page) so the bar fills exactly as the reader moves through it —
+  // unaffected by the header/sidebar/comments around it.
+  const articleRef = React.useRef<HTMLElement>(null);
+  const [readingProgress, setReadingProgress] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!post) return;
+
+    const handleScroll = () => {
+      const el = articleRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const scrollable = rect.height - window.innerHeight;
+      const scrolled = -rect.top;
+      const progress = scrollable > 0 ? (scrolled / scrollable) * 100 : 0;
+      setReadingProgress(Math.min(100, Math.max(0, progress)));
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [post]);
+
   if (isLoading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center">
-        <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
-        <p className="text-zinc-400 font-medium tracking-widest uppercase text-xs">
-          Loading Story
-        </p>
-      </div>
-    );
+    return <PageLoader label="Loading story" minHeight="100vh" />;
   }
 
   if (!post) {
@@ -168,17 +174,17 @@ export const PostDetail = () => {
   const authorName = post.author?.first_name || post.author?.last_name ? `${post.author?.first_name} ${post.author?.last_name}` : 'Unknown author';
 
   return (
+    <>
+      {/* Reading progress */}
+      <div className="fixed top-0 left-0 right-0 z-60 h-1 bg-zinc-100">
+        <div
+          className="h-full bg-primary transition-[width] duration-150 motion-reduce:transition-none"
+          style={{ width: `${readingProgress}%` }}
+        />
+      </div>
+
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
       <div className="lg:col-span-8">
-        {/* Breadcrumbs */}
-        <nav className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400 mb-6 sm:mb-8">
-          <a href="/" className="hover:text-primary">
-            Home
-          </a>
-          <ChevronRight size={12} />
-          <span className="text-zinc-900">{post.title}</span>
-        </nav>
-
         {/* Article Header */}
         <header className="mb-10">
           <div className="flex flex-wrap gap-2 mb-4">
@@ -217,36 +223,61 @@ export const PostDetail = () => {
               {formatLocalDate(post.created_at)}
             </span>
             <span className="flex items-center gap-1 text-sm">
+              <Clock size={14} />
+              {getReadingTime(post.content)} min read
+            </span>
+            <span className="flex items-center gap-1 text-sm">
               <Eye size={14} />
               {(post.views || 0).toLocaleString()} views
             </span>
           </div>
         </header>
 
+        {/* Featured Thumbnail */}
+        {post.thumbnail_url && (
+          <div className="mb-10 aspect-video overflow-hidden rounded-3xl bg-zinc-100">
+            <img
+              src={getThumbnailUrl(post.thumbnail_url, 1200)}
+              onError={handleThumbnailError}
+              alt={post.title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+        )}
+
         {/* Article Content */}
-        <article className="prose prose-slate max-w-none prose-img:rounded-3xl prose-headings:font-black prose-a:text-zinc-900 prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto">
+        <article
+          ref={articleRef}
+          className="prose prose-slate prose-img:rounded-3xl prose-headings:font-black prose-a:text-zinc-900 prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto"
+        >
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
             components={{
+              // Shifted one level below the page's own <h1> (the post title,
+              // rendered above this article) so author-written Markdown
+              // headings never produce a second top-level heading.
               h1: ({ node, ...props }) => (
-                <h1
+                <h2
                   className="text-4xl font-bold mb-6 mt-8 text-zinc-900"
                   {...props}
                 />
               ),
               h2: ({ node, ...props }) => (
-                <h2
+                <h3
                   className="text-3xl font-bold mb-5 mt-7 text-zinc-900"
                   {...props}
                 />
               ),
               h3: ({ node, ...props }) => (
-                <h3
+                <h4
                   className="text-2xl font-bold mb-4 mt-6 text-zinc-900"
                   {...props}
                 />
               ),
+              h4: ({ node, ...props }) => <h5 {...props} />,
               p: ({ node, ...props }) => (
                 <p className="mb-4 text-zinc-700 leading-relaxed" {...props} />
               ),
@@ -290,7 +321,7 @@ export const PostDetail = () => {
               },
               pre: ({ node, ...props }) => (
                 <pre
-                  className="bg-zinc-900 p-4 rounded-lg overflow-x-auto my-4"
+                  className="bg-zinc-900 p-4 rounded-lg overflow-x-auto my-4 scroll-shadows [--scroll-shadow-bg:#18181b]"
                   {...props}
                 />
               ),
@@ -310,7 +341,7 @@ export const PostDetail = () => {
               ),
               table: ({ node, ...props }) => (
                 <table
-                  className="w-full border-collapse border border-zinc-300 my-4"
+                  className="w-full border-collapse border border-zinc-300 my-4 scroll-shadows"
                   {...props}
                 />
               ),
@@ -352,7 +383,8 @@ export const PostDetail = () => {
                 >
                   <div className="aspect-[16/10] overflow-hidden bg-zinc-100">
                     <img
-                      src={relatedPost.thumbnail_url || '/placeholder.jpg'}
+                      src={getThumbnailUrl(relatedPost.thumbnail_url, 400)}
+                      onError={handleThumbnailError}
                       alt={relatedPost.title}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
@@ -377,7 +409,7 @@ export const PostDetail = () => {
                     </h3>
 
                     <p className="mt-3 text-sm leading-relaxed text-zinc-600 line-clamp-2">
-                      {relatedPost.excerpt || 'Read this related article for more context and detail.'}
+                      {relatedPost.excerpt || getPlainExcerpt(relatedPost.content, 120)}
                     </p>
 
                     <div className="mt-4 flex items-center gap-2 text-xs font-medium text-zinc-500">
@@ -400,5 +432,6 @@ export const PostDetail = () => {
         <Sidebar popularPosts={popularPosts} tags={allTags} />
       </div>
     </div>
+    </>
   );
 };
