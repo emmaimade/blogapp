@@ -190,15 +190,15 @@ export const TagManager = () => {
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${getColorForTag(tag.name)}`}>
                       <TagIcon size={18} />
                     </div>
-                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button 
+                    <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                      <button
                         onClick={() => { setEditingId(tag.id); setEditValue(tag.name); }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
                         aria-label={`Edit ${tag.name}`}
                       >
                         <Edit3 size={16} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => setDeleteTarget(tag)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors"
                         aria-label={`Delete ${tag.name}`}

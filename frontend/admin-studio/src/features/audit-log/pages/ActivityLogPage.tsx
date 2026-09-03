@@ -112,9 +112,9 @@ export const ActivityLogPage = () => {
       </div>
 
       {/* Control Bar */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-zinc-50/80 p-3.5 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800">
-        <div className="flex flex-1 items-center gap-3 min-w-[260px]">
-          <div className="relative flex-1 max-w-xs">
+      <div className="mt-6 flex flex-col gap-3 rounded-2xl bg-zinc-50/80 p-3.5 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-1 sm:flex-row sm:items-center sm:min-w-65">
+          <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
             <input
               type="text"
@@ -128,7 +128,7 @@ export const ActivityLogPage = () => {
           <select
             value={resourceFilter}
             onChange={(e) => { setResourceFilter(e.target.value); setPage(0); }}
-            className="rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-700 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 sm:w-auto"
           >
             <option value="all">All Resources</option>
             <option value="post">Posts</option>
@@ -142,7 +142,7 @@ export const ActivityLogPage = () => {
         <button
           onClick={() => refetch()}
           disabled={isLoading || isFetching}
-          className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 transition"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 transition sm:w-auto"
         >
           <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
           <span>Refresh</span>
@@ -195,8 +195,8 @@ export const ActivityLogPage = () => {
                             <FormattedDiffs log={log} />
 
                             {/* Metadata */}
-                            <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-400">
-                              <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
+                              <span className="break-all font-medium text-zinc-600 dark:text-zinc-300">
                                 {log.actor_email || 'System'}
                               </span>
                               {isReaderComment && (
