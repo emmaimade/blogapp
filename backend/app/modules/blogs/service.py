@@ -546,6 +546,24 @@ def update_onboarding_profile(blog_id: int, payload: OnboardingProfileUpdate, se
             "font_body": "Inter",
         },
     )
+    # Seed the footer's tagline from the same value so the public site doesn't
+    # show the generic default the moment onboarding finishes. Footer Settings
+    # is only reachable after onboarding completes, so this can't yet be
+    # clobbering a deliberate edit — merge onto the existing row (rather than
+    # replacing it outright) to preserve its other fields regardless.
+    existing_footer = session.exec(
+        select(SiteSettings).where(SiteSettings.blog_id == blog_id, SiteSettings.setting_key == "footer")
+    ).first()
+    if existing_footer:
+        try:
+            footer_data = FooterSettings.model_validate(json.loads(existing_footer.setting_value)).model_dump()
+        except Exception:
+            footer_data = FooterSettings().model_dump()
+    else:
+        footer_data = FooterSettings().model_dump()
+    footer_data["footer_text"] = payload.tagline
+    _set_site_setting(session, blog_id, "footer", footer_data)
+
     summary, subscription = _sync_onboarding_state(session, blog)
     session.commit()
     session.refresh(blog)
