@@ -66,43 +66,45 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
-        <Link
-          to="/"
-          className="flex items-center gap-2 min-w-0 group"
-          onClick={closeMenu}
-        >
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={siteName}
-              className="h-8 w-auto object-contain"
-            />
-          ) : (
-            <span
-              className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900 transition-colors truncate"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {siteName}
-              <span style={{ color: primaryColor }}>.</span>
-            </span>
-          )}
-        </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-10">
+          <Link
+            to="/"
+            className="flex items-center gap-2 min-w-0 group"
+            onClick={closeMenu}
+          >
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={siteName}
+                className="h-8 w-auto object-contain"
+              />
+            ) : (
+              <span
+                className="text-xl sm:text-2xl font-black tracking-tighter text-zinc-900 transition-colors truncate"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {siteName}
+                <span style={{ color: primaryColor }}>.</span>
+              </span>
+            )}
+          </Link>
 
-        <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={getDesktopNavClassName(link.to)}
-              style={
-                isNavItemActive(link.to) ? { color: primaryColor } : undefined
-              }
-              aria-current={isNavItemActive(link.to) ? "page" : undefined}
-            >
-              {link.label}
-            </NavLink>
-          ))}
+          <div className="hidden md:flex items-center gap-4">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={getDesktopNavClassName(link.to)}
+                style={
+                  isNavItemActive(link.to) ? { color: primaryColor } : undefined
+                }
+                aria-current={isNavItemActive(link.to) ? "page" : undefined}
+              >
+                {link.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
@@ -151,39 +153,43 @@ export const Navbar: React.FC = () => {
 
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-zinc-100 bg-white/95 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col gap-2">
-            {navLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={getMobileNavClassName(link.to)}
-                aria-current={isNavItemActive(link.to) ? "page" : undefined}
-                onClick={closeMenu}
-              >
-                {link.label}
-              </NavLink>
-            ))}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+            <div className="flex flex-col gap-2">
+              {navLinks.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={getMobileNavClassName(link.to)}
+                  aria-current={isNavItemActive(link.to) ? "page" : undefined}
+                  onClick={closeMenu}
+                >
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
 
-            {isAuthenticated ? (
-              <button
-                onClick={handleLogout}
-                className="mt-2 inline-flex items-center justify-center gap-2 bg-zinc-900 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-900 transition"
-              >
-                Logout
-              </button>
-            ) : (
-              <Link
-                to="/auth"
-                className="mt-2 inline-flex items-center justify-center gap-2 text-white px-5 py-3 rounded-2xl text-sm font-bold transition shadow-lg"
-                style={{
-                  background: `${primaryColor}`,
-                  boxShadow: `0 10px 25px -15px ${primaryColor}`,
-                }}
-                onClick={closeMenu}
-              >
-                <User size={16} /> Sign In
-              </Link>
-            )}
+            <div className="mt-4 border-t border-zinc-100 pt-4">
+              {isAuthenticated ? (
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center justify-center gap-2 bg-zinc-900 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-900 transition"
+                >
+                  Logout
+                </button>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="inline-flex items-center justify-center gap-2 text-white px-5 py-3 rounded-2xl text-sm font-bold transition shadow-lg"
+                  style={{
+                    background: `${primaryColor}`,
+                    boxShadow: `0 10px 25px -15px ${primaryColor}`,
+                  }}
+                  onClick={closeMenu}
+                >
+                  <User size={16} /> Sign In
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}
