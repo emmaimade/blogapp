@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Bell, Check, Inbox } from "lucide-react";
@@ -40,7 +40,11 @@ export const NotificationBell = () => {
     markAllReadMutation,
   } = useNotifications();
 
-  useEffect(() => {
+  // Layout effect (not a regular effect) so the position is measured and
+  // set *before* the browser paints - a regular effect runs after paint,
+  // which meant the very first open of a session rendered nothing for a
+  // frame (position still null) before popping in a tick later.
+  useLayoutEffect(() => {
     if (open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const idealWidth = 320; // matches w-80
@@ -51,9 +55,17 @@ export const NotificationBell = () => {
       const width = Math.min(idealWidth, availableWidth);
 
       setPosition({ top: rect.bottom + 8, right, width });
-      refetch();
     }
   }, [open]);
+
+  // Kept separate from the layout effect above: refreshing notification
+  // data on open isn't paint-sensitive, and a network call has no business
+  // inside an effect that's meant to stay synchronous and cheap. The list
+  // itself is prefetched on mount (see useNotifications) so this is a
+  // background refresh of already-visible data, not the only source of it.
+  useEffect(() => {
+    if (open) refetch();
+  }, [open, refetch]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -24,7 +24,13 @@ export const useNotifications = () => {
   const { data: notifications, refetch } = useQuery<AppNotification[]>({
     queryKey: ['notifications-list'],
     queryFn: async () => (await api.get('/notifications/')).data,
-    enabled: false, // fetched on demand when the dropdown opens
+    // Fetched proactively so the list is already warm by the time someone
+    // opens the bell - opening it then just reveals cached data instantly,
+    // with refetch() below still called on open to refresh it in the
+    // background. Previously this was `enabled: false` ("fetch on open"),
+    // which made every open a cold network round-trip with nothing to show
+    // until it resolved.
+    staleTime: 30000,
   });
 
   const markReadMutation = useMutation({
