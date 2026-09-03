@@ -335,7 +335,9 @@ useEffect(() => {
   const rootLabel = "Dashboard";
   const sectionKey = adminSegments[0];
   const sectionLabel = sectionKey ? routeLabels[sectionKey] ?? pageTitle : rootLabel;
-  const pageBreadcrumbs = [rootLabel];
+  const pageBreadcrumbs: { label: string; href: string }[] = [
+    { label: rootLabel, href: "/admin/dashboard" },
+  ];
   const isDashboardRoot =
     location.pathname === "/admin/dashboard" ||
     location.pathname === "/admin/superadmin";
@@ -351,11 +353,11 @@ useEffect(() => {
       : Math.max(0, onboardingStepOrder.indexOf(activeBlog?.onboarding_step ?? "about"));
 
   if (!isDashboardRoot && sectionLabel && sectionLabel !== rootLabel) {
-    pageBreadcrumbs.push(sectionLabel);
+    pageBreadcrumbs.push({ label: sectionLabel, href: `/admin/${sectionKey}` });
   }
 
   if (!isDashboardRoot && pageTitle !== sectionLabel && pageTitle !== rootLabel) {
-    pageBreadcrumbs.push(pageTitle);
+    pageBreadcrumbs.push({ label: pageTitle, href: location.pathname });
   }
 
   // Shared User Action Stack UI markup block.
@@ -588,25 +590,31 @@ useEffect(() => {
           {!isDashboardRoot && (
             <div className="mb-6">
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-                {pageBreadcrumbs.map((crumb, index) => (
-                  <React.Fragment key={`${crumb}-${index}`}>
-                    {index > 0 && (
-                      <ChevronRight
-                        size={14}
-                        className="text-zinc-400 dark:text-zinc-500"
-                      />
-                    )}
-                    <span
-                      className={
-                        index === pageBreadcrumbs.length - 1
-                          ? "text-zinc-900 dark:text-white"
-                          : ""
-                      }
-                    >
-                      {crumb}
-                    </span>
-                  </React.Fragment>
-                ))}
+                {pageBreadcrumbs.map((crumb, index) => {
+                  const isCurrent = index === pageBreadcrumbs.length - 1;
+                  return (
+                    <React.Fragment key={`${crumb.label}-${index}`}>
+                      {index > 0 && (
+                        <ChevronRight
+                          size={14}
+                          className="text-zinc-400 dark:text-zinc-500"
+                        />
+                      )}
+                      {isCurrent ? (
+                        <span className="text-zinc-900 dark:text-white">
+                          {crumb.label}
+                        </span>
+                      ) : (
+                        <Link
+                          to={crumb.href}
+                          className="hover:text-zinc-900 dark:hover:text-white hover:underline"
+                        >
+                          {crumb.label}
+                        </Link>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             </div>
           )}
