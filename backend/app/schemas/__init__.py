@@ -1,4 +1,4 @@
-from .audit import AuditLogRead, AuditLogQueryParams
+from .audit import AuditLogRead, AuditLogQueryParams, MyAuditLogRead
 from .errors import ErrorResponse, ValidationErrorResponse
 from .pagination import PaginatedResponse
 from .comments import CommentAdminRead, CommentCreate, CommentRead
@@ -76,6 +76,7 @@ __all__ = [
     "PaginatedResponse",
     "AuditLogRead",
     "AuditLogQueryParams",
+    "MyAuditLogRead",
     "FlagContentCreate",
     "ModerationActionCreate",
     "ModerationActionRead",

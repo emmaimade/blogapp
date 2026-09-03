@@ -1,5 +1,6 @@
+import json
 import random
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
@@ -7,6 +8,8 @@ from sqlmodel import Session, select
 from slugify import slugify
 
 from app.core.audit import add_audit_log, resolve_primary_blog_id
+from app.core.geolocation import describe_location
+from app.core.user_agent import describe_user_agent
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.notifications import add_notification
@@ -40,7 +43,7 @@ from app.models import (
     OnboardingStep,
     User,
 )
-from app.schemas import UserCreate, UserRead, UserUpdate
+from app.schemas import MyAuditLogRead, UserCreate, UserRead, UserUpdate
 from app.modules.auth.service import authenticate_user, build_login_response, build_user_payload
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -198,7 +201,7 @@ async def get_current_user_info(
     return build_user_payload(current_user.id, session)
 
 
-@router.get("/me/audit-logs")
+@router.get("/me/audit-logs", response_model=List[MyAuditLogRead])
 def get_my_audit_logs(
     skip: int = 0,
     limit: int = 50,
@@ -221,9 +224,31 @@ def get_my_audit_logs(
         .offset(skip)
         .limit(limit)
     )
-    
+
     logs = session.exec(statement).all()
-    return logs
+
+    # Resolve each unique IP once per page rather than once per row — the
+    # same login location typically repeats across many entries, and each
+    # resolution is an external network call against a rate-limited API.
+    location_by_ip: dict[str, Optional[str]] = {}
+    for log in logs:
+        if log.ip_address and log.ip_address not in location_by_ip:
+            location_by_ip[log.ip_address] = describe_location(log.ip_address)
+
+    return [
+        MyAuditLogRead(
+            id=log.id,
+            action=log.action,
+            resource_type=log.resource_type,
+            details=json.loads(log.details) if log.details else None,
+            # A bare IP means little to the person it belongs to — resolve it
+            # into something recognizable at a glance instead.
+            device=describe_user_agent(log.user_agent),
+            location=location_by_ip.get(log.ip_address) if log.ip_address else None,
+            created_at=log.created_at,
+        )
+        for log in logs
+    ]
 
 
 @router.get("/{user_id}", response_model=UserRead)

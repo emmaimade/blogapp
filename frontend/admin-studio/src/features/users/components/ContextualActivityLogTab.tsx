@@ -11,7 +11,13 @@ interface AuditLogEntry {
   id: number;
   action: string;
   description: string | null;
+  // Populated on the superadmin-scoped endpoint only (platform-level abuse
+  // investigation). The workspace endpoint omits it — owners/editors have no
+  // operational need for a teammate's or reader's IP. The self endpoint
+  // resolves it into `device`/`location` instead of showing a bare address.
   ip_address: string | null;
+  device?: string | null;
+  location?: string | null;
   created_at: string;
   actor_email: string | null;
 }
@@ -141,6 +147,9 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
                     </p>
                   )}
                   <div className="flex gap-3 text-[10px] text-zinc-400 pt-1">
+                    {accessTier === 'self' && (log.location || log.device) && (
+                      <span>{[log.location, log.device].filter(Boolean).join(' · ')}</span>
+                    )}
                     {log.ip_address && <span>IP: {log.ip_address}</span>}
                     {accessTier === 'superadmin' && log.actor_email && (
                       <span>Actor: {log.actor_email}</span>

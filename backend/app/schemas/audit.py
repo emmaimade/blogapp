@@ -26,6 +26,27 @@ class AuditLogRead(UTCDatetimeMixin, BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MyAuditLogRead(UTCDatetimeMixin, BaseModel):
+    """
+    Response shape for GET /users/me/audit-logs — a user's own security
+    trail. Deliberately doesn't carry a raw ip_address: showing a bare IP
+    to the account owner themselves is low-value ("was this me?" is hard
+    to answer from a number), so it's resolved into `device` (from the
+    stored user agent) and `location` (best-effort IP geolocation; None
+    for unresolvable/private IPs or if the lookup fails) instead.
+    """
+    id: int
+    action: str
+    resource_type: str
+    description: Optional[str] = None
+    details: Optional[dict] = None
+    device: Optional[str] = None
+    location: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AuditLogQueryParams(BaseModel):
     skip: int = Query(default=0, ge=0, description="Pagination skip offset")
     limit: int = Query(default=50, ge=1, le=200, description="Max entries to return")

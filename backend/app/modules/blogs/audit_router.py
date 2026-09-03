@@ -35,8 +35,14 @@ def _to_audit_log_read(log: AuditLog) -> AuditLogRead:
         blog_id=log.blog_id,
         details=details,
         description=_describe(log, details),
-        ip_address=log.ip_address,
-        user_agent=log.user_agent,
+        # Deliberately omitted: this workspace-scoped log is visible to
+        # owners AND editors, and covers every actor including ordinary
+        # commenters, not just team members. Neither role has an
+        # operational need for anyone else's IP/device — that's a
+        # self-service (my own activity) and superadmin (abuse
+        # investigation) concern, not a workspace-management one.
+        ip_address=None,
+        user_agent=None,
         created_at=log.created_at,
     )
 
