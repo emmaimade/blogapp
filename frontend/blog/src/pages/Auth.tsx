@@ -8,6 +8,7 @@ import {
   User as UserIcon,
   ArrowRight,
   ArrowLeft,
+  CheckCircle2,
 } from "lucide-react";
 import api from "../api/blogApi";
 import toast from "react-hot-toast";
@@ -31,7 +32,7 @@ const loginWithFallback = async (payload: URLSearchParams) => {
 
 export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [step, setStep] = useState<"email" | "username" | "password">("email");
+  const [step, setStep] = useState<"email" | "username" | "password" | "forgot">("email");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -39,6 +40,9 @@ export const AuthPage: React.FC = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -48,6 +52,7 @@ export const AuthPage: React.FC = () => {
     setMode(newMode);
     setStep("email");
     setFormData({ email: "", password: "", username: "" });
+    setResetEmailSent(false);
   };
 
   // Handle email step
@@ -142,6 +147,40 @@ export const AuthPage: React.FC = () => {
     }
   };
 
+  // Switch into the "forgot password" flow, pre-filling whatever email was
+  // already typed on the password step.
+  const openForgotPassword = () => {
+    setForgotEmail(formData.email);
+    setResetEmailSent(false);
+    setStep("forgot");
+  };
+
+  const backToSignIn = () => {
+    setStep("email");
+    setResetEmailSent(false);
+    setFormData({ ...formData, password: "" });
+  };
+
+  const handleForgotPasswordSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!forgotEmail.trim()) {
+      toast.error("Please enter your email");
+      return;
+    }
+
+    setIsSendingReset(true);
+    try {
+      await api.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      setResetEmailSent(true);
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.detail || "Unable to send the recovery email right now.",
+      );
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
   // Get contextual message
   const getMessage = () => {
     if (step === "email") {
@@ -150,6 +189,8 @@ export const AuthPage: React.FC = () => {
         : "Create your account to get started";
     } else if (step === "username") {
       return "Choose a username";
+    } else if (step === "forgot") {
+      return "We'll email you a secure link to reset it";
     } else {
       return mode === "login"
         ? `Welcome back, ${formData.email}`
@@ -167,12 +208,16 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 py-12 px-4">
       <div className="max-w-md w-full">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black text-zinc-900">
-            {mode === "login" ? "Welcome Back!" : "Join the Community"}
+            {step === "forgot"
+              ? "Reset your password"
+              : mode === "login"
+                ? "Welcome Back!"
+                : "Join the Community"}
           </h2>
           <p className="text-zinc-600 mt-2">{getMessage()}</p>
         </div>
@@ -206,7 +251,7 @@ export const AuthPage: React.FC = () => {
           )}
 
           {/* Progress Indicator */}
-          {step !== "email" && (
+          {step !== "email" && step !== "forgot" && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <button
@@ -348,12 +393,13 @@ export const AuthPage: React.FC = () => {
 
               {mode === "login" && (
                 <div className="text-right">
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={openForgotPassword}
                     className="text-sm text-zinc-900 hover:text-zinc-950 font-medium"
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
               )}
 
@@ -376,6 +422,90 @@ export const AuthPage: React.FC = () => {
             </form>
           )}
 
+          {/* STEP: Forgot password */}
+          {step === "forgot" && (
+            resetEmailSent ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+                <CheckCircle2 className="mx-auto mb-3 text-emerald-600" size={36} />
+                <h3 className="text-lg font-bold text-zinc-900">Check your inbox</h3>
+                <p className="mt-2 text-sm text-zinc-600">
+                  If that email is registered, we've sent a link to reset your password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleForgotPasswordSubmit()}
+                  disabled={isSendingReset}
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSendingReset ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    "Resend email"
+                  )}
+                </button>
+                <div className="mt-5">
+                  <button
+                    type="button"
+                    onClick={backToSignIn}
+                    className="inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-900"
+                  >
+                    <ArrowLeft size={16} />
+                    Back to sign in
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
+                <button
+                  type="button"
+                  onClick={backToSignIn}
+                  className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 transition-colors -mt-2 mb-2"
+                >
+                  <ArrowLeft size={16} />
+                  Back to sign in
+                </button>
+
+                <div>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
+                      <Mail size={20} />
+                    </div>
+                    <input
+                      autoFocus
+                      type="email"
+                      className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
+                      placeholder="you@example.com"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSendingReset}
+                  className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSendingReset ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending link...
+                    </>
+                  ) : (
+                    "Send reset link"
+                  )}
+                </button>
+              </form>
+            )
+          )}
+
           {/* Footer - Only show on email step */}
           {step === "email" && (
             <p className="mt-6 text-center text-sm text-zinc-600">
@@ -393,18 +523,6 @@ export const AuthPage: React.FC = () => {
             </p>
           )}
         </div>
-
-        {/* Terms */}
-        <p className="mt-8 text-center text-xs text-zinc-500">
-          By continuing, you agree to our{" "}
-          <a href="/terms" className="text-zinc-900 hover:underline">
-            Terms of Service
-          </a>{" "}
-          and{" "}
-          <a href="/privacy" className="text-zinc-900 hover:underline">
-            Privacy Policy
-          </a>
-        </p>
       </div>
     </div>
   );
