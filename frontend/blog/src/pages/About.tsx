@@ -8,13 +8,17 @@ export const About: React.FC = () => {
   const location = useLocation();
 
   // Fetch posts for real stats
-  const { data: posts } = useQuery({
+  const { data: postsData } = useQuery({
     queryKey: ['posts'],
     queryFn: async () => {
       const res = await api.get('/posts/');
       return res.data;
     }
   });
+
+  // Sample/welcome posts exist to show owners the dashboard has content —
+  // they shouldn't count toward public-facing stats.
+  const posts = (postsData?.items ?? []).filter((p: any) => !p.is_sample);
 
   // Fetch site settings (for customizable About page content)
   const { data: settings } = useQuery({
@@ -58,9 +62,9 @@ export const About: React.FC = () => {
 
   // Real, dynamic stats
   const stats = {
-    articles: posts?.length || 0,
-    views: posts?.reduce((sum: number, post: any) => sum + (post.views || 0), 0) || 0,
-    projects: posts?.filter((p: any) => p.is_project).length || 0
+    articles: posts.length,
+    views: posts.reduce((sum: number, post: any) => sum + (post.views || 0), 0),
+    projects: posts.filter((p: any) => p.is_project).length
   };
 
   const formatNumber = (num: number): string => {
@@ -86,11 +90,11 @@ export const About: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
       
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 border-b border-zinc-100">
+      <div className="bg-zinc-50 border-b border-zinc-100">
         <div className="max-w-4xl mx-auto px-6 py-20 md:py-32">
           <div className="text-center">
             {previewDraft && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-800 rounded-full mb-4 border border-purple-200 text-sm font-bold">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full mb-4 border border-primary/30 text-sm font-bold">
                 Previewing unsaved changes
               </div>
             )}

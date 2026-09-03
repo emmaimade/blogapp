@@ -74,6 +74,12 @@ export const Contact: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // social_links can have every key present but empty (unconfigured) —
+  // only links with an actual URL should make the section appear.
+  const activeSocialLinks = Object.entries(settings.social_links).filter(
+    ([, url]) => Boolean(url)
+  );
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       <div className="text-center mb-16">
@@ -194,7 +200,7 @@ export const Contact: React.FC = () => {
           </div>
 
           {/* Response Time */}
-          <div className="bg-gradient-to-br from-zinc-50 to-zinc-50 rounded-3xl p-6 border border-zinc-300">
+          <div className="bg-zinc-50 rounded-3xl p-6 border border-zinc-300">
             <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center mb-4">
               <Clock className="text-white" size={24} />
             </div>
@@ -225,12 +231,11 @@ export const Contact: React.FC = () => {
           )}
 
           {/* Social Links */}
-          {settings.show_social_links && Object.keys(settings.social_links).length > 0 && (
+          {settings.show_social_links && activeSocialLinks.length > 0 && (
             <div className="bg-zinc-900 rounded-3xl p-6 text-white">
               <h3 className="text-lg font-bold mb-4">Connect on Social</h3>
               <div className="space-y-3">
-                {Object.entries(settings.social_links).map(([platform, url]) => {
-                  if (!url) return null;
+                {activeSocialLinks.map(([platform, url]) => {
                   const Icon = platform === 'github' ? Github : platform === 'twitter' ? Twitter : Linkedin;
                   return (
                     <a

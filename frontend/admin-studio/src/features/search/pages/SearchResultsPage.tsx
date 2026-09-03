@@ -54,7 +54,7 @@ export const SearchResultsPage = () => {
   const postsQuery = useQuery<Post[]>({
     queryKey: ['adminSearch', 'posts', activeBlog?.id, q],
     queryFn: async () =>
-      (await api.get(`/blogs/${activeBlog!.id}/posts/search`, { params: { q } })).data,
+      (await api.get(`/blogs/${activeBlog!.id}/posts/search`, { params: { q, limit: 100 } })).data.items,
     enabled: !!activeBlog?.id && !!q,
   });
 

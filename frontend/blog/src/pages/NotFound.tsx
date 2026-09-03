@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Search, ArrowLeft, TrendingUp } from 'lucide-react';
+import { Home, Search, ArrowLeft, Newspaper, TrendingUp, User } from 'lucide-react';
 
 export const NotFound: React.FC = () => {
   const navigate = useNavigate();
@@ -8,8 +8,8 @@ export const NotFound: React.FC = () => {
 
   const popularLinks = [
     { title: 'Home', path: '/', icon: Home },
-    { title: 'About Me', path: '/about', icon: TrendingUp },
-    { title: 'All Posts', path: '/', icon: Search },
+    { title: 'About Me', path: '/about', icon: User },
+    { title: 'All Posts', path: '/blog', icon: Newspaper },
     { title: 'Projects', path: '/blog?filter=projects', icon: TrendingUp }
   ];
 
@@ -21,7 +21,7 @@ export const NotFound: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 via-zinc-50 to-zinc-50 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-6">
       <div className="max-w-2xl w-full text-center">
         
         {/* 404 Illustration */}
