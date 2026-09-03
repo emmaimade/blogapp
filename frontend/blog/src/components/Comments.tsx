@@ -95,11 +95,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
   };
 
   // Delete comment
-  const deleteComment = async (commentId: number) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) {
-      return;
-    }
-
+  const performDelete = async (commentId: number) => {
     try {
       await api.delete(`/comments/${commentId}`);
       toast.success('Comment deleted');
@@ -109,6 +105,32 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to delete comment');
     }
+  };
+
+  const deleteComment = (commentId: number) => {
+    setMenuOpen(null);
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-bold text-zinc-900">Delete this comment?</p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-3 py-1.5 rounded-lg text-sm font-bold text-zinc-600 hover:bg-zinc-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              performDelete(commentId);
+            }}
+            className="px-3 py-1.5 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), { duration: 10000 });
   };
 
   const displayComments = fetchedComments || [];
@@ -176,7 +198,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       <div className="space-y-6">
         {displayComments.length === 0 ? (
           <div className="text-center py-12 bg-zinc-50 rounded-2xl">
-            <p className="text-zinc-400 font-medium">No comments yet. Be the first to share your thoughts!</p>
+            <p className="text-zinc-500 font-medium">No comments yet. Be the first to share your thoughts!</p>
           </div>
         ) : (
           displayComments.map((comment: Comment) => {
@@ -208,7 +230,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                         <p className="font-bold text-zinc-900">
                           {comment.user?.first_name || 'Anonymous'}
                         </p>
-                        <p className="text-xs text-zinc-400">
+                        <p className="text-xs text-zinc-500">
                           {formatLocalDate(comment.created_at)}
                         </p>
                       </div>
@@ -285,7 +307,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                       </div>
                     ) : (
                       <p className={`text-zinc-700 mt-2 leading-relaxed ${
- isDeleted ? 'italic text-zinc-400' : ''
+ isDeleted ? 'italic text-zinc-500' : ''
  }`}>
                         {comment.content}
                       </p>
