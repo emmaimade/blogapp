@@ -26,6 +26,7 @@ from app.core.permissions import Permissions
 from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
+from app.modules.settings.router import blog_general_defaults
 from app.modules.users.router import _generate_random_handle
 from app.core.email import dispatch_email
 from app.core.email_templates import (
@@ -216,10 +217,11 @@ def _sync_onboarding_state(session: Session, blog: Blog) -> tuple[OnboardingSumm
     return summary, subscription
 
 
-def _initialize_blog_settings(session: Session, blog_id: int) -> None:
+def _initialize_blog_settings(session: Session, blog: Blog) -> None:
     """Initialize all default settings for a new blog on creation."""
+    blog_id = blog.id
     _set_site_setting(session, blog_id, "branding", BrandingSettings().model_dump())
-    _set_site_setting(session, blog_id, "general", GeneralSettings().model_dump())
+    _set_site_setting(session, blog_id, "general", blog_general_defaults(blog).model_dump())
     _set_site_setting(session, blog_id, "footer", FooterSettings().model_dump())
     _set_site_setting(session, blog_id, "seo", SEOSettings().model_dump())
     _set_site_setting(session, blog_id, "contact", ContactSettings().model_dump())
@@ -321,7 +323,7 @@ def create_blog(blog_data: BlogCreate, session: Session, current_user: User, req
     session.commit()
     session.refresh(new_blog)
 
-    _initialize_blog_settings(session, new_blog.id)
+    _initialize_blog_settings(session, new_blog)
 
     membership = BlogMember(
         user_id=current_user.id,
@@ -593,7 +595,7 @@ def update_onboarding_publication(blog_id: int, payload: OnboardingPublicationUp
         "general",
         {
             "site_name": blog.name,
-            "site_tagline": blog.tagline or "Your ideas, amplified",
+            "site_tagline": blog.tagline or "",
             "site_description": blog.description or "",
             "timezone": payload.timezone,
             "language": blog.primary_language,

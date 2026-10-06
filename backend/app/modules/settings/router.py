@@ -1,12 +1,13 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
@@ -50,12 +51,42 @@ cloudinary.config(
 router = APIRouter(prefix="/blogs/{blog_id}/settings", tags=["Settings"])
 
 
-def get_setting(session: Session, blog_id: int, key: str, default_model: Any) -> Dict:
+def get_setting(
+    session: Session, blog_id: int, key: str, default_model: Any, fallback: Optional[BaseModel] = None
+) -> Dict:
+    """Stored settings for `key`, else `fallback` (or the schema's defaults) when missing or unreadable."""
     statement = select(SiteSettings).where(SiteSettings.setting_key == key, SiteSettings.blog_id == blog_id)
     setting = session.exec(statement).first()
+    return _parse_setting(setting, blog_id, key, default_model, fallback)
+
+
+def get_settings(
+    session: Session, blog_id: int, sections: Dict[str, Any], fallbacks: Optional[Dict[str, BaseModel]] = None
+) -> Dict[str, Dict]:
+    """
+    Several settings sections in ONE query — {key: schema} in, {key: settings} out.
+    Each database round trip is expensive (remote DB), so pages that need many
+    sections must not fetch them one by one. Per-key behaviour matches get_setting.
+    """
+    fallbacks = fallbacks or {}
+    statement = select(SiteSettings).where(
+        SiteSettings.blog_id == blog_id,
+        SiteSettings.setting_key.in_(list(sections)),
+    )
+    rows = {row.setting_key: row for row in session.exec(statement).all()}
+    return {
+        key: _parse_setting(rows.get(key), blog_id, key, model, fallbacks.get(key))
+        for key, model in sections.items()
+    }
+
+
+def _parse_setting(
+    setting: Optional[SiteSettings], blog_id: int, key: str, default_model: Any, fallback: Optional[BaseModel]
+) -> Dict:
+    default = fallback if fallback is not None else default_model()
 
     if not setting:
-        return default_model().model_dump()
+        return default.model_dump()
 
     try:
         return default_model.model_validate(json.loads(setting.setting_value)).model_dump()
@@ -66,7 +97,57 @@ def get_setting(session: Session, blog_id: int, key: str, default_model: Any) ->
         logger.warning(
             "Falling back to defaults for setting %r on blog %s", key, blog_id, exc_info=True
         )
-        return default_model().model_dump()
+        return default.model_dump()
+
+
+def _finalize_general(general: Dict, blog: Blog) -> Dict:
+    general["site_name"] = general.get("site_name") or blog.name
+    return general
+
+
+def blog_general_defaults(blog: Blog) -> GeneralSettings:
+    """General settings derived from the blog record itself — the tenant's own identity."""
+    return GeneralSettings(
+        site_name=blog.name,
+        site_tagline=blog.tagline or "",
+        site_description=blog.description or "",
+        timezone=blog.timezone or "UTC",
+        language=blog.primary_language or "en",
+        posts_per_page=blog.posts_per_page or 10,
+    )
+
+
+def general_settings_for(session: Session, blog: Blog) -> Dict:
+    """
+    A blog's general settings, with its own name/tagline/description filling the
+    gaps when nothing (or nothing readable) is saved, and its name standing in
+    for a blank site_name — never the platform's brand.
+    """
+    general = get_setting(session, blog.id, "general", GeneralSettings, fallback=blog_general_defaults(blog))
+    return _finalize_general(general, blog)
+
+
+_ALL_SECTIONS = {
+    "general": GeneralSettings,
+    "about_page": AboutPageSettings,
+    "footer": FooterSettings,
+    "branding": BrandingSettings,
+    "seo": SEOSettings,
+    "contact": ContactSettings,
+}
+
+
+def all_settings_for(session: Session, blog: Blog) -> AllSiteSettings:
+    """Every settings section for a blog, fetched in a single query."""
+    s = get_settings(session, blog.id, _ALL_SECTIONS, fallbacks={"general": blog_general_defaults(blog)})
+    return AllSiteSettings(
+        general=_finalize_general(s["general"], blog),
+        about=s["about_page"],
+        footer=s["footer"],
+        branding=s["branding"],
+        seo=s["seo"],
+        contact=s["contact"],
+    )
 
 
 def _diff_fields(old_values: Dict, new_values: Dict) -> Dict[str, Dict[str, Any]]:
@@ -160,7 +241,7 @@ def upload_branding_asset(file: UploadFile, folder: str, allowed_types: tuple[st
 
 @router.get("/general", response_model=GeneralSettingsResponse)
 def get_general_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
-    return get_setting(session, blog_id, "general", GeneralSettings)
+    return general_settings_for(session, blog)
 
 
 @router.post("/general", response_model=GeneralSettingsResponse)
@@ -364,7 +445,12 @@ def send_contact_message(
         subject=payload.subject,
         message=payload.message,
     )
-    dispatch_email(background_tasks, contact_settings.contact_email, f"New message: {payload.subject}", email_html, email_text)
+    # No public contact address configured → deliver to the blog owner instead.
+    owner = session.get(User, blog.owner_id)
+    recipient = contact_settings.contact_email or (owner.email if owner else None)
+    if not recipient:
+        raise BadRequestError(ErrorCode.INVALID_INPUT, "This blog isn't accepting messages right now.")
+    dispatch_email(background_tasks, recipient, f"New message: {payload.subject}", email_html, email_text)
     return {"ok": True, "message": "Message sent successfully."}
 
 
@@ -375,14 +461,7 @@ def get_public_settings(
     blog: Blog = Depends(get_public_blog),
 ):
     """Aggregate settings for the live public blog site — anonymous visitors included."""
-    return AllSiteSettings(
-        general=get_setting(session, blog_id, "general", GeneralSettings),
-        about=get_setting(session, blog_id, "about_page", AboutPageSettings),
-        footer=get_setting(session, blog_id, "footer", FooterSettings),
-        branding=get_setting(session, blog_id, "branding", BrandingSettings),
-        seo=get_setting(session, blog_id, "seo", SEOSettings),
-        contact=get_setting(session, blog_id, "contact", ContactSettings),
-    )
+    return all_settings_for(session, blog)
 
 
 @router.get("/all", response_model=AllSiteSettings)
@@ -397,11 +476,5 @@ def get_all_settings(
     # blog site needs them to render footer/SEO/branding/about/contact for
     # anonymous visitors). require_blog_owner (via get_current_blog) already
     # validates blog_id + membership/superadmin, so no separate blog dep needed here.
-    return AllSiteSettings(
-        general=get_setting(session, blog_id, "general", GeneralSettings),
-        about=get_setting(session, blog_id, "about_page", AboutPageSettings),
-        footer=get_setting(session, blog_id, "footer", FooterSettings),
-        branding=get_setting(session, blog_id, "branding", BrandingSettings),
-        seo=get_setting(session, blog_id, "seo", SEOSettings),
-        contact=get_setting(session, blog_id, "contact", ContactSettings),
-    )
+    # session.get hits the identity map — require_blog_owner already loaded this blog.
+    return all_settings_for(session, session.get(Blog, blog_id))

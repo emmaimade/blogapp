@@ -13,9 +13,11 @@ class SocialLinks(BaseModel):
 
 
 class GeneralSettings(BaseModel):
-    site_name: str = "Inko"
-    site_tagline: str = "Your ideas, amplified"
-    site_description: str = "A modern blog CMS for sharing your stories and ideas"
+    # Tenant-neutral on purpose: a blank site_name falls back to the blog's own
+    # name (see general_settings_for), so a tenant never shows the platform's brand.
+    site_name: str = ""
+    site_tagline: str = ""
+    site_description: str = ""
     timezone: str = "UTC"
     language: str = "en"
     posts_per_page: int = 10
@@ -94,9 +96,11 @@ class FAQItem(BaseModel):
 
 
 class ContactSettings(BaseModel):
-    contact_email: EmailStr = "hello@inko.blog"
-    location: str = "San Francisco, CA"
-    response_time: str = "Usually within 24-48 hours"
+    # Unset by default — the public contact page hides empty fields, and contact
+    # messages go to the blog owner when no address is set.
+    contact_email: Optional[EmailStr] = None
+    location: str = ""
+    response_time: str = ""
     phone: Optional[str] = None
     show_social_links: bool = True
     social_links: SocialLinks = Field(default_factory=SocialLinks)

@@ -30,9 +30,9 @@ interface ContactSettingsData {
 }
 
 const defaultSettings: ContactSettingsData = {
-  contact_email: 'hello@inko.blog',
-  location: 'San Francisco, CA',
-  response_time: 'Usually within 24-48 hours',
+  contact_email: '',
+  location: '',
+  response_time: '',
   phone: null,
   show_social_links: true,
   show_faq: true,
@@ -45,6 +45,10 @@ const normalizeContactSettings = (
 ): ContactSettingsData => ({
   ...defaultSettings,
   ...settings,
+  // The API returns null for an unset email; inputs need a string.
+  contact_email: settings?.contact_email ?? '',
+  location: settings?.location ?? '',
+  response_time: settings?.response_time ?? '',
   phone: settings?.phone ?? null,
   show_social_links: settings?.show_social_links ?? true,
   social_links: settings?.social_links ?? {},
@@ -68,8 +72,9 @@ export const ContactSettings = () => {
   }, [settings]);
 
   const mutation = useMutation({
+    // A blank email is "not set" — the backend validates any non-null value as an address.
     mutationFn: async (payload: ContactSettingsData) =>
-      (await api.post('/settings/contact', payload)).data,
+      (await api.post('/settings/contact', { ...payload, contact_email: payload.contact_email.trim() || null })).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'contact'] });
       toast.success('Contact settings saved successfully!');
@@ -161,9 +166,11 @@ if (isLoading) {
                 value={formData.contact_email}
                 onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                required
+                placeholder="you@yourdomain.com"
               />
-              <p className="text-xs text-zinc-500 mt-1">Primary email address shown on the contact page.</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                Shown on your contact page. Leave blank to hide it — messages will still reach your account email.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-bold text-zinc-700 mb-2">Phone (optional)</label>
@@ -183,8 +190,9 @@ if (isLoading) {
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                placeholder="e.g. Lagos, Nigeria · or Remote"
               />
-              <p className="text-xs text-zinc-500 mt-1">City, region, or remote availability for visitors.</p>
+              <p className="text-xs text-zinc-500 mt-1">City, region, or remote availability. Leave blank to hide it.</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-zinc-700 mb-2">Expected Response Time</label>
@@ -193,8 +201,9 @@ if (isLoading) {
                 value={formData.response_time}
                 onChange={(e) => setFormData(prev => ({ ...prev, response_time: e.target.value }))}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                placeholder="e.g. Usually within 24-48 hours"
               />
-              <p className="text-xs text-zinc-500 mt-1">Set expectations for how quickly you usually reply.</p>
+              <p className="text-xs text-zinc-500 mt-1">How quickly you usually reply. Leave blank to hide it.</p>
             </div>
           </div>
         </div>
