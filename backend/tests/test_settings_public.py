@@ -80,3 +80,70 @@ def test_all_settings_still_requires_owner_access(client, owner):
     client.cookies.clear()
     res = client.get(f"/blogs/{blog_id}/settings/all")
     assert res.status_code == 401
+
+
+# ── Post layout (branding) ────────────────────────────────────────────────────
+
+def _complete_onboarding(blog_id: int) -> None:
+    """Saving settings needs a finished onboarding wizard, which these tests
+    don't exercise — set it directly, as other test files do."""
+    from app.models import Blog
+    from app.models.blog import OnboardingStatus
+
+    with Session(engine) as session:
+        blog = session.get(Blog, blog_id)
+        blog.onboarding_status = OnboardingStatus.COMPLETED
+        session.add(blog)
+        session.commit()
+
+
+def _branding_payload(**overrides) -> dict:
+    return {
+        "primary_color": "#9333EA",
+        "secondary_color": "#18181B",
+        "accent_color": "#A855F7",
+        "font_heading": "Inter",
+        "font_body": "Inter",
+        **overrides,
+    }
+
+
+def test_post_layouts_default_to_feed_and_compact(client, owner):
+    _, blog_id = owner
+
+    branding = client.get(f"/blogs/{blog_id}/settings/public").json()["branding"]
+
+    assert branding["home_layout"] == "feed"
+    assert branding["archive_layout"] == "compact"
+
+
+def test_post_layout_choice_is_saved_and_public(client, owner):
+    token, blog_id = owner
+    _complete_onboarding(blog_id)
+
+    res = client.post(
+        f"/blogs/{blog_id}/settings/branding",
+        json=_branding_payload(home_layout="cards", archive_layout="feed"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200, res.text
+
+    branding = client.get(f"/blogs/{blog_id}/settings/public").json()["branding"]
+    assert branding["home_layout"] == "cards"
+    assert branding["archive_layout"] == "feed"
+
+
+def test_unknown_post_layout_is_rejected(client, owner):
+    token, blog_id = owner
+    _complete_onboarding(blog_id)
+
+    res = client.post(
+        f"/blogs/{blog_id}/settings/branding",
+        json=_branding_payload(home_layout="masonry"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code in (400, 422), res.text
+
+    # Nothing was saved — the defaults still apply.
+    branding = client.get(f"/blogs/{blog_id}/settings/public").json()["branding"]
+    assert branding["home_layout"] == "feed"

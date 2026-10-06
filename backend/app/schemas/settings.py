@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -60,6 +60,9 @@ class FooterSettingsResponse(FooterSettings):
         from_attributes = True
 
 
+PostLayout = Literal["feed", "cards", "compact"]
+
+
 class BrandingSettings(BaseModel):
     primary_color: str = "#9333EA"
     secondary_color: str = "#18181B"
@@ -68,6 +71,10 @@ class BrandingSettings(BaseModel):
     favicon_url: Optional[str] = None
     font_heading: str = "Inter"
     font_body: str = "Inter"
+    # How post lists render on the public blog. Feed and compact work with or
+    # without thumbnails; cards suit image-led blogs.
+    home_layout: PostLayout = "feed"
+    archive_layout: PostLayout = "compact"
 
 
 class BrandingSettingsResponse(BrandingSettings):

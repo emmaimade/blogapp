@@ -296,9 +296,13 @@ useEffect(() => {
       titleSegments[2]
     ) {
       const settingType = titleSegments[2];
-      return (
-        settingType.charAt(0).toUpperCase() + settingType.slice(1) + " Settings"
-      );
+      // The branding page covers layout too, so it's shown as "Appearance"
+      // (its URL stays /settings/branding so existing links keep working).
+      const settingLabels: Record<string, string> = { branding: "Appearance" };
+      const settingLabel =
+        settingLabels[settingType] ??
+        settingType.charAt(0).toUpperCase() + settingType.slice(1);
+      return settingLabel + " Settings";
     }
 
     const mainSection = titleSegments[titleSegments.length - 1];

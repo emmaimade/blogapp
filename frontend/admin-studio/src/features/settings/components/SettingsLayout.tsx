@@ -17,7 +17,7 @@ const settingsSections: readonly SettingsSection[] = [
   { to: '/admin/settings/general', label: 'General', description: 'Site identity and defaults', icon: Globe, roles: ['owner'] },
   { to: '/admin/settings/about', label: 'About', description: 'Bio and contact details', icon: UserSquare2, roles: ['owner'] },
   { to: '/admin/settings/footer', label: 'Footer', description: 'Footer content and links', icon: PanelBottom, roles: ['owner'] },
-  { to: '/admin/settings/branding', label: 'Branding', description: 'Colors, logo, and fonts', icon: Palette, roles: ['owner'] },
+  { to: '/admin/settings/branding', label: 'Appearance', description: 'Colors, logo, fonts and layout', icon: Palette, roles: ['owner'] },
   { to: '/admin/settings/seo', label: 'SEO', description: 'Metadata and analytics', icon: Search, roles: ['owner'] },
   { to: '/admin/settings/contact', label: 'Contact', description: 'Email, location & FAQ', icon: Mail, roles: ['owner'] },
 ];

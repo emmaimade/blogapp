@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, Upload, X, Palette, Image } from 'lucide-react';
+import { Loader2, AlertCircle, Upload, X, Palette, Image, LayoutList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton'; // Adjust path as needed
+
+type PostLayout = 'feed' | 'cards' | 'compact';
 
 interface BrandingSettingsData {
   primary_color: string;
@@ -14,6 +17,10 @@ interface BrandingSettingsData {
   favicon_url: string;
   font_heading: string;
   font_body: string;
+  // Saved with the rest of branding (the endpoint takes the whole object),
+  // so they must always be in the form data — or saving a colour would reset them.
+  home_layout: PostLayout;
+  archive_layout: PostLayout;
 }
 
 const defaultBrandingSettings: BrandingSettingsData = {
@@ -24,7 +31,106 @@ const defaultBrandingSettings: BrandingSettingsData = {
   favicon_url: '',
   font_heading: 'Inter',
   font_body: 'Inter',
+  home_layout: 'feed',
+  archive_layout: 'compact',
 };
+
+const LAYOUT_OPTIONS: Array<{ value: PostLayout; label: string; description: string }> = [
+  { value: 'feed', label: 'Feed', description: 'Title, excerpt and byline. A thumbnail only when the post has one.' },
+  { value: 'compact', label: 'Compact', description: 'One line per post: date, title and tags.' },
+  { value: 'cards', label: 'Cards', description: 'An image-led grid. Best when every post has a thumbnail.' },
+];
+
+const PreviewBar: React.FC<{ className: string }> = ({ className }) => (
+  <span className={`block rounded-sm ${className}`} />
+);
+
+/** A tiny drawing of each layout, so owners can see what they're choosing. */
+const LayoutPreview: React.FC<{ layout: PostLayout }> = ({ layout }) => {
+  if (layout === 'cards') {
+    return (
+      <div className="grid grid-cols-3 gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded border border-zinc-200 bg-white p-1">
+            <PreviewBar className="h-6 bg-zinc-200" />
+            <PreviewBar className="mt-1 h-1.5 w-4/5 bg-zinc-400" />
+            <PreviewBar className="mt-0.5 h-1 w-3/5 bg-zinc-300" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (layout === 'compact') {
+    return (
+      <div className="space-y-2">
+        {['w-4/5', 'w-3/5', 'w-11/12', 'w-2/3', 'w-3/4'].map((width, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <PreviewBar className="h-1 w-5 shrink-0 bg-zinc-300" />
+            <PreviewBar className={`h-1.5 bg-zinc-400 ${width}`} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-zinc-200">
+      {[true, false, true].map((hasImage, i) => (
+        <div key={i} className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0">
+          <div className="flex-1">
+            <PreviewBar className="h-1.5 w-4/5 bg-zinc-400" />
+            <PreviewBar className="mt-1 h-1 w-full bg-zinc-300" />
+            <PreviewBar className="mt-0.5 h-1 w-2/3 bg-zinc-300" />
+          </div>
+          {hasImage && <PreviewBar className="h-6 w-6 shrink-0 bg-zinc-200" />}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+interface LayoutPickerProps {
+  name: string;
+  legend: string;
+  hint: string;
+  value: PostLayout;
+  onChange: (layout: PostLayout) => void;
+}
+
+const LayoutPicker: React.FC<LayoutPickerProps> = ({ name, legend, hint, value, onChange }) => (
+  <fieldset>
+    <legend className="text-sm font-bold text-zinc-700">{legend}</legend>
+    <p className="text-xs text-zinc-500 mt-1 mb-3">{hint}</p>
+    <div className="grid gap-3 sm:grid-cols-3">
+      {LAYOUT_OPTIONS.map((option) => {
+        const selected = value === option.value;
+        return (
+          <label
+            key={option.value}
+            className={`cursor-pointer rounded-xl border p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-zinc-900 has-[:focus-visible]:ring-offset-2 ${
+              selected ? 'border-zinc-900 ring-1 ring-zinc-900 bg-white' : 'border-zinc-200 hover:border-zinc-300 bg-white'
+            }`}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={selected}
+              onChange={() => onChange(option.value)}
+              className="sr-only"
+            />
+            <div className="h-20 overflow-hidden rounded-lg bg-zinc-50 p-2.5" aria-hidden="true">
+              <LayoutPreview layout={option.value} />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-zinc-900">{option.label}</p>
+            <p className="mt-0.5 text-xs text-zinc-500 leading-snug">{option.description}</p>
+          </label>
+        );
+      })}
+    </div>
+  </fieldset>
+);
 
 const hexColorPattern = /^#(?:[0-9A-F]{3}){1,2}$/i;
 
@@ -32,6 +138,7 @@ const getSafeHexColor = (value: string | undefined, fallback: string) =>
   value && hexColorPattern.test(value) ? value : fallback;
 
 export const BrandingSettings: React.FC = () => {
+  useDocumentTitle('Appearance settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +178,7 @@ export const BrandingSettings: React.FC = () => {
     mutationFn: (data: BrandingSettingsData) => api.post('/settings/branding', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brandingSettings'] });
-      toast.success('Branding settings saved successfully!');
+      toast.success('Appearance settings saved');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to save settings');
@@ -132,8 +239,14 @@ export const BrandingSettings: React.FC = () => {
     formData.logo_url !== settings.logo_url ||
     formData.favicon_url !== settings.favicon_url ||
     formData.font_heading !== settings.font_heading ||
-    formData.font_body !== settings.font_body
+    formData.font_body !== settings.font_body ||
+    formData.home_layout !== settings.home_layout ||
+    formData.archive_layout !== settings.archive_layout
   );
+
+  const handleLayoutChange = (field: 'home_layout' | 'archive_layout', layout: PostLayout) => {
+    setFormData((prev) => ({ ...prev, [field]: layout }));
+  };
 
   // Render the skeleton loader if the settings query is still loading
   if (isLoading) {
@@ -395,6 +508,34 @@ export const BrandingSettings: React.FC = () => {
             >
               This is body text. The quick brown fox jumps over the lazy dog. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
             </p>
+          </div>
+        </div>
+
+        {/* Post layout */}
+        <div className="bg-white rounded-2xl border border-zinc-200 p-6">
+          <h2 className="text-lg font-bold text-zinc-900 mb-1 flex items-center gap-2">
+            <LayoutList size={20} className="text-zinc-900" />
+            Post layout
+          </h2>
+          <p className="text-sm text-zinc-500 mb-6">
+            How lists of posts appear on your blog. Article pages aren't affected.
+          </p>
+
+          <div className="space-y-8">
+            <LayoutPicker
+              name="home_layout"
+              legend="Home page"
+              hint="The posts below the large lead post at the top."
+              value={formData.home_layout}
+              onChange={(layout) => handleLayoutChange('home_layout', layout)}
+            />
+            <LayoutPicker
+              name="archive_layout"
+              legend="Blog page"
+              hint="The full list of posts, including tag pages. Compact groups posts by year."
+              value={formData.archive_layout}
+              onChange={(layout) => handleLayoutChange('archive_layout', layout)}
+            />
           </div>
         </div>
       </div>
