@@ -4,9 +4,13 @@ from starlette.responses import JSONResponse
 
 from app.core.error_codes import ErrorCode, spec_for
 from app.core.error_handlers import build_error_payload
-from app.core.security import CSRF_COOKIE_NAME
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME
 
 STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# Cookies the browser attaches automatically that carry a session — the
+# things a forged cross-site request would be riding on.
+SESSION_COOKIE_NAMES = (ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME)
 
 # No session cookie exists yet at these points, so there's nothing to
 # double-submit against.
@@ -56,17 +60,35 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
         if not cookie_token:
-            return await call_next(request)
+            # No session cookie either → nothing ambient to ride on, so
+            # nothing to protect (anonymous requests, cookie-less logout).
+            # But a session cookie *without* its csrf_token partner can't be
+            # waved through: the csrf cookie is always issued alongside the
+            # session cookies, so its absence means it was stripped or
+            # never set, and skipping the check would let a cross-site
+            # request act on the session unverified.
+            if not _has_session_cookie(request):
+                return await call_next(request)
+            return _csrf_rejection(request)
 
         header_token = request.headers.get("x-csrf-token")
         if not header_token or header_token != cookie_token:
-            return JSONResponse(
-                status_code=spec_for(ErrorCode.CSRF_TOKEN_INVALID).status_code,
-                content=build_error_payload(
-                    code=ErrorCode.CSRF_TOKEN_INVALID,
-                    message=spec_for(ErrorCode.CSRF_TOKEN_INVALID).message,
-                    request_id=getattr(request.state, "request_id", None),
-                ),
-            )
+            return _csrf_rejection(request)
 
         return await call_next(request)
+
+
+def _has_session_cookie(request: Request) -> bool:
+    return any(request.cookies.get(name) for name in SESSION_COOKIE_NAMES)
+
+
+def _csrf_rejection(request: Request) -> JSONResponse:
+    spec = spec_for(ErrorCode.CSRF_TOKEN_INVALID)
+    return JSONResponse(
+        status_code=spec.status_code,
+        content=build_error_payload(
+            code=ErrorCode.CSRF_TOKEN_INVALID,
+            message=spec.message,
+            request_id=getattr(request.state, "request_id", None),
+        ),
+    )

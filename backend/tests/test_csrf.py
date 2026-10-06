@@ -61,6 +61,27 @@ def test_cookie_authenticated_request_with_wrong_csrf_header_is_rejected(client)
     assert res.json()["code"] == "CSRF_TOKEN_INVALID"
 
 
+def test_session_cookie_without_csrf_cookie_is_rejected(client):
+    """A session cookie on its own must not skip the check just because the csrf cookie is gone."""
+    _register(client)
+    client.cookies.delete(CSRF_COOKIE_NAME)
+    assert client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+
+    res = client.post(
+        "/auth/change-password",
+        json={"current_password": "correcthorse1", "new_password": "brandnewpass1"},
+    )
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "CSRF_TOKEN_INVALID"
+
+
+def test_request_with_no_cookies_at_all_is_not_csrf_checked(client):
+    """No ambient credentials means nothing to forge — e.g. logging out with no session stays a no-op."""
+    client.cookies.clear()
+    res = client.post("/auth/logout")
+    assert res.status_code == 204, res.text
+
+
 def test_bearer_header_authenticated_request_is_exempt_from_csrf(client):
     _register(client)
     # Login/register respond with cookies only now; grab a usable bearer
