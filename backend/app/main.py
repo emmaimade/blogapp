@@ -1,6 +1,7 @@
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.audit_middleware import AuditLogMiddleware
@@ -8,6 +9,7 @@ from app.core.config import settings
 from app.core.csrf_middleware import CSRFMiddleware
 from app.core.db import create_db_and_tables
 from app.core.error_handlers import register_exception_handlers
+from app.core.exceptions import NotFoundError
 from app.core.logging_config import configure_logging
 from app.core.request_context import RequestContextMiddleware
 from app.core.scheduler import start_scheduler, stop_scheduler
@@ -117,3 +119,18 @@ app.include_router(notifications_router)
 @app.get("/")
 def read_root():
     return {"status": "CMS Backend is running"}
+
+
+# TEMPORARY — remove once the trusted client-IP header has been chosen.
+# Shows which proxy headers reach the backend through Vercel (direct and via
+# the frontends' /api rewrite). Off unless DEBUG_CLIENT_IP=1, and echoes only
+# IP-related headers — never cookies or Authorization.
+@app.get("/debug/client-ip", include_in_schema=False)
+def debug_client_ip(request: Request):
+    if os.getenv("DEBUG_CLIENT_IP") != "1":
+        raise NotFoundError()
+    keys = ["x-forwarded-for", "x-real-ip", "x-vercel-forwarded-for", "forwarded"]
+    return {
+        "socket_peer": request.client.host if request.client else None,
+        **{key: request.headers.get(key) for key in keys},
+    }
