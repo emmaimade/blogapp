@@ -18,7 +18,6 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useBlog } from "../app/providers/BlogProvider";
-import { InkoLogo } from "../assets/inko";
 import { useAuth } from "../features/auth/context/AuthContext";
 import {
     isSuperAdmin
@@ -413,19 +412,20 @@ useEffect(() => {
         ) : (
           <>
         <div className="flex items-center min-w-0 gap-1.5">
-          <Link to={userIsSuperAdmin ? '/admin/superadmin' : '/admin/dashboard'} className="flex-shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center">
-              <InkoLogo size={18} />
-            </div>
-          </Link>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="-ml-1.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
+            aria-label="Toggle navigation drawer"
+          >
+            {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
 
           {/* Workspace contextual switcher display block */}
           {activeBlog?.name && !userIsSuperAdmin ? (
             <div className="flex items-center min-w-0" ref={mobileWorkspaceMenuRef}>
-              <span className="text-zinc-300 dark:text-zinc-700 text-sm mx-1 font-light select-none">/</span>
               <button
                 onClick={() => setShowMobileWorkspaceMenu(!showMobileWorkspaceMenu)}
-                className="flex items-center gap-1 text-sm font-bold tracking-tight text-zinc-900 dark:text-white px-1.5 py-1 rounded-lg active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors min-w-0"
+                className="flex items-center gap-1 text-[15px] font-bold tracking-tight text-zinc-900 dark:text-white px-1.5 py-1 rounded-lg active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors min-w-0"
               >
                 <span className="truncate">{activeBlog.name}</span>
                 <ChevronDown size={14} className={`text-zinc-400 flex-shrink-0 transition-transform duration-200 ${showMobileWorkspaceMenu ? 'rotate-180' : ''}`} />
@@ -461,7 +461,7 @@ useEffect(() => {
               )}
             </div>
           ) : (
-            <div className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white ml-1">Inko</div>
+            <div className="text-[15px] font-bold tracking-tight text-zinc-900 dark:text-white ml-1">Inko</div>
           )}
         </div>
 
@@ -474,13 +474,6 @@ useEffect(() => {
             <Search size={20} />
           </button>
           {user && renderUserActions()}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
-            aria-label="Toggle navigation drawer"
-          >
-            {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
         </div>
           </>
         )}
