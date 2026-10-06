@@ -9,7 +9,7 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import Request, UploadFile
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -24,7 +24,7 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.core.logging_config import get_logger
-from app.models import Comment, Post, Tag, User, BlogRole
+from app.models import Comment, Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
 from app.core.permissions import Permissions
@@ -327,17 +327,25 @@ def read_posts(
     limit: int = 12,
     status: Optional[str] = None,
     q: Optional[str] = None,
+    public_view: bool = False,
 ) -> Tuple[List[Post], int]:
-    query = _scope_posts_to_viewer(blog_id, session, current_user)
+    # The admin studio and the public blog share this endpoint. By default the
+    # list is scoped to the viewer's role (drafts for owners/editors, own posts
+    # for authors) — right for the admin, wrong for the live site, where staff
+    # who happen to be signed in must see exactly what readers see. The public
+    # blog opts into that reader view, which also hides sample posts.
+    if public_view:
+        query = _public_posts(blog_id)
+    else:
+        query = _scope_posts_to_viewer(blog_id, session, current_user)
+        if status and status.lower() in (PostStatus.PUBLISHED, PostStatus.SCHEDULED, PostStatus.DRAFT):
+            query = query.where(Post.status == status.lower())
 
     if filter_value and filter_value.lower() == "projects":
         query = query.where(Post.is_project == True)
 
-    if status and status.lower() in (PostStatus.PUBLISHED, PostStatus.SCHEDULED, PostStatus.DRAFT):
-        query = query.where(Post.status == status.lower())
-
     if q:
-        query = query.where(or_(Post.title.contains(q), Post.content.contains(q)))
+        query = query.where(or_(Post.title.ilike(f"%{q}%"), Post.content.ilike(f"%{q}%")))
 
     query = _apply_tag_filter(query, blog_id, tag)
 
@@ -385,18 +393,68 @@ def search_posts(
     sort: Literal["latest", "popular"] = "latest",
     skip: int = 0,
     limit: int = 12,
+    public_view: bool = False,
 ) -> Tuple[List[Post], int]:
-    statement = select(Post).where(
+    # Already published-only for everyone; the public blog's reader view
+    # additionally hides sample posts.
+    statement = _public_posts(blog_id) if public_view else select(Post).where(
         Post.blog_id == blog_id,
         Post.status == PostStatus.PUBLISHED,
     )
     if q:
         statement = statement.where(
-            or_(Post.title.contains(q), Post.content.contains(q))
+            or_(Post.title.ilike(f"%{q}%"), Post.content.ilike(f"%{q}%"))
         )
     statement = _apply_tag_filter(statement, blog_id, tag)
 
     return _paginate(session, statement, sort, skip, limit, selectinload(Post.author))
+
+
+def _public_posts(blog_id: int):
+    """Published, non-sample posts — what an anonymous reader of the blog can see."""
+    return select(Post).where(
+        Post.blog_id == blog_id,
+        Post.status == PostStatus.PUBLISHED,
+        Post.is_sample == False,
+    )
+
+
+def get_public_post_stats(blog_id: int, session: Session) -> dict:
+    """Blog-wide totals for the public About page — across every post, not one page of them."""
+    public = _public_posts(blog_id).subquery()
+    articles, projects, views = session.exec(
+        select(
+            func.count(),
+            func.coalesce(func.sum(case((public.c.is_project == True, 1), else_=0)), 0),
+            func.coalesce(func.sum(public.c.views), 0),
+        ).select_from(public)
+    ).one()
+    return {"articles": articles, "projects": projects, "views": views}
+
+
+def get_related_posts(blog_id: int, slug: str, session: Session, limit: int = 3) -> List[Post]:
+    """
+    Public posts sharing the most tags with the given one, newest first among
+    ties. Read-only (no view bump), and an unknown/unpublished slug or an
+    untagged post simply has no related posts.
+    """
+    current = session.exec(
+        _public_posts(blog_id).where(Post.slug == slug).options(selectinload(Post.tags))
+    ).first()
+    if not current or not current.tags:
+        return []
+
+    shared = func.count(PostTagLink.tag_id).label("shared")
+    statement = (
+        _public_posts(blog_id)
+        .join(PostTagLink, PostTagLink.post_id == Post.id)
+        .where(PostTagLink.tag_id.in_([tag.id for tag in current.tags]), Post.id != current.id)
+        .group_by(Post.id)
+        .order_by(shared.desc(), _post_date.desc())
+        .limit(limit)
+        .options(selectinload(Post.tags), selectinload(Post.author))
+    )
+    return session.exec(statement).all()
 
 
 def update_post(

@@ -50,8 +50,11 @@ def read_posts(
     limit: int = Query(12, ge=1, le=100),
     status: Optional[str] = None,
     q: Optional[str] = None,
+    public_view: bool = False,
 ):
-    items, total = post_service.read_posts(blog_id, session, current_user, filter, tag, sort, skip, limit, status, q)
+    items, total = post_service.read_posts(
+        blog_id, session, current_user, filter, tag, sort, skip, limit, status, q, public_view
+    )
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 
 
@@ -85,11 +88,23 @@ def search_posts(
     sort: Literal["latest", "popular"] = "latest",
     skip: int = Query(0, ge=0),
     limit: int = Query(12, ge=1, le=100),
+    public_view: bool = False,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
 ):
-    items, total = post_service.search_posts(blog_id, session, q, tag, sort, skip, limit)
+    items, total = post_service.search_posts(blog_id, session, q, tag, sort, skip, limit, public_view)
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
+
+
+# Declared before /{post_id} so "stats" isn't parsed (and rejected) as a post id.
+@router.get("/stats")
+def get_public_post_stats(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_public_blog),
+):
+    """Totals across all public posts, for the blog's About page."""
+    return post_service.get_public_post_stats(blog_id, session)
 
 
 @router.patch("/{post_id}", response_model=PostRead)
@@ -162,6 +177,17 @@ def read_post(
     blog: Blog = Depends(get_public_blog),
 ):
     return post_service.read_post(blog_id, post_id, session)
+
+
+@router.get("/slug/{slug}/related", response_model=List[PostRead])
+def read_related_posts(
+    blog_id: int,
+    slug: str,
+    limit: int = Query(3, ge=1, le=12),
+    session: Session = Depends(get_session),
+    blog: Blog = Depends(get_public_blog),
+):
+    return post_service.get_related_posts(blog_id, slug, session, limit)
 
 
 @router.get("/slug/{slug}", response_model=PostRead)

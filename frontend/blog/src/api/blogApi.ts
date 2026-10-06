@@ -25,6 +25,17 @@ api.interceptors.request.use((config) => {
     }
   }
 
+  // Post lists/search share endpoints with the admin studio, which scopes
+  // results to the signed-in user's role (drafts for owners and editors,
+  // only their own posts for authors). The public blog always asks for the
+  // reader view: published, non-sample posts, whoever is signed in.
+  const isPostListing =
+    config.method?.toLowerCase() === 'get' &&
+    (config.url === '/posts/' || config.url?.startsWith('/posts/search'));
+  if (isPostListing) {
+    config.params = { ...config.params, public_view: true };
+  }
+
   const blogId = localStorage.getItem('public_blog_id');
   if (blogId && config.url) {
     const isMultitenantEndpoint =
