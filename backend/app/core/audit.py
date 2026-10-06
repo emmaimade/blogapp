@@ -35,14 +35,30 @@ from fastapi import Request
 from sqlalchemy import event
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.models.audit import AuditLog
 
 
-def get_client_ip(request: Request) -> Optional[str]:
-    """Client IP, preferring X-Forwarded-For (set by reverse proxies) over the raw socket peer."""
+def get_client_ip(request: Request, trusted_hops: Optional[int] = None) -> Optional[str]:
+    """
+    Client IP as seen by our own nearest trusted proxy.
+
+    X-Forwarded-For is appended to left-to-right, so its left-most entries
+    are whatever the client chose to send — trusting them would let anyone
+    rotate a fake IP per request and walk around per-IP login throttling.
+    Only the right-most `trusted_hops` entries (default TRUSTED_PROXY_HOPS)
+    were written by infrastructure we control, so the client is the entry
+    that many hops from the right. Falls back to the socket peer when the
+    header is absent or no proxy is trusted.
+    """
+    hops = settings.TRUSTED_PROXY_HOPS if trusted_hops is None else trusted_hops
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    if hops > 0 and forwarded:
+        entries = [entry.strip() for entry in forwarded.split(",") if entry.strip()]
+        if entries:
+            # Fewer entries than trusted hops means the request skipped some
+            # of our proxies; the left-most is then the furthest one we have.
+            return entries[-min(hops, len(entries))]
     return request.client.host if request.client else None
 
 

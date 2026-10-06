@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # Secure cookies, so local dev doesn't need this — it exists so the test
     # suite's plain-http TestClient can actually round-trip cookies.
     COOKIE_SECURE: bool = True
+    # How many reverse proxies we control sit in front of the app, i.e. how
+    # many right-hand X-Forwarded-For entries were written by our own
+    # infrastructure rather than the client. The client IP is the entry that
+    # many hops from the right; anything to its left is client-supplied and
+    # never trusted. 1 suits Vercel (which also replaces the header outright)
+    # and a single nginx/load balancer. 0 ignores the header entirely and uses
+    # the socket peer — use that when nothing proxies the app.
+    TRUSTED_PROXY_HOPS: int = Field(1, ge=0)
 
     # ── Uploads ──
     MAX_UPLOAD_SIZE_MB: int = 5
