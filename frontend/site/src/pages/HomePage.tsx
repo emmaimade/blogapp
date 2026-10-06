@@ -1,6 +1,7 @@
 import { ArrowRight, Building2, FileText, ShieldCheck, Users, Star, TrendingUp, Shield, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+import { usePageMeta } from '../shared/hooks/usePageMeta';
 
 const features = [
   {
@@ -51,6 +52,12 @@ const testimonials = [
 
 
 export const HomePage = () => {
+  usePageMeta(
+    'Multi-tenant blog platform',
+    'Launch and manage branded multi-tenant blogs with publishing workflows, workspace roles, and platform-grade administration.',
+    { brandFirst: true }
+  );
+
   return (
     <div className="space-y-0">
       {/* ✅ Hero Section - Industry Standard with Gradient Background */}

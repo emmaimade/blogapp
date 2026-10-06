@@ -1,6 +1,7 @@
 import { ArrowRight, Users, Globe, Heart, Target, Shield, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+import { usePageMeta } from '../shared/hooks/usePageMeta';
 
 const values = [
   {
@@ -65,6 +66,11 @@ const team = [
 ];
 
 export const AboutPage = () => {
+  usePageMeta(
+    'About',
+    'Inko started as an internal tool for a digital agency managing dozens of client blogs, built by publishers, for publishers.'
+  );
+
   return (
     <div className="space-y-0">
 

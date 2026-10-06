@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle, ArrowRight, Mail } from "lucide-react";
 import axios from "axios";
+import { usePageMeta } from "../shared/hooks/usePageMeta";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || "http://localhost:5173";
@@ -14,6 +15,8 @@ export const VerifyEmailPage = () => {
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
   const hasVerified = useRef(false);
+
+  usePageMeta("Verify your email", "Confirm your email address to finish setting up your Inko account.");
 
   const handleResendVerification = async (e?: React.FormEvent) => {
     e?.preventDefault();

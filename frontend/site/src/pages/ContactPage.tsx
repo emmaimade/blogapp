@@ -3,10 +3,16 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+import { usePageMeta } from '../shared/hooks/usePageMeta';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const ContactPage = () => {
+  usePageMeta(
+    'Contact',
+    'Have questions or want a demo? Get in touch with the Inko team.'
+  );
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -14,7 +20,7 @@ export const ContactPage = () => {
     subject: '',
     message: '',
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);

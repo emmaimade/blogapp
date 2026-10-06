@@ -1,6 +1,7 @@
   import { Building2, Users, FileText, ShieldCheck, Lock, BarChart3, Code, Globe, Settings, Bell, ArrowRight } from 'lucide-react';
   import { Link } from 'react-router-dom';
   import { PrimaryCta } from '../shared/components/PrimaryCta';
+  import { usePageMeta } from '../shared/hooks/usePageMeta';
 
   const mainFeatures = [
     {
@@ -117,6 +118,11 @@
   ];
 
   export const FeaturesPage = () => {
+    usePageMeta(
+      'Features',
+      "Explore Inko's publishing tools, analytics, REST API, enterprise security, custom domains, and SSO, everything you need to publish at scale."
+    );
+
     return (
       <div className="space-y-0">
         {/* Hero Section */}

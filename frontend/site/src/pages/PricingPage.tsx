@@ -2,6 +2,7 @@ import { Check, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+import { usePageMeta } from '../shared/hooks/usePageMeta';
 
 const pricingPlans = [
   {
@@ -100,6 +101,11 @@ const faqs = [
 
 export const PricingPage = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  usePageMeta(
+    'Pricing',
+    'Simple, transparent pricing plans for every stage, from solo creators to enterprise teams. 14-day free trial, no credit card required.'
+  );
 
   return (
     <div className="space-y-0">
