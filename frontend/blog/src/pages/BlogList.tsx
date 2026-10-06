@@ -143,9 +143,13 @@ export const BlogList = () => {
               {filterParam === 'projects' ? 'Projects' : 'All posts'}
             </h1>
           )}
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            {total} {total === 1 ? 'post' : 'posts'}
-          </p>
+          {/* A count only helps when filtering — it says how much there is on a
+              topic. On the unfiltered list it just draws attention to size. */}
+          {hasActiveFilters && (
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+              {total} {total === 1 ? 'post' : 'posts'}
+            </p>
+          )}
         </div>
 
         {/* Controls Bar */}
@@ -359,8 +363,8 @@ export const BlogList = () => {
             </>
           )}
 
-          {/* Pagination */}
-          {filteredPosts.length > 0 && (
+          {/* Pagination — only when there's more than one page */}
+          {filteredPosts.length > 0 && totalPages > 1 && (
             <div className="mt-12 flex flex-col items-center gap-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of {total}
