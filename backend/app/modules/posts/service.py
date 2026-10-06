@@ -101,22 +101,41 @@ def upload_welcome_banner(blog_name: str) -> str:
 
 # ── Scheduling helpers ────────────────────────────────────────────────────────
 
+def _went_live_at(published_at: Optional[datetime], now: datetime) -> Optional[datetime]:
+    """The post's original go-live time, if it has one — a past published_at.
+    A future one is only a schedule that never fired, not a publish date."""
+    if published_at is None:
+        return None
+    if published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=timezone.utc)
+    return published_at if published_at <= now else None
+
+
 def _resolve_status(
     status: Optional[PostStatus],
     published: Optional[bool],
     published_at: Optional[datetime],
+    previous_published_at: Optional[datetime] = None,
 ) -> tuple[PostStatus, bool, Optional[datetime]]:
     """
     Resolve the final (status, published, published_at) triple from request data.
 
+    `previous_published_at` is the post's stored value on update (None on
+    create). A post keeps the date it first went live: editors send no date
+    when they re-save or republish, and that must not make an old post look new.
+
     Rules:
     - If status=scheduled and published_at is in the past → promote to published
     - If status=scheduled and no published_at → raise 400
-    - If status=published and no published_at → set published_at = now()
-    - If status=draft → clear published_at, published=False
+    - If status=published and no published_at → keep the original go-live
+      time if the post has one, else published_at = now()
+    - If status=draft → published=False; keep a past published_at (the
+      original publish date, reused on republish), clear a future one (an
+      abandoned schedule)
     - Backward compat: if only `published` bool is set, derive status from it
     """
     now = datetime.now(timezone.utc)
+    original_go_live = _went_live_at(previous_published_at, now)
 
     # Backward compat — old clients only send `published: bool`
     if status is None:
@@ -140,13 +159,13 @@ def _resolve_status(
 
     if status == PostStatus.PUBLISHED:
         if not published_at:
-            published_at = now
+            published_at = original_go_live or now
         if published_at.tzinfo is None:
             published_at = published_at.replace(tzinfo=timezone.utc)
         return PostStatus.PUBLISHED, True, published_at
 
     # DRAFT
-    return PostStatus.DRAFT, False, None
+    return PostStatus.DRAFT, False, original_go_live
 
 
 # ── Image upload ──────────────────────────────────────────────────────────────
@@ -249,13 +268,18 @@ def _apply_tag_filter(query, blog_id: int, tag: Optional[str]):
     return query
 
 
+# When a post went live, falling back to creation for drafts that never
+# have — so "latest" means latest published, not latest started.
+_post_date = func.coalesce(Post.published_at, Post.created_at)
+
+
 def _apply_sort(query, sort: str):
     # Featured post always leads, regardless of recency/popularity — the
     # homepage hero picks filteredPosts[0], so this is what makes a
     # manually-featured post win that slot instead of just the latest one.
     if sort == "popular":
-        return query.order_by(Post.is_featured.desc(), Post.views.desc(), Post.created_at.desc())
-    return query.order_by(Post.is_featured.desc(), Post.created_at.desc())
+        return query.order_by(Post.is_featured.desc(), Post.views.desc(), _post_date.desc())
+    return query.order_by(Post.is_featured.desc(), _post_date.desc())
 
 
 def _paginate(session: Session, query, sort: str, skip: int, limit: int, *options) -> Tuple[List[Post], int]:
@@ -409,7 +433,8 @@ def update_post(
     # Resolve status change if any scheduling field was touched
     if any(f in post_data.model_fields_set for f in ("status", "published", "published_at")):
         resolved_status, resolved_published, resolved_published_at = _resolve_status(
-            post_data.status, post_data.published, post_data.published_at
+            post_data.status, post_data.published, post_data.published_at,
+            previous_published_at=db_post.published_at,
         )
         db_post.status       = resolved_status
         db_post.published    = resolved_published
