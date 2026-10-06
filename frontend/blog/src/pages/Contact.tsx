@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mail, MapPin, Clock, Phone, Send, CheckCircle, ChevronDown } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../api/blogApi';
 import { getApiErrorMessage } from '../api/errors';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useSiteSettings } from '../hooks/useSiteSettings';
+import { ContactDetailsSkeleton, FaqSkeleton } from '../components/Skeletons';
 import { getActiveSocialLinks } from '../utils/social';
 
 interface ContactSettingsData {
@@ -68,11 +69,12 @@ export const Contact: React.FC = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const successRef = useRef<HTMLDivElement>(null);
 
-  const { data: settings = defaultSettings } = useQuery<ContactSettingsData>({
-    queryKey: ['settings', 'contact'],
-    queryFn: async () => normalizeContactSettings((await api.get('/settings/contact')).data),
-    staleTime: 1000 * 60 * 5,
-  });
+  // Contact settings come with the site-wide settings the blog already loads
+  // at startup (navbar and footer use them), so arriving from inside the blog
+  // they're ready on first paint. On a cold load the query shows placeholder
+  // data until the real settings arrive — that's when placeholders show.
+  const { data: siteSettings, isPlaceholderData: isLoadingSettings } = useSiteSettings();
+  const settings = normalizeContactSettings(siteSettings?.contact);
 
   // The form unmounts on success, so move focus to the confirmation instead of
   // letting it fall back to <body>.
@@ -109,20 +111,32 @@ export const Contact: React.FC = () => {
     : [];
 
   const hasDetails = Boolean(settings.contact_email || settings.phone || settings.location);
-  const hasSidebar = hasDetails || activeSocialLinks.length > 0;
+  // While loading, keep the details column so the form is already in its final
+  // place; most blogs have contact details, so it rarely has to collapse.
+  const hasSidebar = isLoadingSettings || hasDetails || activeSocialLinks.length > 0;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-zinc-50 mb-4">Get in touch</h1>
-        <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="text-center mb-10">
+        <h1 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-zinc-50 mb-3">Get in touch</h1>
+        <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
           Questions, feedback or ideas — send a message.
         </p>
+        {/* FAQs answer questions before someone writes, but sit below the
+            form — so point to them up front, without pushing the form down. */}
+        {visibleFaqs.length > 0 && (
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            Quick question?{' '}
+            <a href="#faq" className="font-semibold text-primary hover:underline underline-offset-2">
+              Check the FAQ
+            </a>
+          </p>
+        )}
       </div>
 
-      <div className={hasSidebar ? 'grid md:grid-cols-5 gap-12' : 'max-w-2xl mx-auto'}>
+      <div className={hasSidebar ? 'grid md:grid-cols-3 gap-8 lg:gap-12' : 'max-w-2xl mx-auto'}>
         {/* Contact Form */}
-        <div className={hasSidebar ? 'md:col-span-3' : undefined}>
+        <div className={hasSidebar ? 'md:col-span-2' : undefined}>
           {isSuccess ? (
             <div
               ref={successRef}
@@ -145,7 +159,7 @@ export const Contact: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="contact-name" className={labelClass}>Your Name</label>
+                  <label htmlFor="contact-name" className={labelClass}>Name</label>
                   <input
                     id="contact-name"
                     type="text"
@@ -153,13 +167,13 @@ export const Contact: React.FC = () => {
                     autoComplete="name"
                     value={formData.name}
                     onChange={handleChange}
-                    placeholder="John Doe"
+                    placeholder="Your name"
                     required
                     className={inputClass}
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-email" className={labelClass}>Email Address</label>
+                  <label htmlFor="contact-email" className={labelClass}>Email</label>
                   <input
                     id="contact-email"
                     type="email"
@@ -167,7 +181,7 @@ export const Contact: React.FC = () => {
                     autoComplete="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="john@example.com"
+                    placeholder="you@example.com"
                     required
                     className={inputClass}
                   />
@@ -195,8 +209,8 @@ export const Contact: React.FC = () => {
                   name="message"
                   value={formData.message}
                   onChange={handleChange}
-                  placeholder="Tell me more..."
-                  rows={8}
+                  placeholder="How can we help?"
+                  rows={6}
                   required
                   className={`${inputClass} resize-none`}
                 />
@@ -232,8 +246,14 @@ export const Contact: React.FC = () => {
         </div>
 
         {/* Contact Details — shown above the form on mobile so the email is reachable without scrolling */}
-        {hasSidebar && (
-          <aside className="md:col-span-2 order-first md:order-none">
+        {hasSidebar && isLoadingSettings && (
+          <aside className="md:col-span-1 order-first md:order-none" aria-busy="true" aria-label="Loading contact details">
+            <ContactDetailsSkeleton />
+          </aside>
+        )}
+
+        {hasSidebar && !isLoadingSettings && (
+          <aside className="md:col-span-1 order-first md:order-none">
             <div className="card p-6">
               {hasDetails && (
                 <>
@@ -286,23 +306,21 @@ export const Contact: React.FC = () => {
                   >
                     Connect on social
                   </h2>
-                  <ul className="space-y-2">
-                    {activeSocialLinks.map(({ key, url, label, icon: Icon }) => {
-                      return (
-                        <li key={key}>
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 px-3 py-2 -mx-3 rounded-xl text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
-                          >
-                            <Icon size={18} aria-hidden="true" />
-                            <span className="font-medium">{label}</span>
-                            <span className="sr-only">(opens in new tab)</span>
-                          </a>
-                        </li>
-                      );
-                    })}
+                  <ul className="flex flex-wrap gap-2">
+                    {activeSocialLinks.map(({ key, url, label, icon: Icon }) => (
+                      <li key={key}>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-colors dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                        >
+                          <Icon size={16} aria-hidden="true" />
+                          {label}
+                          <span className="sr-only">(opens in new tab)</span>
+                        </a>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -312,8 +330,14 @@ export const Contact: React.FC = () => {
       </div>
 
       {/* FAQ */}
+      {isLoadingSettings && (
+        <section className="max-w-3xl mx-auto mt-16" aria-busy="true" aria-label="Loading frequently asked questions">
+          <FaqSkeleton />
+        </section>
+      )}
+
       {visibleFaqs.length > 0 && (
-        <section className="max-w-3xl mx-auto mt-20">
+        <section id="faq" className="max-w-3xl mx-auto mt-16 scroll-mt-24">
           <h2 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-8 text-center">
             Frequently asked questions
           </h2>

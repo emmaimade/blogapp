@@ -73,3 +73,35 @@ export const ArticleSkeleton: React.FC = () => (
     </div>
   </div>
 );
+
+/** The contact page's details card, while settings load. */
+export const ContactDetailsSkeleton: React.FC = () => (
+  <div className="card p-6">
+    <Block className="h-5 w-32 mb-6 rounded" />
+    <div className="space-y-5">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex gap-3">
+          <Block className="h-5 w-5 shrink-0 rounded" />
+          <div className="flex-1 space-y-2">
+            <Block className="h-3 w-16 rounded" />
+            <Block className="h-4 w-3/4 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/** The contact page's FAQ section, while settings load. */
+export const FaqSkeleton: React.FC = () => (
+  <div>
+    <Block className="h-8 w-72 max-w-full mx-auto mb-8 rounded-lg" />
+    <div className="card overflow-hidden divide-y divide-zinc-200 dark:divide-zinc-800">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="px-6 py-5">
+          <Block className="h-5 w-2/3 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
