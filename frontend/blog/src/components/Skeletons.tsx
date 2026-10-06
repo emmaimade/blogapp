@@ -22,6 +22,17 @@ export const CompactRowSkeleton: React.FC = () => (
   </div>
 );
 
+/** Matches PostCard's `list` variant. */
+export const ListRowSkeleton: React.FC = () => (
+  <div className="flex items-center gap-4 py-3">
+    <Block className="h-14 w-14 shrink-0 rounded-lg sm:h-16 sm:w-16" />
+    <div className="flex-1">
+      <Block className="h-4 w-3/4 rounded" />
+      <Block className="mt-2 h-3 w-32 rounded" />
+    </div>
+  </div>
+);
+
 /** Matches PostCard's `card` variant. */
 export const GridCardSkeleton: React.FC = () => (
   <div className="rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">

@@ -60,7 +60,7 @@ class FooterSettingsResponse(FooterSettings):
         from_attributes = True
 
 
-PostLayout = Literal["feed", "cards", "compact"]
+PostLayout = Literal["feed", "list", "cards", "compact"]
 
 
 class BrandingSettings(BaseModel):
@@ -71,10 +71,10 @@ class BrandingSettings(BaseModel):
     favicon_url: Optional[str] = None
     font_heading: str = "Inter"
     font_body: str = "Inter"
-    # How post lists render on the public blog. Feed and compact work with or
-    # without thumbnails; cards suit image-led blogs.
+    # How post lists render on the public blog. Feed, list and compact work
+    # with or without thumbnails; cards suit image-led blogs.
     home_layout: PostLayout = "feed"
-    archive_layout: PostLayout = "compact"
+    archive_layout: PostLayout = "list"
 
 
 class BrandingSettingsResponse(BrandingSettings):

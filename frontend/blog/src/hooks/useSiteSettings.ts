@@ -3,11 +3,11 @@ import api from '../api/blogApi';
 import { useTenant } from '../contexts/TenantContext';
 
 /** How post lists render on the public blog — chosen in the admin's Appearance settings. */
-export type PostLayout = 'feed' | 'cards' | 'compact';
+export type PostLayout = 'feed' | 'list' | 'cards' | 'compact';
 
-const POST_LAYOUTS: readonly PostLayout[] = ['feed', 'cards', 'compact'];
+const POST_LAYOUTS: readonly PostLayout[] = ['feed', 'list', 'cards', 'compact'];
 const DEFAULT_HOME_LAYOUT: PostLayout = 'feed';
-const DEFAULT_ARCHIVE_LAYOUT: PostLayout = 'compact';
+const DEFAULT_ARCHIVE_LAYOUT: PostLayout = 'list';
 
 const toPostLayout = (value: unknown, fallback: PostLayout): PostLayout =>
   POST_LAYOUTS.includes(value as PostLayout) ? (value as PostLayout) : fallback;

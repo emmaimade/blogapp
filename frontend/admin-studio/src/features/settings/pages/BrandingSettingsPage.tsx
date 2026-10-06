@@ -7,7 +7,7 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton'; // Adjust path as needed
 
-type PostLayout = 'feed' | 'cards' | 'compact';
+type PostLayout = 'feed' | 'list' | 'cards' | 'compact';
 
 interface BrandingSettingsData {
   primary_color: string;
@@ -32,11 +32,12 @@ const defaultBrandingSettings: BrandingSettingsData = {
   font_heading: 'Inter',
   font_body: 'Inter',
   home_layout: 'feed',
-  archive_layout: 'compact',
+  archive_layout: 'list',
 };
 
 const LAYOUT_OPTIONS: Array<{ value: PostLayout; label: string; description: string }> = [
   { value: 'feed', label: 'Feed', description: 'Title, excerpt and byline. A thumbnail only when the post has one.' },
+  { value: 'list', label: 'List', description: 'Thumbnail, title and date. Compact but visual.' },
   { value: 'compact', label: 'Compact', description: 'One line per post: date, title and tags.' },
   { value: 'cards', label: 'Cards', description: 'A grid of small image cards. Best when every post has a thumbnail.' },
 ];
@@ -54,6 +55,22 @@ const LayoutPreview: React.FC<{ layout: PostLayout }> = ({ layout }) => {
           <div key={i} className="rounded-sm border border-zinc-200 bg-white p-0.5">
             <PreviewBar className="h-3 bg-zinc-200" />
             <PreviewBar className="mt-0.5 h-1 w-4/5 bg-zinc-400" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (layout === 'list') {
+    return (
+      <div className="space-y-1.5">
+        {['w-4/5', 'w-3/5', 'w-11/12'].map((width, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <PreviewBar className="h-4 w-4 shrink-0 bg-zinc-200" />
+            <div className="flex-1">
+              <PreviewBar className={`h-1.5 bg-zinc-400 ${width}`} />
+              <PreviewBar className="mt-0.5 h-1 w-1/3 bg-zinc-300" />
+            </div>
           </div>
         ))}
       </div>
@@ -101,7 +118,7 @@ const LayoutPicker: React.FC<LayoutPickerProps> = ({ name, legend, hint, value, 
   <fieldset>
     <legend className="text-sm font-bold text-zinc-700">{legend}</legend>
     <p className="text-xs text-zinc-500 mt-1 mb-3">{hint}</p>
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
       {LAYOUT_OPTIONS.map((option) => {
         const selected = value === option.value;
         return (
@@ -531,7 +548,7 @@ export const BrandingSettings: React.FC = () => {
             <LayoutPicker
               name="archive_layout"
               legend="Blog page"
-              hint="The full list of posts, including tag pages. Compact groups posts by year."
+              hint="The full list of posts, including tag pages. List and Compact group posts by year."
               value={formData.archive_layout}
               onChange={(layout) => handleLayoutChange('archive_layout', layout)}
             />

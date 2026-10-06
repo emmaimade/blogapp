@@ -108,13 +108,13 @@ def _branding_payload(**overrides) -> dict:
     }
 
 
-def test_post_layouts_default_to_feed_and_compact(client, owner):
+def test_post_layouts_default_to_feed_and_list(client, owner):
     _, blog_id = owner
 
     branding = client.get(f"/blogs/{blog_id}/settings/public").json()["branding"]
 
     assert branding["home_layout"] == "feed"
-    assert branding["archive_layout"] == "compact"
+    assert branding["archive_layout"] == "list"
 
 
 def test_post_layout_choice_is_saved_and_public(client, owner):
@@ -147,3 +147,17 @@ def test_unknown_post_layout_is_rejected(client, owner):
     # Nothing was saved — the defaults still apply.
     branding = client.get(f"/blogs/{blog_id}/settings/public").json()["branding"]
     assert branding["home_layout"] == "feed"
+
+
+@pytest.mark.parametrize("layout", ["feed", "list", "cards", "compact"])
+def test_every_post_layout_can_be_saved(client, owner, layout):
+    token, blog_id = owner
+    _complete_onboarding(blog_id)
+
+    res = client.post(
+        f"/blogs/{blog_id}/settings/branding",
+        json=_branding_payload(home_layout=layout, archive_layout=layout),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["archive_layout"] == layout

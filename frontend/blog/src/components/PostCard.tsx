@@ -5,21 +5,34 @@ import { getPostDate, getPlainExcerpt, tagUrl } from '../utils/posts';
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import type { Post } from '../types/post';
 
-export type PostCardVariant = 'feed' | 'compact' | 'card';
+export type PostCardVariant = 'feed' | 'list' | 'compact' | 'card';
 
 interface PostProps {
   post: Post;
   /**
    * `feed` (default): title, excerpt and byline, with a thumbnail only when the post has one.
+   * `list`: a small square thumbnail beside the title, date and tag.
    * `compact`: a single text row — date, title, tags.
    * `card`: a small image-on-top grid card.
    */
   variant?: PostCardVariant;
   /** Match the surrounding page outline — a card under an <h2> section should be an <h3>. */
   headingAs?: 'h2' | 'h3' | 'h4';
-  /** Compact rows under a year heading drop the year from their date. */
+  /** List and compact rows under a year heading drop the year from their date. */
   hideYear?: boolean;
 }
+
+// Posts without a thumbnail get a tinted letter tile in list rows, rather
+// than a run of identical grey placeholders.
+const LetterTile: React.FC<{ title: string }> = ({ title }) => (
+  <span
+    aria-hidden="true"
+    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xl font-bold text-primary dark:bg-primary/20 dark:text-zinc-100 sm:h-16 sm:w-16"
+    style={{ fontFamily: 'var(--font-heading)' }}
+  >
+    {title.trim().charAt(0).toUpperCase() || '·'}
+  </span>
+);
 
 const getAuthorName = (author: Post['author']) => {
   const fullName = [author?.first_name, author?.last_name].filter(Boolean).join(' ');
@@ -73,6 +86,40 @@ export const PostCard: React.FC<PostProps> = ({ post, variant = 'feed', headingA
           </time>
         </div>
       </Link>
+    );
+  }
+
+  if (variant === 'list') {
+    const firstTag = post.tags[0]?.name;
+    return (
+      <article>
+        <Link
+          to={`/post/${post.slug}`}
+          className="group -mx-3 flex items-center gap-4 rounded-xl px-3 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
+        >
+          {post.thumbnail_url ? (
+            <img
+              src={getThumbnailUrl(post.thumbnail_url, 160)}
+              onError={handleThumbnailError}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="h-14 w-14 shrink-0 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 sm:h-16 sm:w-16"
+            />
+          ) : (
+            <LetterTile title={post.title} />
+          )}
+          <div className="min-w-0 flex-1">
+            <Heading className="font-semibold leading-snug text-zinc-900 line-clamp-2 transition-colors group-hover:text-primary dark:text-zinc-50">
+              {post.title}
+            </Heading>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <time dateTime={postDate}>{hideYear ? formatShortDate(postDate) : formatLocalDate(postDate)}</time>
+              {firstTag && <> &middot; {firstTag}</>}
+            </p>
+          </div>
+        </Link>
+      </article>
     );
   }
 
