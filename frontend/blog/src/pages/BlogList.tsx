@@ -26,6 +26,8 @@ export const BlogList = () => {
   const filterParam = hasProjects === false ? 'all' : requestedFilter;
   const sortBy = (searchParams.get('sort') === 'popular' ? 'popular' : 'latest') as 'latest' | 'popular';
   const { archiveLayout } = usePostLayouts();
+  // Cards need room for three per row; the row layouts keep a reading width.
+  const pageWidthClass = archiveLayout === 'cards' ? 'max-w-6xl' : 'max-w-4xl';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const {
@@ -115,15 +117,15 @@ export const BlogList = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <PostListSkeleton layout={archiveLayout} count={archiveLayout === 'compact' ? 10 : 5} columns={2} />
+      <div className={`${pageWidthClass} mx-auto px-4 sm:px-6 py-8 sm:py-12`}>
+        <PostListSkeleton layout={archiveLayout} count={archiveLayout === 'feed' ? 5 : 9} columns={3} />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className={`${pageWidthClass} mx-auto px-4 sm:px-6 py-8 sm:py-12`}>
 
         {/* Page header — doubles as the tag page when a tag is selected */}
         <div className="mb-8">
@@ -318,7 +320,7 @@ export const BlogList = () => {
                 posts={filteredPosts}
                 layout={archiveLayout}
                 headingAs="h2"
-                columns={2}
+                columns={3}
                 groupByYear={sortBy === 'latest'}
               />
             </div>

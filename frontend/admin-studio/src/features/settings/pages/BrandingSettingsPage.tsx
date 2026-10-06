@@ -38,7 +38,7 @@ const defaultBrandingSettings: BrandingSettingsData = {
 const LAYOUT_OPTIONS: Array<{ value: PostLayout; label: string; description: string }> = [
   { value: 'feed', label: 'Feed', description: 'Title, excerpt and byline. A thumbnail only when the post has one.' },
   { value: 'compact', label: 'Compact', description: 'One line per post: date, title and tags.' },
-  { value: 'cards', label: 'Cards', description: 'An image-led grid. Best when every post has a thumbnail.' },
+  { value: 'cards', label: 'Cards', description: 'A grid of small image cards. Best when every post has a thumbnail.' },
 ];
 
 const PreviewBar: React.FC<{ className: string }> = ({ className }) => (
@@ -49,12 +49,11 @@ const PreviewBar: React.FC<{ className: string }> = ({ className }) => (
 const LayoutPreview: React.FC<{ layout: PostLayout }> = ({ layout }) => {
   if (layout === 'cards') {
     return (
-      <div className="grid grid-cols-3 gap-1.5">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="rounded border border-zinc-200 bg-white p-1">
-            <PreviewBar className="h-6 bg-zinc-200" />
-            <PreviewBar className="mt-1 h-1.5 w-4/5 bg-zinc-400" />
-            <PreviewBar className="mt-0.5 h-1 w-3/5 bg-zinc-300" />
+      <div className="grid grid-cols-4 gap-1">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <div key={i} className="rounded-sm border border-zinc-200 bg-white p-0.5">
+            <PreviewBar className="h-3 bg-zinc-200" />
+            <PreviewBar className="mt-0.5 h-1 w-4/5 bg-zinc-400" />
           </div>
         ))}
       </div>

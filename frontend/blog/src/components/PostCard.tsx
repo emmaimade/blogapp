@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, User } from 'lucide-react';
 import { formatLocalDate, formatShortDate } from '../utils/dates';
 import { getPostDate, getPlainExcerpt, tagUrl } from '../utils/posts';
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
@@ -13,7 +12,7 @@ interface PostProps {
   /**
    * `feed` (default): title, excerpt and byline, with a thumbnail only when the post has one.
    * `compact`: a single text row — date, title, tags.
-   * `card`: the image-on-top grid card.
+   * `card`: a small image-on-top grid card.
    */
   variant?: PostCardVariant;
   /** Match the surrounding page outline — a card under an <h2> section should be an <h3>. */
@@ -53,9 +52,9 @@ export const PostCard: React.FC<PostProps> = ({ post, variant = 'feed', headingA
         to={`/post/${post.slug}`}
         className="card group flex flex-col overflow-hidden transition hover:border-zinc-300 hover:shadow-lg dark:hover:border-zinc-700"
       >
-        <div className="aspect-[16/10] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+        <div className="aspect-video overflow-hidden bg-zinc-100 dark:bg-zinc-800">
           <img
-            src={getThumbnailUrl(post.thumbnail_url, 500)}
+            src={getThumbnailUrl(post.thumbnail_url, 400)}
             onError={handleThumbnailError}
             alt=""
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
@@ -64,18 +63,14 @@ export const PostCard: React.FC<PostProps> = ({ post, variant = 'feed', headingA
           />
         </div>
 
-        <div className="flex flex-1 flex-col p-5">
+        <div className="flex flex-1 flex-col p-4">
           <TagLabels post={post} limit={2} />
-          <Heading className="text-lg font-semibold leading-snug text-zinc-900 dark:text-zinc-50 transition-colors group-hover:text-primary line-clamp-2">
+          <Heading className="text-base font-semibold leading-snug text-zinc-900 dark:text-zinc-50 transition-colors group-hover:text-primary line-clamp-2">
             {post.title}
           </Heading>
-          {excerpt && (
-            <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400 line-clamp-2">{excerpt}</p>
-          )}
-          <div className="mt-auto pt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="flex items-center gap-1"><User size={13} /> {getAuthorName(post.author)}</span>
-            <span className="flex items-center gap-1"><Calendar size={13} /> {formatLocalDate(postDate)}</span>
-          </div>
+          <time dateTime={postDate} className="mt-auto pt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            {formatLocalDate(postDate)}
+          </time>
         </div>
       </Link>
     );

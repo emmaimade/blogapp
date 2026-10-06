@@ -14,10 +14,14 @@ import { useBlogStats } from '../hooks/useBlogStats';
 import { applyPageMeta } from '../utils/seo';
 import type { PaginatedPosts, Post } from '../types/post';
 
-// The homepage is a short teaser — one hero plus the next six in the owner's
-// chosen layout — not the archive. /blog is the real paginated listing.
-const GRID_POST_COUNT = 6;
-const HOME_POST_LIMIT = GRID_POST_COUNT + 1;
+// The homepage is a short teaser — one hero plus the next few posts in the
+// owner's chosen layout — not the archive. /blog is the real paginated listing.
+// Cards show 8 (two full rows of 4 on wide screens); the row layouts show 6.
+const CARD_POST_COUNT = 8;
+const ROW_POST_COUNT = 6;
+// Always fetch enough for the largest layout, so switching layouts (or the
+// settings arriving after the posts) never needs a second request.
+const HOME_POST_LIMIT = CARD_POST_COUNT + 1;
 
 // "Most read" only lists posts the page isn't already showing, and only when
 // there are enough of them to fill its row. Fetching more popular posts than
@@ -50,6 +54,7 @@ export const Home: React.FC = () => {
   const { homeLayout } = usePostLayouts();
   // Feed and compact read best as a single centred column; cards use the full width.
   const listWidthClass = homeLayout === 'cards' ? '' : 'max-w-3xl mx-auto';
+  const gridPostCount = homeLayout === 'cards' ? CARD_POST_COUNT : ROW_POST_COUNT;
 
   // Blogs that never publish projects don't get an always-empty Projects tab.
   const { hasProjects } = useBlogStats();
@@ -82,11 +87,12 @@ export const Home: React.FC = () => {
   const posts = data?.items ?? [];
   const totalPosts = data?.total ?? 0;
 
-  const heroPost = posts[0];
-  const gridPosts = posts.slice(1, HOME_POST_LIMIT);
+  const shownPosts = posts.slice(0, gridPostCount + 1);
+  const heroPost = shownPosts[0];
+  const gridPosts = shownPosts.slice(1);
   const blogLink = activeFilter === 'projects' ? '/blog?filter=projects' : '/blog';
 
-  const shownPostIds = new Set(posts.map((post) => post.id));
+  const shownPostIds = new Set(shownPosts.map((post) => post.id));
   const mostReadPosts = popularPosts
     .filter((post) => !shownPostIds.has(post.id))
     .slice(0, MOST_READ_COUNT);
@@ -102,7 +108,7 @@ export const Home: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <HeroSkeleton />
         <div className={`mt-12 ${listWidthClass}`}>
-          <PostListSkeleton layout={homeLayout} count={GRID_POST_COUNT} />
+          <PostListSkeleton layout={homeLayout} count={gridPostCount} />
         </div>
       </div>
     );
@@ -211,7 +217,7 @@ export const Home: React.FC = () => {
             </div>
           )}
 
-          {totalPosts > posts.length && (
+          {totalPosts > shownPosts.length && (
             <div className="mt-10 flex justify-center">
               <Link to={blogLink} className="btn-secondary">
                 View all posts <ArrowRight size={16} />
