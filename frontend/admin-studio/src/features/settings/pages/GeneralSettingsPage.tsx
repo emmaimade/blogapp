@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const inputClass =
   'w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-medium text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-violet-500/10 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-violet-500';
@@ -29,6 +30,7 @@ const defaultGeneralSettings: GeneralSettingsData = {
 };
 
 export const GeneralSettings: React.FC = () => {
+  useDocumentTitle('General settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
   const [copied, setCopied] = useState(false);

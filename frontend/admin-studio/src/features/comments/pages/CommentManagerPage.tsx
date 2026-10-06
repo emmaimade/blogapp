@@ -15,6 +15,7 @@ import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface Comment {
   id: number;
@@ -26,6 +27,7 @@ interface Comment {
 }
 
 export const CommentManager = () => {
+  useDocumentTitle('Comments');
   const { activeMembership } = useBlog();
   const queryClient = useQueryClient();
   const navigate = useNavigate();

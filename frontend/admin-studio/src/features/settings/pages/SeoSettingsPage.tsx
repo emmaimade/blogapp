@@ -6,6 +6,7 @@ import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import type { AxiosError } from 'axios';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface SEOSettingsData {
   meta_title: string;
@@ -40,6 +41,7 @@ const normalizeSEOSettings = (settings?: PartialSEOSettingsData | null): SEOSett
 });
 
 export const SEOSettings: React.FC = () => {
+  useDocumentTitle('SEO settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
 

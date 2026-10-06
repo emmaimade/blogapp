@@ -8,8 +8,10 @@ import { formatRelative } from '../../../shared/utils/dates';
 import { useDashboard } from '../hooks/useDashboard';
 import { StatCard, PublishProgress, QuickAction, DashboardSkeleton } from '../components/DashboardComponents';
 import { SiteCard } from '../components/SiteCard';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 export const Dashboard = () => {
+  useDocumentTitle('Dashboard');
   const {
     user, activeBlog, permissions, data, isLoading, error, refetch, subscription, greeting, today, isOwner
   } = useDashboard();

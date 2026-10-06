@@ -12,6 +12,7 @@ import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { type Post } from '../../../shared/types';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status, publishedAt }: { status: string; publishedAt?: string | null }) => {
@@ -94,6 +95,8 @@ export const PostView = () => {
       (await api.get(`/blogs/${activeBlog!.id}/posts/${id}`)).data,
     enabled: !!id && !!activeBlog?.id,
   });
+
+  useDocumentTitle(post?.title ?? 'Post');
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (isLoading) {

@@ -4,6 +4,7 @@ import { Mail, Plus, Trash2, AlertCircle, Loader2,  } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface FAQItem {
   question: string;
@@ -51,6 +52,7 @@ const normalizeContactSettings = (
 });
 
 export const ContactSettings = () => {
+  useDocumentTitle('Contact settings');
   const queryClient = useQueryClient();
 
   const { data: settings = defaultSettings, isLoading } = useQuery<ContactSettingsData>({

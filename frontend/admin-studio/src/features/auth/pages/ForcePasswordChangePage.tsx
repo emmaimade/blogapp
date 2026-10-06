@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useAuth } from '../context/AuthContext';
 import { SupportModal } from '../../support/components/SupportModal';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const PasswordField = ({
   label,
@@ -45,6 +46,7 @@ const PasswordField = ({
 };
 
 export const ForcePasswordChangePage = () => {
+  useDocumentTitle('Change password');
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
 

@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const SuperAdminBlogDetailSkeleton = () => (
   <div className="space-y-6 p-4 sm:p-6 max-w-5xl mx-auto">
@@ -108,6 +109,8 @@ export const SuperAdminBlogDetailPage = () => {
     queryFn: async () => (await api.get(`/superadmin/blogs/${blogId}`)).data,
     enabled: !!blogId,
   });
+
+  useDocumentTitle(blog ? blog.name ?? blog.blog_name ?? 'Untitled workspace' : 'Blog');
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ is_active }: { is_active: boolean }) => {

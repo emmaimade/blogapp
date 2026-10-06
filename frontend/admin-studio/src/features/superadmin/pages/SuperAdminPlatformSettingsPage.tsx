@@ -4,6 +4,7 @@ import { useBlocker } from 'react-router-dom';
 import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -85,6 +86,7 @@ const inputClass = "w-full rounded-xl border border-zinc-200 dark:border-zinc-70
 const labelClass = "block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5";
 
 export const SuperAdminPlatformSettingsPage = () => {
+  useDocumentTitle('Platform settings');
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saved, setSaved] = useState(false);
 

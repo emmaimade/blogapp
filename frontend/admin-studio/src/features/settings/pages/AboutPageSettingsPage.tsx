@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface AboutSettingsData {
   bio_title: string;
@@ -35,6 +36,7 @@ const defaultAboutSettings: AboutSettingsData = {
 };
 
 export const AboutPageSettings: React.FC = () => {
+  useDocumentTitle('About page settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
   const publicSiteOrigin =

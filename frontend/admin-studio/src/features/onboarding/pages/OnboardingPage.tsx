@@ -14,6 +14,7 @@ import { useAuth } from '../../auth/context/AuthContext';
 import { InkoLogo } from '../../../assets/inko';
 import { EmailVerificationBanner } from '../../auth/components/EmailVerificationBanner';
 import { SupportModal } from '../../support/components/SupportModal';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 type SubscriptionPlan = 'free' | 'pro' | 'team';
 type OnboardingStepKey = 'about' | 'profile' | 'publication' | 'team' | 'plan';
@@ -107,6 +108,7 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 );
 
 export const OnboardingPage = () => {
+  useDocumentTitle('Set up your blog');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeBlog, requiresOnboarding } = useBlog();

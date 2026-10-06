@@ -5,6 +5,7 @@ import { MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
 import api from '../../../shared/api/client';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
@@ -35,6 +36,7 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const MyTicketsPage = () => {
+  useDocumentTitle('Support tickets');
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);

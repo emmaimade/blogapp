@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Mail, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const ForgotPasswordPage = () => {
+  useDocumentTitle('Forgot password');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

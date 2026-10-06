@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, Clock, CreditCard, Search, XCircle } from 'lu
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatLocalDate } from '../../../shared/utils/dates';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -29,6 +30,7 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
 };
 
 export const SuperAdminSubscriptionsPage = () => {
+  useDocumentTitle('Subscriptions');
   const [search, setSearch] = useState('');
 
   const { data: subscriptions, isLoading } = useQuery({

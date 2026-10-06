@@ -11,6 +11,7 @@ import { Modal } from '../../../shared/components/Modal';
 import { type Post } from '../../../shared/types';
 import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 type FilterTab = 'all' | 'published' | 'scheduled' | 'draft';
 
@@ -92,6 +93,7 @@ const StatusBadge = ({
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const PostList = () => {
+  useDocumentTitle('Posts');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { activeBlog } = useBlog();

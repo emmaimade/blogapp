@@ -7,6 +7,7 @@ import { InviteModal } from "../components/InviteModal";
 import { Avatar, RoleBadge, RoleDropdown, MemberActionsMenu } from "../components/UserComponents";
 import { Modal } from "../../../shared/components/Modal";
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from "../../../shared/ui/Skeleton";
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const UserManagerSkeleton = () => (
   <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6">
@@ -44,6 +45,7 @@ const UserManagerSkeleton = () => (
 );
 
 export const UserManager = () => {
+  useDocumentTitle('Users');
   const {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
     showInviteModal, setShowInviteModal,

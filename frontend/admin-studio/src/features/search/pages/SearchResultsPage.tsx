@@ -8,6 +8,7 @@ import { formatLocalDate } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useAuth } from '../../auth/context/AuthContext';
 import { canAccess } from '../../auth/lib/accessControl';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface CommentHit {
   id: number;
@@ -47,6 +48,7 @@ export const SearchResultsPage = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const q = searchParams.get('q')?.trim() ?? '';
+  useDocumentTitle(q ? `Search: ${q}` : 'Search');
 
   const canSearchComments = canAccess(user, activeMembership, 'manage_comments');
   const canSearchTags = canAccess(user, activeMembership, 'manage_tags');

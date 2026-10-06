@@ -21,6 +21,7 @@ import {
 import api from '../../../shared/api/client';
 import { formatLocalDateTime, formatRelative } from '../../../shared/utils/dates';
 import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface AuditLogEntry {
   id: number;
@@ -199,6 +200,7 @@ const stringifyDetail = (value: unknown) => {
 };
 
 export const SuperAdminAuditLogPage = () => {
+  useDocumentTitle('Audit log');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');

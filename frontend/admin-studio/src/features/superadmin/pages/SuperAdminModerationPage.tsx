@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Eye, MessageSquare, MoreHorizontal, Search
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -124,6 +125,7 @@ const ActionMenu = ({
 };
 
 export const SuperAdminModerationPage = () => {
+  useDocumentTitle('Moderation');
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<FilterTab>('pending');

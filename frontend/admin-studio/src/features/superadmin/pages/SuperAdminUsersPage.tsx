@@ -8,6 +8,7 @@ import { useAuth } from '../../auth/context/AuthContext';
 import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { Modal } from '../../../shared/components/Modal';
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const SuperAdminUsersSkeleton = () => (
   <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
@@ -46,6 +47,7 @@ const SuperAdminUsersSkeleton = () => (
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const SuperAdminUsersPage = () => {
+  useDocumentTitle('Platform users');
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');

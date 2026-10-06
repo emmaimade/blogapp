@@ -4,10 +4,12 @@ import { getPlatformStats, getBlogAnalytics } from '../api/superadminApi';
 import { Activity, Users, Database, Layout } from 'lucide-react';
 import { SuperAdminDashboardSkeleton } from '../components/SuperAdminDashboardSkeleton';
 import { formatSmart } from '../../../shared/utils/dates';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const TENANT_PREVIEW_LIMIT = 5;
 
 export const SuperAdminDashboardPage = () => {
+  useDocumentTitle('Platform overview');
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['superadmin-stats'],
     queryFn: getPlatformStats,

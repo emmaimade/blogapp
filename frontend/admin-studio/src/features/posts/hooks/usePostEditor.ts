@@ -30,7 +30,7 @@ export const usePostEditor = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
 
-  const { control, register, handleSubmit, reset, watch, setValue } = useForm<PostForm>({
+  const { control, register, handleSubmit, reset, watch, setValue, formState: { isDirty } } = useForm<PostForm>({
     defaultValues: {
       is_project: false,
       is_featured: false,
@@ -190,6 +190,7 @@ export const usePostEditor = () => {
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
     currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
-    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate
+    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
+    isDirty, savedTitle: existingPost?.title as string | undefined,
   };
 };

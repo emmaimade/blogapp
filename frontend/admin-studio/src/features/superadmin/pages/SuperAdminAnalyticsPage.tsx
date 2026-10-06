@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats, getBlogAnalytics } from '../api/superadminApi';
 import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp } from 'lucide-react';
 import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const SuperAdminAnalyticsSkeleton = () => (
   <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto space-y-8">
@@ -48,6 +49,7 @@ const SuperAdminAnalyticsSkeleton = () => (
 );
 
 export const SuperAdminAnalyticsPage = () => {
+  useDocumentTitle('Analytics');
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['superadmin-stats'],
     queryFn: getPlatformStats,

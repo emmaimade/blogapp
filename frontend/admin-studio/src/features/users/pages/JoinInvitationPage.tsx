@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import api from "../../../shared/api/client";
 import { useAuth } from "../../auth/context/AuthContext";
 import { RoleBadge } from "../components/UserComponents";
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface InvitationInfo {
   blog_name: string;
@@ -18,6 +19,7 @@ interface InvitationInfo {
 type PageState = "loading" | "ready" | "not_found" | "expired" | "error";
 
 export const JoinInvitationPage = () => {
+  useDocumentTitle('Join blog');
   const { token } = useParams<{ token: string }>();
   const { user, login } = useAuth();
 

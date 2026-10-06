@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 import axios from "axios";
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const ResetPasswordPage = () => {
+  useDocumentTitle('Reset password');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token");

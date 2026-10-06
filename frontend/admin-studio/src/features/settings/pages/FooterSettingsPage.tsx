@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface FooterSettingsData {
   footer_text: string;
@@ -43,6 +44,7 @@ const defaultFooterSettings: FooterSettingsData = {
 };
 
 export const FooterSettings: React.FC = () => {
+  useDocumentTitle('Footer settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
 

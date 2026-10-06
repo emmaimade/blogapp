@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const SuperAdminBlogsSkeleton = () => (
   <div className="space-y-6 p-6">
@@ -147,6 +148,7 @@ const RowActionsMenu = ({ blog, onOpenModal }: RowActionsProps) => {
 };
 
 export const SuperAdminBlogsPage = () => {
+  useDocumentTitle('Blogs');
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 

@@ -3,6 +3,7 @@ import { MessageSquare, Send, Clock } from 'lucide-react';
 import { useSupportTickets, type TicketStatus } from '../hooks/useSupportTickets';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const STATUS_TABS: { key: TicketStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -23,6 +24,7 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const SuperAdminSupportPage = () => {
+  useDocumentTitle('Support');
   const { user } = useAuth();
   const {
     tickets,

@@ -10,6 +10,7 @@ import WorkspacesTab from '../components/WorkspacesTab';
 import ContextualActivityLogTab from '../components/ContextualActivityLogTab';
 import { useState } from 'react';
 import { SkeletonBar } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const UserInfoSkeleton = () => (
   <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto p-4 md:p-6">
@@ -69,6 +70,10 @@ export default function UserInfoPage() {
   });
 
   const targetUserEmail = targetUser ? targetUser.email : null;
+
+  const isOwnProfile = !id || targetUserId === currentUser?.id;
+  const targetUserName = [targetUser?.first_name, targetUser?.last_name].filter(Boolean).join(' ') || targetUserEmail;
+  useDocumentTitle(isOwnProfile ? 'My profile' : targetUserName || 'User');
   const activeTab = (searchParams.get('tab') as TabId) || 'profile';
 
   const membershipInActiveBlog = targetUser?.blog_memberships?.find(

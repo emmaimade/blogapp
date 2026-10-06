@@ -6,6 +6,7 @@ import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { type Tag } from '../../../shared/types';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const TAG_COLORS = [
   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -26,6 +27,7 @@ const getColorForTag = (tagName: string) => {
 };
 
 export const TagManager = () => {
+  useDocumentTitle('Tags');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
   const [newTagName, setNewTagName] = useState('');

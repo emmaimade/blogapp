@@ -11,6 +11,7 @@ import { TagSelector } from '../components/TagSelector';
 import { markdownComponents, getEditorOptions } from '../components/MarkdownConfig';
 import { SchedulePublishPanel } from '../components/SchedulePublishPanel';
 import { ContentBlueprint } from '../components/ContentBlueprint';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 import 'easymde/dist/easymde.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
@@ -21,8 +22,12 @@ export const PostEditor: React.FC = () => {
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
     currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
-    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate
+    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
+    isDirty, savedTitle
   } = usePostEditor();
+
+  // Saved title rather than the live input, so the tab doesn't churn while typing.
+  useDocumentTitle(isEditMode ? (savedTitle ? `Edit: ${savedTitle}` : 'Edit post') : 'New post', isDirty);
 
   const editorOptions = useMemo(() => getEditorOptions(handleImageUpload), [handleImageUpload]);
 

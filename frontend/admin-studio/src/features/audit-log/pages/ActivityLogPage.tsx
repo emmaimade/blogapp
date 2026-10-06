@@ -5,6 +5,7 @@ import { formatLocalDateTime, formatRelative } from '../../../shared/utils/dates
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 interface AuditLogEntry {
   id: number;
@@ -31,6 +32,7 @@ const roleLabel = (role: unknown) =>
   typeof role === 'string' ? ROLE_LABELS[role.toLowerCase()] ?? role : String(role ?? 'unknown');
 
 export const ActivityLogPage = () => {
+  useDocumentTitle('Activity log');
   const { activeBlog } = useBlog();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
