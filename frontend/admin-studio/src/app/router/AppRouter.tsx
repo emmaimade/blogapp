@@ -51,9 +51,9 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <>
     {/* ── Public routes ── */}
+      <Route path="/admin/login" element={<LoginView />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route element={<AuthLayout />}>
-        <Route path="/admin/login" element={<LoginView />} />
         <Route
           path="/admin/forgot-password"
           element={<ForgotPasswordPage />}
