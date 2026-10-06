@@ -112,22 +112,9 @@ class ContactSettings(BaseModel):
     show_social_links: bool = True
     social_links: SocialLinks = Field(default_factory=SocialLinks)
     show_faq: bool = True
-    faqs: List[FAQItem] = Field(
-        default_factory=lambda: [
-            FAQItem(
-                question="Open for freelance?",
-                answer="Yes, currently accepting select projects.",
-            ),
-            FAQItem(
-                question="Speaking engagements?",
-                answer="Always interested in tech conferences and meetups.",
-            ),
-            FAQItem(
-                question="Guest posting?",
-                answer="Open to high-quality technical content collaborations.",
-            ),
-        ]
-    )
+    # Empty by default: the owner writes their own FAQs. Built-in examples
+    # would show on a tenant's blog as if the owner had written them.
+    faqs: List[FAQItem] = Field(default_factory=list)
 
 
 class ContactSettingsResponse(ContactSettings):
