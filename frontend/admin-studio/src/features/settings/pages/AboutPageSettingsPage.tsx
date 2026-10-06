@@ -97,11 +97,32 @@ export const AboutPageSettings: React.FC = () => {
     saveMutation.mutate(formData);
   };
 
+  // The draft goes to the preview tab over postMessage, never in the URL —
+  // a URL-borne draft let anyone make a blog's About page show any content.
+  // Handshake (mirrored in the blog's useAboutPreviewDraft): the tab opens
+  // `/about?preview=1`, says it's ready, and only then gets the draft, sent
+  // pinned to the blog's origin. No `noopener`, since the tab needs
+  // window.opener to reach back here.
   const handlePreview = () => {
     const draft = { ...formData };
     const url = new URL(previewUrl);
-    url.searchParams.set('draft', JSON.stringify(draft));
-    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    url.searchParams.set('preview', '1');
+    const blogOrigin = url.origin;
+
+    const previewWindow = window.open(url.toString(), '_blank');
+    if (!previewWindow) {
+      toast.error('Allow pop-ups for this site to preview your changes.');
+      return;
+    }
+
+    const handleReady = (event: MessageEvent) => {
+      if (event.origin !== blogOrigin || event.source !== previewWindow) return;
+      if (event.data?.type !== 'inko:about-preview-ready') return;
+      previewWindow.postMessage({ type: 'inko:about-preview-draft', draft }, blogOrigin);
+    };
+    window.addEventListener('message', handleReady);
+    // The tab announces itself within seconds of loading; don't listen forever.
+    window.setTimeout(() => window.removeEventListener('message', handleReady), 60_000);
   };
 
   const handleChange = (field: keyof AboutSettingsData, value: AboutSettingsData[keyof AboutSettingsData]) => {

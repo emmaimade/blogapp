@@ -1,11 +1,11 @@
 import React from 'react';
 import { Mail } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/blogApi';
+import { useAboutPreviewDraft } from '../hooks/useAboutPreviewDraft';
 
 export const About: React.FC = () => {
-  const location = useLocation();
 
   // Fetch posts for real stats
   const { data: postsData } = useQuery({
@@ -47,18 +47,9 @@ export const About: React.FC = () => {
     }
   });
 
-  let previewDraft = null;
-
-  try {
-    const params = new URLSearchParams(location.search);
-    const draftParam = params.get('draft');
-
-    if (draftParam) {
-      previewDraft = JSON.parse(draftParam);
-    }
-  } catch (error) {
-    previewDraft = null;
-  }
+  // Unsaved settings from the admin's Preview button, received over
+  // postMessage — never read from the URL, where anyone could craft one.
+  const previewDraft = useAboutPreviewDraft();
 
   // Real, dynamic stats
   const stats = {
