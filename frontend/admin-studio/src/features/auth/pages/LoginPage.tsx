@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { authSession } from '../lib/session';
-import { getCurrentUserRequest, loginRequest } from '../../../shared/api/auth';
+import { loginRequest } from '../../../shared/api/auth';
 import { getPostLoginPath } from '../lib/accessControl';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || "http://localhost:5175";
 
 export const LoginView = () => {
+  useDocumentTitle('Sign in');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,15 +54,9 @@ export const LoginView = () => {
       formData.append('password', password);
 
       const loginResponse = await loginRequest(formData);
-      const { access_token, refresh_token } = loginResponse.data;
+      const userData = loginResponse.data.user;
 
-      authSession.setToken(access_token);
-      if (refresh_token) authSession.setRefreshToken(refresh_token);
-
-      const userResponse = await getCurrentUserRequest();
-      const userData = userResponse.data;
-
-      login(access_token, userData);
+      login(userData);
       navigate(safeRedirect || getPostLoginPath(userData));
     } catch (err: any) {
       console.error('Login error:', err);
@@ -75,7 +70,6 @@ export const LoginView = () => {
       } else {
         setError(err.response?.data?.detail || 'Login failed. Please try again.');
       }
-      authSession.clearToken();
     } finally {
       setIsLoading(false);
     }

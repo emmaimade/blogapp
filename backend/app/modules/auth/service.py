@@ -1,8 +1,18 @@
+import secrets
+
+from fastapi import Response
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
-from app.core.security import create_access_token, verify_password
+from app.core.config import settings
+from app.core.security import (
+    ACCESS_TOKEN_COOKIE_NAME,
+    CSRF_COOKIE_NAME,
+    REFRESH_TOKEN_COOKIE_NAME,
+    create_access_token,
+    verify_password,
+)
 from app.models import BlogMember, User
 from app.schemas import UserRead
 from app.services.auth_tokens import create_refresh_token
@@ -38,14 +48,60 @@ def build_user_payload(user_id: int, session: Session) -> UserRead:
     return UserRead.model_validate(hydrated_user)
 
 
-def build_login_response(user: User, session: Session) -> dict:
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """
+    Issues the session as httpOnly cookies rather than handing the raw tokens
+    to JS. Host-only (no explicit Domain) and relies on the frontends' Vercel
+    rewrite proxying same-origin `/api/*` calls to this backend — that's what
+    makes these ordinary first-party cookies instead of needing SameSite=None.
+
+    csrf_token is deliberately NOT httpOnly: the frontend reads it and echoes
+    it back as X-CSRF-Token on state-changing requests (see the CSRF check),
+    which a cross-site page can't do since it can't read another origin's
+    cookies — that's what defeats CSRF now that auth rides on a cookie the
+    browser attaches automatically.
+    """
+    response.set_cookie(
+        ACCESS_TOKEN_COOKIE_NAME,
+        access_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        REFRESH_TOKEN_COOKIE_NAME,
+        refresh_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/auth",
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        secrets.token_urlsafe(32),
+        httponly=False,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(ACCESS_TOKEN_COOKIE_NAME, path="/")
+    response.delete_cookie(REFRESH_TOKEN_COOKIE_NAME, path="/auth")
+    response.delete_cookie(CSRF_COOKIE_NAME, path="/")
+
+
+def build_login_response(user: User, session: Session, response: Response) -> dict:
     access_token = create_access_token(data={"sub": user.username})
     refresh_token = create_refresh_token(session, user.id)
+    set_auth_cookies(response, access_token, refresh_token)
     user_payload = build_user_payload(user.id, session)
     return {
         "message": "Login successful",
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
         "user": user_payload.model_dump(mode="json"),
     }

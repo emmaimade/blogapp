@@ -1,16 +1,20 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../api/blogApi';
 
 interface AuthUser {
   id: number;
   username?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (token: string, user: AuthUser, refreshToken?: string) => void;
+  login: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -21,53 +25,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate the stored token against the backend rather than trusting
-    // localStorage blindly — a stale or forged userId shouldn't grant "this
-    // is my comment" UI to the wrong visitor.
+    // The session lives in an httpOnly cookie now — there's no token in JS
+    // to check before asking, so this call is unconditional. A 401 here just
+    // means there's no session yet, which is the normal state for an
+    // anonymous visitor.
     api
       .get('/auth/me')
       .then((res) => {
-        const authUser: AuthUser = { id: res.data.id, username: res.data.username };
-        setUser(authUser);
-        localStorage.setItem('userId', String(authUser.id));
-        if (authUser.username) localStorage.setItem('username', authUser.username);
+        setUser({
+          id: res.data.id,
+          username: res.data.username,
+          first_name: res.data.first_name,
+          last_name: res.data.last_name,
+          email: res.data.email,
+        });
       })
       .catch(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('username');
         setUser(null);
       })
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = useCallback((token: string, userData: AuthUser, refreshToken?: string) => {
-    localStorage.setItem('token', token);
-    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
-    localStorage.setItem('userId', String(userData.id));
-    if (userData.username) localStorage.setItem('username', userData.username);
+  const login = useCallback((userData: AuthUser) => {
     setUser(userData);
   }, []);
 
+  const queryClient = useQueryClient();
+
   const logout = useCallback(() => {
-    const refreshToken = localStorage.getItem('refresh_token');
-    if (refreshToken) {
-      // Best-effort — local state is cleared either way.
-      api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
-    }
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
+    // Best-effort — local state is cleared either way.
+    api.post('/auth/logout').catch(() => {});
     setUser(null);
-  }, []);
+    // Staff can open unpublished posts by direct link while signed in; drop
+    // those cached post pages so a draft isn't still on screen afterwards.
+    queryClient.removeQueries({ queryKey: ['post'] });
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, logout }}>

@@ -11,6 +11,7 @@ import uuid
 from sqlmodel import Session, select
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models import User
 
 
@@ -50,7 +51,7 @@ def test_registering_a_new_tenant_notifies_superadmins(client):
         data={"username": admin_email, "password": "correcthorse1"},
     )
     assert login.status_code == 200, login.text
-    admin_token = login.json()["access_token"]
+    admin_token = client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
     before = client.get("/notifications/unread-count", headers=admin_headers)
@@ -88,12 +89,12 @@ def test_creating_an_additional_blog_notifies_superadmins(client):
         "/users/login",
         data={"username": admin_email, "password": "correcthorse1"},
     )
-    admin_token = login.json()["access_token"]
+    admin_token = client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
     owner_email = _unique_email()
     owner_resp = _register(client, owner_email)
-    owner_token = owner_resp.json()["access_token"]
+    owner_token = client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
     owner_headers = {"Authorization": f"Bearer {owner_token}"}
 
     before = client.get("/notifications/unread-count", headers=admin_headers)

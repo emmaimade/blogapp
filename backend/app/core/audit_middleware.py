@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.audit import add_audit_log
 from app.core.config import ALGORITHM, SECRET_KEY
 from app.core.db import engine
+from app.core.security import extract_bearer_token
 from app.models import User
 
 
@@ -44,11 +45,10 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             return
 
     def _get_actor(self, request: Request, session: Session) -> User | None:
-        auth_header = request.headers.get("authorization", "")
-        if not auth_header.lower().startswith("bearer "):
+        token = extract_bearer_token(request)
+        if not token:
             return None
 
-        token = auth_header.split(" ", 1)[1].strip()
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username = payload.get("sub")

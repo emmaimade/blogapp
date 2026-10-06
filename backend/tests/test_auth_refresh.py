@@ -1,7 +1,8 @@
 """
-Coverage for JWT refresh/logout/revocation: login returns a refresh token
-alongside the access token, /auth/refresh rotates it (old token rejected on
-reuse), and /auth/logout revokes it outright.
+Coverage for cookie-based JWT refresh/logout/revocation: login sets httpOnly
+access_token/refresh_token/csrf_token cookies (no tokens in the JSON body),
+/auth/refresh rotates the refresh cookie (old one rejected on reuse), and
+/auth/logout revokes it and clears all three cookies.
 """
 
 import uuid
@@ -9,6 +10,7 @@ import uuid
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME
 from app.models import RefreshToken
 
 
@@ -31,60 +33,67 @@ def _register(client) -> dict:
     return resp.json()
 
 
-def test_login_response_includes_a_refresh_token(client):
+def test_login_sets_auth_cookies_and_omits_tokens_from_the_body(client):
     body = _register(client)
-    assert "refresh_token" in body
-    assert isinstance(body["refresh_token"], str) and body["refresh_token"]
+    assert "access_token" not in body
+    assert "refresh_token" not in body
+    assert client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+    assert client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    assert client.cookies.get(CSRF_COOKIE_NAME)
 
 
 def test_refresh_issues_a_new_access_token(client):
-    body = _register(client)
-    res = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
-    assert res.status_code == 200, res.text
-    new_body = res.json()
-    assert new_body["access_token"]
-    assert new_body["refresh_token"]
-    # The refresh token always rotates (a fresh random value each time);
-    # the access token's byte content isn't asserted here since it has no
-    # jti/iat and can be identical to the prior one if minted in the same
-    # second — its *usability* is what's asserted below instead.
-    assert new_body["refresh_token"] != body["refresh_token"]
+    _register(client)
+    old_access_token = client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+    old_refresh_token = client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
 
-    # The new access token is actually usable.
-    me = client.get("/auth/me", headers={"Authorization": f"Bearer {new_body['access_token']}"})
+    res = client.post("/auth/refresh")
+    assert res.status_code == 200, res.text
+
+    # The refresh token always rotates (a fresh random value each time).
+    assert client.cookies.get(REFRESH_TOKEN_COOKIE_NAME) != old_refresh_token
+    assert client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+
+    # The new access token cookie is actually usable.
+    me = client.get("/auth/me")
     assert me.status_code == 200, me.text
 
 
 def test_refresh_rotates_and_rejects_reuse_of_the_old_token(client):
-    body = _register(client)
-    first_refresh = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
+    _register(client)
+    original_refresh_token = client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+
+    first_refresh = client.post("/auth/refresh")
     assert first_refresh.status_code == 200, first_refresh.text
 
     # Reusing the now-rotated-out original refresh token must fail.
-    reuse = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
+    client.cookies.set(REFRESH_TOKEN_COOKIE_NAME, original_refresh_token)
+    reuse = client.post("/auth/refresh")
     assert reuse.status_code == 400, reuse.text
     assert reuse.json()["code"] == "INVALID_TOKEN"
 
-    # The newly-issued refresh token from the first call still works.
-    second_refresh = client.post(
-        "/auth/refresh", json={"refresh_token": first_refresh.json()["refresh_token"]}
-    )
-    assert second_refresh.status_code == 200, second_refresh.text
-
 
 def test_refresh_rejects_unknown_token(client):
-    res = client.post("/auth/refresh", json={"refresh_token": "not-a-real-token"})
+    client.cookies.set(REFRESH_TOKEN_COOKIE_NAME, "not-a-real-token")
+    res = client.post("/auth/refresh")
     assert res.status_code == 400, res.text
     assert res.json()["code"] == "INVALID_TOKEN"
 
 
+def test_refresh_rejects_missing_token(client):
+    res = client.post("/auth/refresh")
+    assert res.status_code == 401, res.text
+
+
 def test_refresh_rejects_expired_token(client):
-    body = _register(client)
+    _register(client)
+    raw_refresh_token = client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+
     with Session(engine) as session:
         from sqlmodel import select
         import hashlib
 
-        hashed = hashlib.sha256(body["refresh_token"].encode("utf-8")).hexdigest()
+        hashed = hashlib.sha256(raw_refresh_token.encode("utf-8")).hexdigest()
         record = session.exec(select(RefreshToken).where(RefreshToken.token == hashed)).first()
         assert record is not None
         from datetime import datetime, timedelta, timezone
@@ -93,22 +102,24 @@ def test_refresh_rejects_expired_token(client):
         session.add(record)
         session.commit()
 
-    res = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
+    res = client.post("/auth/refresh")
     assert res.status_code == 410, res.text
     assert res.json()["code"] == "LINK_EXPIRED"
 
 
-def test_logout_revokes_the_refresh_token(client):
-    body = _register(client)
-    logout = client.post("/auth/logout", json={"refresh_token": body["refresh_token"]})
+def test_logout_revokes_the_refresh_token_and_clears_cookies(client):
+    _register(client)
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    logout = client.post("/auth/logout", headers={"X-CSRF-Token": csrf_token})
     assert logout.status_code == 204, logout.text
+    assert not client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+    assert not client.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
 
-    res = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
-    assert res.status_code == 400, res.text
-    assert res.json()["code"] == "INVALID_TOKEN"
+    res = client.post("/auth/refresh")
+    assert res.status_code == 401, res.text
 
 
-def test_logout_with_unknown_token_is_a_no_op(client):
-    """Logout shouldn't error just because the token is already gone/invalid."""
-    res = client.post("/auth/logout", json={"refresh_token": "not-a-real-token"})
+def test_logout_with_no_cookie_is_a_no_op(client):
+    """Logout shouldn't error just because there's no session to revoke."""
+    res = client.post("/auth/logout")
     assert res.status_code == 204, res.text

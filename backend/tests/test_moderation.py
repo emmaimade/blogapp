@@ -10,6 +10,7 @@ import uuid
 from sqlmodel import Session, select
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models import Post, User
 from app.models.post import PostStatus
 
@@ -31,7 +32,7 @@ def _register_owner(client) -> tuple[str, int, int]:
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    return body["access_token"], body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
+    return client.cookies.get(ACCESS_TOKEN_COOKIE_NAME), body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
 
 
 def _promote_to_superadmin(email: str):
@@ -61,7 +62,7 @@ def _superadmin_headers(client) -> dict:
         data={"username": admin_email, "password": "correcthorse1"},
     )
     assert login.status_code == 200, login.text
-    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+    return {"Authorization": f"Bearer {client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)}"}
 
 
 def _create_post(blog_id: int, author_id: int) -> int:

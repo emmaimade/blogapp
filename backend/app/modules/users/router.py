@@ -2,7 +2,7 @@ import json
 import random
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, Response, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
@@ -78,7 +78,13 @@ def _generate_random_handle(email: str, session: Session) -> str:
 
 
 @router.post("/register")
-def register(user_data: UserCreate, background_tasks: BackgroundTasks, request: Request, session: Session = Depends(get_session)):
+def register(
+    user_data: UserCreate,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+):
     existing_email = session.exec(select(User).where(User.email == user_data.email)).first()
     if existing_email:
         raise ConflictError(ErrorCode.EMAIL_ALREADY_EXISTS)
@@ -169,11 +175,16 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, request: 
     # the token), not an id — passing new_user.id made this endpoint raise
     # AttributeError and return a bare 500. The two other call sites in
     # auth/router.py and blogs/router.py already pass the object.
-    return build_login_response(new_user, session)
+    return build_login_response(new_user, session, response)
 
 
 @router.post("/login")
-def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(
+    request: Request,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session),
+):
     # Same brute-force throttle as /auth/login — this is a second, equally
     # real path to the same credential check, and skipping it here would
     # just hand an attacker an unthrottled way around the /auth/login limit.
@@ -198,7 +209,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), se
     )
     session.commit()
     # Same fix as /users/register above — this takes the User, not its id.
-    return build_login_response(user, session)
+    return build_login_response(user, session, response)
 
 
 @router.get("/me", response_model=UserRead)

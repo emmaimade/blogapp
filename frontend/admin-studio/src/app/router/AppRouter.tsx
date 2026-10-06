@@ -3,6 +3,7 @@ import { ProtectedRoute } from '../../features/auth/components/ProtectedRoute';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { getPostLoginPath } from '../../features/auth/lib/accessControl';
 import { LoginView } from '../../features/auth/pages/LoginPage';
+import { SignupPage } from '../../features/auth/pages/SignupPage';
 import { ForgotPasswordPage } from '../../features/auth/pages/ForgotPasswordPage';
 import { AuthCallbackPage } from '../../features/auth/pages/AuthCallbackPage';
 import { OnboardingPage } from '../../features/onboarding/pages/OnboardingPage';
@@ -50,6 +51,7 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <>
     {/* ── Public routes ── */}
+      <Route path="/signup" element={<SignupPage />} />
       <Route element={<AuthLayout />}>
         <Route path="/admin/login" element={<LoginView />} />
         <Route

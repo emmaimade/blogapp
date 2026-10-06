@@ -90,15 +90,14 @@ export const JoinInvitationPage = () => {
     setIsSigningUp(true);
     try {
       // NEW backend endpoint — creates the User with no Blog attached,
-      // accepts this invitation, and returns an access token in one step
+      // accepts this invitation, and sets the session cookies in one step
       // so there's no separate "now go log in" hop.
       const res = await api.post(`/invitations/${token}/register-and-accept`, {
         first_name: signupData.firstName.trim(),
         last_name: signupData.lastName.trim(),
         password: signupData.password,
       });
-      const { access_token, refresh_token, user: userData } = res.data;
-      login(access_token, userData, refresh_token);
+      login(res.data.user);
       setJustJoined(true);
       setTimeout(() => window.location.assign("/admin/dashboard"), 1400);
     } catch (err: any) {

@@ -1,17 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
-import { authSession } from '../lib/session';
+import api from '../../../shared/api/client';
 import { type AuthUser } from '../types';
 import { getCurrentUserRequest } from '../../../shared/api/auth';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (token: string, userData: AuthUser, refreshToken?: string) => void;
+  login: (userData: AuthUser) => void;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
 }
@@ -23,12 +20,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = async () => {
-    const token = authSession.getToken();
-    if (!token) {
-      setUser(null);
-      return null;
-    }
-
     const response = await getCurrentUserRequest();
     setUser(response.data);
     return response.data;
@@ -36,35 +27,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = authSession.getToken();
-      if (token) {
-        try {
-          await refreshUser();
-        } catch (error) {
-          authSession.clearToken();
-          toast.error('Session expired. Please login again.');
-        }
+      // The session lives in an httpOnly cookie now — there's no token in JS
+      // to check before asking, so this call is unconditional. A 401 here
+      // just means there's no session yet, which is the normal state for an
+      // anonymous visitor, not something to surface as an error.
+      try {
+        await refreshUser();
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     initializeAuth();
   }, []);
 
-  const login = (token: string, userData: AuthUser, refreshToken?: string) => {
-    authSession.setToken(token);
-    if (refreshToken) authSession.setRefreshToken(refreshToken);
+  const login = (userData: AuthUser) => {
     setUser(userData);
     toast.success(`Welcome back, ${userData.first_name}!`);
   };
 
   const logout = () => {
-    const refreshToken = authSession.getRefreshToken();
-    if (refreshToken) {
-      // Best-effort — local state is cleared either way.
-      axios.post(`${API_URL}/auth/logout`, { refresh_token: refreshToken }).catch(() => {});
-    }
-    authSession.clearToken();
-    authSession.clearRefreshToken();
+    // Best-effort — local state is cleared either way.
+    api.post('/auth/logout').catch(() => {});
     setUser(null);
     toast.success('Logged out successfully');
   };

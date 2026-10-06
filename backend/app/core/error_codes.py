@@ -41,6 +41,7 @@ class ErrorCode(str, Enum):
     EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED"
     PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
     INCORRECT_PASSWORD = "INCORRECT_PASSWORD"
+    CSRF_TOKEN_INVALID = "CSRF_TOKEN_INVALID"
 
     # ── Authorization ─────────────────────────────────────────────────────────
     FORBIDDEN = "FORBIDDEN"
@@ -136,6 +137,10 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.INCORRECT_PASSWORD: ErrorSpec(
         status.HTTP_400_BAD_REQUEST,
         "Your current password is incorrect.",
+    ),
+    ErrorCode.CSRF_TOKEN_INVALID: ErrorSpec(
+        status.HTTP_403_FORBIDDEN,
+        "Your session could not be verified. Please refresh the page and try again.",
     ),
 
     # ── Authorization ─────────────────────────────────────────────────────────

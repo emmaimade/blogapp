@@ -8,6 +8,7 @@ from app.core.config import ALGORITHM, SECRET_KEY
 from app.core.db import engine
 from app.core.error_codes import ErrorCode, spec_for
 from app.core.error_handlers import build_error_payload
+from app.core.security import extract_bearer_token
 from app.models import User
 
 # Exempt (method, path) pairs — checked as exact matches.
@@ -46,14 +47,13 @@ def _is_exempt(method: str, path: str) -> bool:
 
 class RequirePasswordChangeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        auth_header = request.headers.get("authorization", "")
-        if not auth_header.lower().startswith("bearer "):
+        token = extract_bearer_token(request)
+        if not token:
             return await call_next(request)
 
         if _is_exempt(request.method, request.url.path):
             return await call_next(request)
 
-        token = auth_header.split(" ", 1)[1].strip()
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username = payload.get("sub")

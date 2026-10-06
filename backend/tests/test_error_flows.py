@@ -12,6 +12,7 @@ import pytest
 
 from tests.test_error_handling import assert_envelope, assert_no_internal_leak
 from app.core.error_codes import ErrorCode
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 
 
 def _unique_email() -> str:
@@ -36,24 +37,31 @@ def registered_user(client):
     email = _unique_email()
     response = _register(client, email)
     assert response.status_code == 200, response.text
-    return {"email": email, "password": "correcthorse1", "body": response.json()}
+    return {
+        "email": email,
+        "password": "correcthorse1",
+        "body": response.json(),
+        "token": client.cookies.get(ACCESS_TOKEN_COOKIE_NAME),
+    }
 
 
 # ── Successful responses must be untouched ────────────────────────────────────
 
 
-def test_registration_success_response_shape_is_unchanged(registered_user):
+def test_registration_success_response_shape_is_unchanged(client, registered_user):
     """
     The refactor must not have leaked the error envelope into success bodies —
-    no `success` key, no `code`, and the original payload intact.
+    no `success` key, no `code`, and the session set as cookies rather than
+    handed back as raw tokens in the body.
     """
     body = registered_user["body"]
     assert body["message"] == "Login successful"
-    assert body["token_type"] == "bearer"
-    assert body["access_token"]
+    assert "access_token" not in body
+    assert "token_type" not in body
     assert body["user"]["email"] == registered_user["email"]
     assert "success" not in body
     assert "code" not in body
+    assert client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
 
 
 def test_login_success_is_unchanged(client, registered_user):
@@ -63,12 +71,13 @@ def test_login_success_is_unchanged(client, registered_user):
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["access_token"]
+    assert "access_token" not in body
     assert "success" not in body
+    assert client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
 
 
 def test_authenticated_read_still_works(client, registered_user):
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200, response.text
     assert response.json()["email"] == registered_user["email"]
@@ -182,7 +191,7 @@ def test_forgot_password_does_not_disclose_unknown_accounts(client):
 
 
 def test_password_change_rejects_a_weak_password(client, registered_user):
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
     response = client.post(
         "/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
@@ -195,7 +204,7 @@ def test_password_change_rejects_a_weak_password(client, registered_user):
 
 
 def test_password_change_rejects_a_wrong_current_password(client, registered_user):
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
     response = client.post(
         "/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
@@ -219,7 +228,7 @@ def test_non_member_cannot_read_another_workspace_dashboard(client, registered_u
 
     outsider = _register(client, _unique_email())
     assert outsider.status_code == 200, outsider.text
-    outsider_token = outsider.json()["access_token"]
+    outsider_token = client.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
 
     response = client.get(
         f"/blogs/{blog_id}/dashboard",
@@ -229,7 +238,7 @@ def test_non_member_cannot_read_another_workspace_dashboard(client, registered_u
 
 
 def test_superadmin_area_is_closed_to_ordinary_accounts(client, registered_user):
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
     response = client.get("/superadmin/stats", headers={"Authorization": f"Bearer {token}"})
     assert_envelope(response, status_code=403, code=ErrorCode.SUPER_ADMIN_REQUIRED)
 
@@ -239,7 +248,7 @@ def test_superadmin_area_is_closed_to_ordinary_accounts(client, registered_user)
 
 def test_missing_post_in_a_real_workspace(client, registered_user):
     blog_id = registered_user["body"]["user"]["blog_memberships"][0]["blog_id"]
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
 
     response = client.get(
         f"/blogs/{blog_id}/posts/9999999",
@@ -250,7 +259,7 @@ def test_missing_post_in_a_real_workspace(client, registered_user):
 
 def test_missing_tag_in_a_real_workspace(client, registered_user):
     blog_id = registered_user["body"]["user"]["blog_memberships"][0]["blog_id"]
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
 
     response = client.delete(
         f"/blogs/{blog_id}/tags/9999999",
@@ -278,7 +287,7 @@ def test_unknown_invitation_token_is_a_typed_404(client):
 
 
 def test_support_ticket_requires_a_subject_and_body(client, registered_user):
-    token = registered_user["body"]["access_token"]
+    token = registered_user["token"]
     response = client.post(
         "/support/",
         headers={"Authorization": f"Bearer {token}"},

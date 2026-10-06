@@ -1,36 +1,26 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
-import { authSession } from '../lib/session';
+import api from '../../../shared/api/client';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
+// Not currently reachable from any backend flow (no email template or invite
+// endpoint redirects here) — kept for a future magic-link/OAuth-style flow.
+// If that's ever wired up, the backend redirect must set the session cookies
+// itself rather than passing tokens in this page's URL, which is its own
+// leak vector (browser history, referrer, server logs).
 export const AuthCallbackPage = () => {
+  useDocumentTitle('Signing in…');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
-      navigate('/admin/login', { replace: true });
-      return;
-    }
-
-    authSession.setToken(token);
-    const refreshToken = searchParams.get('refresh_token');
-    if (refreshToken) authSession.setRefreshToken(refreshToken);
     const next = searchParams.get('next') || '/admin/dashboard';
 
-    // If there's a pending invite token, auto-accept it now
     const inviteToken = searchParams.get('invite') || sessionStorage.getItem('pending_invite_token');
     if (inviteToken) {
       sessionStorage.removeItem('pending_invite_token');
-      axios
-        .post(
-          `${API_URL}/invitations/${inviteToken}/accept`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } },
-        )
+      api
+        .post(`/invitations/${inviteToken}/accept`, {})
         .catch(() => {
           // Silently ignore — user might already be a member or invite expired
         })

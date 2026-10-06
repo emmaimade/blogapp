@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authSession } from '../lib/session';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { canAccess, getAccessSummary, type AdminCapability } from '../lib/accessControl';
 
@@ -9,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
 
   if (isLoading || isBlogLoading) {
@@ -59,7 +58,7 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               onClick={() => {
-                authSession.clearToken();
+                logout();
                 window.location.href = '/admin/login';
               }}
               className="admin-btn admin-btn-primary px-6 py-3 text-sm"

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import BackgroundTasks, Request
+from fastapi import BackgroundTasks, Request, Response
 from jinja2 import Template
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -1180,7 +1180,7 @@ def accept_invitation(token: str, session: Session, current_user: User) -> BlogM
     return membership
 
 
-def register_and_accept_invitation(token: str, payload: InvitationRegisterCreate, session: Session, request: Request | None = None):
+def register_and_accept_invitation(token: str, payload: InvitationRegisterCreate, session: Session, response: Response, request: Request | None = None):
     """
     Creates a brand-new account for someone who doesn't have one yet and
     immediately accepts the invitation with it — deliberately skips
@@ -1268,4 +1268,4 @@ def register_and_accept_invitation(token: str, payload: InvitationRegisterCreate
     session.commit()
     session.refresh(new_user)
 
-    return build_login_response(new_user, session)
+    return build_login_response(new_user, session, response)

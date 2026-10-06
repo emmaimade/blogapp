@@ -8,6 +8,7 @@ import uuid
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models import Post, Tag, User
 from app.models.post import PostStatus
 from app.modules.posts import service as post_service
@@ -31,7 +32,7 @@ def _register_owner(client) -> tuple[str, int, int]:
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    return body["access_token"], body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
+    return client.cookies.get(ACCESS_TOKEN_COOKIE_NAME), body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
 
 
 def _create_posts(blog_id: int, author_id: int, count: int, views: list[int] | None = None, tag_name: str | None = None) -> list[int]:
@@ -224,6 +225,10 @@ def test_post_counts_endpoint_reflects_all_statuses(client):
 def test_post_counts_endpoint_requires_author_access(client):
     _, blog_id, _ = _register_owner(client)
 
+    # Registering set the owner's session as cookies on this client — clear
+    # them so the request genuinely carries no credentials, the same as it
+    # would have with no Authorization header before cookie-based auth.
+    client.cookies.clear()
     res = client.get(f"/blogs/{blog_id}/posts/counts")
     assert res.status_code == 401
 

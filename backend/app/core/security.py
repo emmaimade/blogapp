@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
@@ -20,6 +20,30 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
+
+# Cookie names shared between the routes that set them (auth/service.py's
+# build_login_response) and the code that reads them (this module, the
+# password-change and audit middlewares).
+ACCESS_TOKEN_COOKIE_NAME = "access_token"
+REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
+CSRF_COOKIE_NAME = "csrf_token"
+
+
+def extract_bearer_token(request: Request) -> Optional[str]:
+    """
+    The JWT for this request: the `Authorization: Bearer` header if present
+    (curl, /docs, any non-browser API client), otherwise the httpOnly
+    access-token cookie the browser frontends rely on.
+
+    Used directly by the two raw ASGI middlewares (password-change gate,
+    audit log) that can't use FastAPI's dependency injection; get_current_user
+    below reaches the same result through oauth2_scheme_optional instead, to
+    keep the OpenAPI "Authorize" declaration for /docs.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+    return request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
 
 
 PASSWORD_MIN_LENGTH = 8
@@ -69,7 +93,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
+async def get_current_user(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    session: Session = Depends(get_session),
+):
+    # Header first (curl, /docs, any non-browser API client), falling back to
+    # the httpOnly access-token cookie the browser frontends rely on.
+    token = token or request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+    if not token:
+        raise AuthenticationError(ErrorCode.AUTHENTICATION_REQUIRED, headers=_BEARER_CHALLENGE)
+
     # An expired token is worth telling apart from a malformed one: "your
     # session has expired, log in again" is actionable, "invalid token" isn't.
     # Both stay 401 so client-side session handling is unaffected.
@@ -116,9 +150,11 @@ def require_password_changed(current_user: User = Depends(get_current_user)) -> 
 
 
 async def get_current_user_optional(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme_optional),
     session: Session = Depends(get_session),
 ) -> Optional[User]:
+    token = token or request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
     if not token:
         return None
     try:

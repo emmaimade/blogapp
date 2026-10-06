@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     DATABASE_URL: Optional[str] = None
+    # Auth cookies are Secure by default (required in production, over HTTPS).
+    # Browsers already treat http://localhost as a trustworthy origin for
+    # Secure cookies, so local dev doesn't need this — it exists so the test
+    # suite's plain-http TestClient can actually round-trip cookies.
+    COOKIE_SECURE: bool = True
 
     # ── Uploads ──
     MAX_UPLOAD_SIZE_MB: int = 5

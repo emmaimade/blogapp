@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
+from app.core.csrf_middleware import CSRFMiddleware
 from app.core.db import create_db_and_tables
 from app.core.error_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
@@ -75,12 +76,13 @@ register_exception_handlers(app)
 origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
 
 # Middleware is applied outermost-last, so the effective request order is:
-#   CORS -> RequestContext -> AuditLog -> RequirePasswordChange -> routes
+#   CORS -> RequestContext -> AuditLog -> RequirePasswordChange -> CSRF -> routes
 #
 # RequestContextMiddleware sits *inside* CORS on purpose. It is what turns an
 # unhandled exception into the standard error envelope, and a response produced
 # outside CORSMiddleware reaches the browser without CORS headers — leaving the
 # frontend unable to read anything but "network error".
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(RequirePasswordChangeMiddleware)
 app.add_middleware(AuditLogMiddleware)
 app.add_middleware(RequestContextMiddleware)

@@ -12,6 +12,7 @@ import pytest
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models.settings import SiteSettings
 
 
@@ -32,7 +33,7 @@ def _register_owner(client) -> tuple[str, int]:
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    return body["access_token"], body["user"]["blog_memberships"][0]["blog_id"]
+    return client.cookies.get(ACCESS_TOKEN_COOKIE_NAME), body["user"]["blog_memberships"][0]["blog_id"]
 
 
 @pytest.fixture
@@ -73,5 +74,9 @@ def test_public_settings_are_readable_without_auth(client, owner):
 def test_all_settings_still_requires_owner_access(client, owner):
     _, blog_id = owner
 
+    # Registering set the owner's session as cookies on this client — clear
+    # them so the request genuinely carries no credentials, the same as it
+    # would have with no Authorization header before cookie-based auth.
+    client.cookies.clear()
     res = client.get(f"/blogs/{blog_id}/settings/all")
     assert res.status_code == 401

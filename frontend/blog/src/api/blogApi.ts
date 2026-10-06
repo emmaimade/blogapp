@@ -1,17 +1,28 @@
 import axios from 'axios';
+import { getCsrfToken } from './csrf';
 
+// In production this points at this app's own /api/* path, which Vercel
+// rewrites server-side to the real backend (see vercel.json) — that's what
+// makes the backend's auth cookies ordinary same-origin, first-party cookies
+// instead of needing SameSite=None (which third-party-cookie blocking would
+// then eat). Local dev talks to the backend directly; localhost on any port
+// is already same-site for cookie purposes, so no proxy is needed there.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:8000'),
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add token to requests if it exists
+const STATE_CHANGING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (config.method && STATE_CHANGING_METHODS.has(config.method.toLowerCase())) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
   }
 
   const blogId = localStorage.getItem('public_blog_id');
@@ -29,20 +40,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshInFlight: Promise<string> | null = null;
+let refreshInFlight: Promise<void> | null = null;
 
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = localStorage.getItem('refresh_token');
-  if (!refreshToken) throw new Error('No refresh token available');
-
+async function refreshAccessToken(): Promise<void> {
   if (!refreshInFlight) {
     refreshInFlight = axios
-      .post(`${api.defaults.baseURL}/auth/refresh`, { refresh_token: refreshToken })
-      .then((res) => {
-        localStorage.setItem('token', res.data.access_token);
-        localStorage.setItem('refresh_token', res.data.refresh_token);
-        return res.data.access_token as string;
-      })
+      .post(`${api.defaults.baseURL}/auth/refresh`, {}, { withCredentials: true })
+      .then(() => undefined)
       .finally(() => {
         refreshInFlight = null;
       });
@@ -59,12 +63,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !isRefreshCall && !originalRequest?._retry) {
       originalRequest._retry = true;
       try {
-        const newAccessToken = await refreshAccessToken();
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        await refreshAccessToken();
         return api(originalRequest);
       } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
+        return Promise.reject(error);
       }
     }
 

@@ -18,6 +18,10 @@ os.environ["SQL_ECHO"] = "false"
 os.environ["LOG_LEVEL"] = "CRITICAL"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-used-in-production")
 os.environ.setdefault("ALGORITHM", "HS256")
+# TestClient talks to http://testserver — a `Secure` cookie set over plain
+# http never gets sent back on the next request, so auth cookies would look
+# like they never persisted. Real deployments always run over HTTPS.
+os.environ.setdefault("COOKIE_SECURE", "false")
 # Required settings with no default — stubbed so the suite never needs real
 # credentials, and never reaches the real upload provider.
 os.environ.setdefault("CLOUDINARY_NAME", "test-cloud")

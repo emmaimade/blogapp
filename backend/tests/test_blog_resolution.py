@@ -10,6 +10,7 @@ import uuid
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models import Blog, User
 from app.models.blog import OnboardingStatus
 
@@ -33,7 +34,7 @@ def _register_owner(client) -> tuple[str, int, int, str]:
     assert resp.status_code == 200, resp.text
     body = resp.json()
     membership = body["user"]["blog_memberships"][0]
-    return body["access_token"], membership["blog_id"], body["user"]["id"], membership["blog"]["subdomain"]
+    return client.cookies.get(ACCESS_TOKEN_COOKIE_NAME), membership["blog_id"], body["user"]["id"], membership["blog"]["subdomain"]
 
 
 def _complete_onboarding_and_verify_email(blog_id: int, user_id: int) -> None:

@@ -95,14 +95,13 @@ export const AuthPage: React.FC = () => {
 
         const res = await loginWithFallback(loginData);
 
-        login(
-          res.data.access_token,
-          {
-            id: res.data.user?.id,
-            username: res.data.user?.username,
-          },
-          res.data.refresh_token,
-        );
+        login({
+          id: res.data.user?.id,
+          username: res.data.user?.username,
+          first_name: res.data.user?.first_name,
+          last_name: res.data.user?.last_name,
+          email: res.data.user?.email,
+        });
 
         toast.success("Welcome back!");
 

@@ -1,5 +1,5 @@
 import hashlib
-from fastapi import APIRouter, Depends, Query, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, Request, Response, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
@@ -16,6 +16,7 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.security import (
+    REFRESH_TOKEN_COOKIE_NAME,
     create_access_token,
     ensure_strong_password,
     get_current_user,
@@ -44,7 +45,7 @@ from app.core.email_templates import (
 )
 from app.schemas import UserRead
 
-from .service import authenticate_user, build_login_response, build_user_payload
+from .service import authenticate_user, build_login_response, build_user_payload, clear_auth_cookies, set_auth_cookies
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -63,12 +64,14 @@ class ChangePasswordSchema(BaseModel):
     current_password: str
     new_password: str
 
-class RefreshTokenSchema(BaseModel):
-    refresh_token: str
-
 
 @router.post("/login")
-def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(
+    request: Request,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session),
+):
     client_ip = get_client_ip(request)
     check_login_allowed(session, form_data.username, client_ip)
 
@@ -96,35 +99,39 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), se
     )
 
     session.commit()
-    return build_login_response(user, session)
+    return build_login_response(user, session, response)
 
 
 @router.post("/refresh")
-def refresh_access_token(payload: RefreshTokenSchema, session: Session = Depends(get_session)):
+def refresh_access_token(request: Request, response: Response, session: Session = Depends(get_session)):
     """
-    Exchanges a still-valid refresh token for a new access token. The refresh
-    token itself rotates on every use — the one presented here is revoked and
-    a new one is returned alongside the new access token, so a client must
-    persist the new refresh_token from the response, not reuse the old one.
+    Exchanges a still-valid refresh token (read from its httpOnly cookie) for
+    a new access token. The refresh token itself rotates on every use — the
+    one presented here is revoked and a new pair of cookies is set in its
+    place, so a stolen, already-rotated-out refresh token is useless.
     """
-    user, new_refresh_token = verify_and_rotate_refresh_token(session, payload.refresh_token)
+    raw_refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if not raw_refresh_token:
+        raise AuthenticationError(ErrorCode.AUTHENTICATION_REQUIRED)
+
+    user, new_refresh_token = verify_and_rotate_refresh_token(session, raw_refresh_token)
     access_token = create_access_token(data={"sub": user.username})
-    return {
-        "access_token": access_token,
-        "refresh_token": new_refresh_token,
-        "token_type": "bearer",
-    }
+    set_auth_cookies(response, access_token, new_refresh_token)
+    return {"message": "Token refreshed"}
 
 
 @router.post("/logout", status_code=204)
-def logout(payload: RefreshTokenSchema, session: Session = Depends(get_session)):
+def logout(request: Request, response: Response, session: Session = Depends(get_session)):
     """
-    Revokes the presented refresh token. Possession of the token is
-    sufficient — same reasoning as the password-reset flow — since the whole
-    point is to let a client end its own session without needing a still-valid
-    access token to do it.
+    Revokes the refresh token from its cookie, if present, and clears all
+    auth cookies. A no-op (not an error) if there's no cookie to revoke — same
+    reasoning as the password-reset flow, since the whole point is to let a
+    client end its own session unconditionally.
     """
-    revoke_refresh_token(session, payload.refresh_token)
+    raw_refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if raw_refresh_token:
+        revoke_refresh_token(session, raw_refresh_token)
+    clear_auth_cookies(response)
 
 
 @router.get("/me", response_model=UserRead)

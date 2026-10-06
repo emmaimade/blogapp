@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session
 
 from app.core.db import engine
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME
 from app.models import BlogInvitation, BlogRole
 
 
@@ -32,7 +33,7 @@ def _register(client, email: str | None = None) -> tuple[str, int, int]:
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    return body["access_token"], body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
+    return client.cookies.get(ACCESS_TOKEN_COOKIE_NAME), body["user"]["blog_memberships"][0]["blog_id"], body["user"]["id"]
 
 
 def _create_invitation(

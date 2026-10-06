@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 from sqlmodel import Session
 
 from app.core.db import get_session
@@ -73,6 +73,7 @@ def register_and_accept_invitation(
     token: str,
     payload: InvitationRegisterCreate,
     request: Request,
+    response: Response,
     session: Session = Depends(get_session),
 ):
-    return blog_service.register_and_accept_invitation(token, payload, session, request=request)
+    return blog_service.register_and_accept_invitation(token, payload, session, response, request=request)

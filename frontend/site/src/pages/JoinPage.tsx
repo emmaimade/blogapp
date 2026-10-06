@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { InkoLogo } from '../shared/inko';
 import { Clock, Loader2, AlertCircle, LogIn, UserPlus } from 'lucide-react';
+import { usePageMeta } from '../shared/hooks/usePageMeta';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || 'http://localhost:5173';
@@ -23,10 +24,11 @@ const ROLE_COLORS: Record<string, string> = {
 
 export const JoinPage = () => {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
   const [info, setInfo] = useState<InviteInfo | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'expired'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+
+  usePageMeta('Join workspace', 'Accept your invitation to join a workspace on Inko.');
 
   useEffect(() => {
     const fetchInvite = async () => {
@@ -47,13 +49,14 @@ export const JoinPage = () => {
     fetchInvite();
   }, [token]);
 
-  // Store invite token in sessionStorage so signup/login pages can pick it up
+  // Both paths hand off to admin-studio directly now — /join/:token there
+  // handles "log in or create an account" for an existing invite on its own,
+  // so there's nothing left for this app to coordinate via sessionStorage.
   const storeAndRedirect = (path: 'login' | 'signup') => {
-    sessionStorage.setItem('pending_invite_token', token!);
     if (path === 'login') {
-      window.location.href = `${ADMIN_STUDIO_URL}/admin/login?invite=${token}`;
+      window.location.href = `${ADMIN_STUDIO_URL}/admin/login?redirect=/join/${token}`;
     } else {
-      navigate(`/signup?invite=${token}`);
+      window.location.href = `${ADMIN_STUDIO_URL}/join/${token}`;
     }
   };
 
