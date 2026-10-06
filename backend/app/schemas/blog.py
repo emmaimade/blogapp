@@ -221,3 +221,30 @@ class OnboardingState(BaseModel):
     blog: BlogRead
     subscription: Optional[SubscriptionRead] = None
     summary: OnboardingSummary
+
+class PageMetaPost(UTCDatetimeMixin, BaseModel):
+    title: str
+    slug: str
+    description: str
+    image: Optional[str] = None
+    author_name: Optional[str] = None
+    published_at: datetime
+    updated_at: datetime
+
+
+class PageMeta(BaseModel):
+    """
+    Everything the public blog's edge middleware needs to server-render the
+    <head> for one page — site identity, plus the post when the path is one.
+    """
+    site_name: str
+    site_tagline: Optional[str] = None
+    site_description: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    og_image: Optional[str] = None
+    twitter_handle: Optional[str] = None
+    favicon_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    language: str = "en"
+    post: Optional[PageMetaPost] = None

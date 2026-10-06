@@ -27,6 +27,7 @@ from app.schemas import (
     OnboardingPublicationUpdate,
     OnboardingState,
     OnboardingTeamComplete,
+    PageMeta,
     SubscriptionRead,
 )
 from . import service as blog_service
@@ -68,6 +69,16 @@ def resolve_blog_by_host(
 ):
     """Resolves a tenant from a full request hostname — subdomain or custom domain alike."""
     return blog_service.resolve_blog_by_host(host, session)
+
+
+@router.get("/meta", response_model=PageMeta)
+def read_page_meta(
+    host: str,
+    path: str = "/",
+    session: Session = Depends(get_session),
+):
+    """Read-only <head> metadata for a public page — used by the blog's edge middleware."""
+    return blog_service.get_page_meta(host, path, session)
 
 
 @router.get("/check-slug/{slug}")

@@ -26,7 +26,7 @@ from app.core.permissions import Permissions
 from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
-from app.modules.settings.router import blog_general_defaults
+from app.modules.settings.router import blog_general_defaults, get_settings
 from app.modules.users.router import _generate_random_handle
 from app.core.email import dispatch_email
 from app.core.email_templates import (
@@ -76,6 +76,8 @@ from app.schemas import (
     OnboardingState,
     OnboardingSummary,
     OnboardingTeamComplete,
+    PageMeta,
+    PageMetaPost,
     SEOSettings,
     SubscriptionRead,
 )
@@ -403,6 +405,88 @@ def resolve_blog_by_host(host: str, session: Session) -> Blog:
     if not blog or not blog.is_active:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     return blog
+
+
+_POST_PATH_PATTERN = re.compile(r"^/post/([^/]+)/?$")
+_META_DESCRIPTION_LENGTH = 160
+
+
+def _plain_excerpt(markdown: str, length: int = _META_DESCRIPTION_LENGTH) -> str:
+    """Markdown → plain one-line text for a meta description (mirrors the blog's getPlainExcerpt)."""
+    text = re.sub(r"```[\s\S]*?```", "", markdown or "")
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"(\*\*|__|\*|_|`|~~)", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= length:
+        return text
+    return text[:length].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+
+
+def get_page_meta(host: str, path: str, session: Session) -> PageMeta:
+    """
+    Site (and, for /post/<slug>, post) metadata for server-rendering a public
+    page's <head>. Read-only on purpose — unlike read_post_by_slug it never
+    bumps view counts, since it runs on every full page load and crawler hit.
+    Drafts/scheduled posts are reported as no post at all, same as a miss.
+    """
+    blog = resolve_blog_by_host(host, session)
+    # One query for all three sections — this runs inside the edge middleware's
+    # short timeout, so every database round trip counts.
+    sections = get_settings(
+        session,
+        blog.id,
+        {"general": GeneralSettings, "seo": SEOSettings, "branding": BrandingSettings},
+        fallbacks={"general": blog_general_defaults(blog)},
+    )
+    general = sections["general"]
+    general["site_name"] = general.get("site_name") or blog.name
+    seo = sections["seo"]
+    branding = sections["branding"]
+
+    post_meta = None
+    match = _POST_PATH_PATTERN.match(path or "")
+    if match:
+        post = session.exec(
+            select(Post)
+            .where(
+                Post.blog_id == blog.id,
+                Post.slug == match.group(1),
+                Post.status == PostStatus.PUBLISHED,
+            )
+            .options(selectinload(Post.author))
+        ).first()
+        if post:
+            author = post.author
+            author_name = None
+            if author:
+                author_name = " ".join(filter(None, [author.first_name, author.last_name])) or author.username
+            post_meta = PageMetaPost(
+                title=post.title,
+                slug=post.slug,
+                description=_plain_excerpt(post.content),
+                image=post.thumbnail_url or None,
+                author_name=author_name,
+                # as_utc: the nested model's UTC serializer doesn't run inside
+                # PageMeta, and naive values would be read as local time in JS.
+                published_at=as_utc(post.published_at or post.created_at),
+                updated_at=as_utc(post.updated_at),
+            )
+
+    return PageMeta(
+        site_name=general.get("site_name") or blog.name,
+        site_tagline=general.get("site_tagline"),
+        site_description=general.get("site_description"),
+        seo_title=seo.get("meta_title"),
+        seo_description=seo.get("meta_description"),
+        og_image=seo.get("og_image"),
+        twitter_handle=seo.get("twitter_handle"),
+        favicon_url=branding.get("favicon_url") or None,
+        primary_color=branding.get("primary_color"),
+        language=general.get("language") or "en",
+        post=post_meta,
+    )
 
 
 _CUSTOM_DOMAIN_PATTERN = re.compile(
