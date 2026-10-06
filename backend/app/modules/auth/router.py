@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
 from datetime import datetime, timezone
 
-from app.core.audit import add_audit_log, resolve_primary_blog_id
+from app.core.audit import add_audit_log, get_client_ip, resolve_primary_blog_id
 from app.core.datetimes import as_utc, utc_now
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
@@ -30,6 +30,7 @@ from app.services.auth_tokens import (
     revoke_refresh_token,
     verify_and_rotate_refresh_token,
 )
+from app.services.login_throttle import check_login_allowed, record_failed_login
 from app.core.email import dispatch_email
 from app.core.email_templates import (
     get_verification_template,
@@ -68,8 +69,12 @@ class RefreshTokenSchema(BaseModel):
 
 @router.post("/login")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    client_ip = get_client_ip(request)
+    check_login_allowed(session, form_data.username, client_ip)
+
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
+        record_failed_login(session, form_data.username, client_ip)
         # Same response whether the address is unknown or the password is
         # wrong, so login can't be used to enumerate accounts. Kept at 400
         # rather than 401: the admin client treats *any* 401 as an expired

@@ -7,7 +7,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
 
-from app.core.audit import add_audit_log, resolve_primary_blog_id
+from app.core.audit import add_audit_log, get_client_ip, resolve_primary_blog_id
+from app.services.login_throttle import check_login_allowed, record_failed_login
 from app.core.geolocation import describe_location
 from app.core.user_agent import describe_user_agent
 from app.core.db import get_session
@@ -173,8 +174,15 @@ def register(user_data: UserCreate, background_tasks: BackgroundTasks, request: 
 
 @router.post("/login")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    # Same brute-force throttle as /auth/login — this is a second, equally
+    # real path to the same credential check, and skipping it here would
+    # just hand an attacker an unthrottled way around the /auth/login limit.
+    client_ip = get_client_ip(request)
+    check_login_allowed(session, form_data.username, client_ip)
+
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
+        record_failed_login(session, form_data.username, client_ip)
         # Identical response for unknown account and wrong password — see the
         # note on /auth/login for why this stays 400 rather than 401.
         raise AuthenticationError(ErrorCode.INVALID_CREDENTIALS)

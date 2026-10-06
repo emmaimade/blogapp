@@ -44,3 +44,18 @@ class RefreshToken(SQLModel, table=True):
     expires_at: datetime = Field(sa_column=Column(SQLDateTime(timezone=True), nullable=False))
     revoked_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))
+
+
+class LoginAttempt(SQLModel, table=True):
+    """
+    One row per *failed* login attempt, used to throttle brute-forcing of
+    POST /auth/login. Deliberately not tied to a user_id — the identifier may
+    not resolve to a real account, and per-IP throttling needs to catch that
+    case too (credential stuffing across many nonexistent usernames).
+    """
+    __tablename__ = "login_attempts"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    identifier: str = Field(index=True, nullable=False)  # lowercased username/email as submitted
+    ip_address: Optional[str] = Field(default=None, index=True, nullable=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False))

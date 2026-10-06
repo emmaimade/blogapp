@@ -38,6 +38,14 @@ from sqlmodel import Session, select
 from app.models.audit import AuditLog
 
 
+def get_client_ip(request: Request) -> Optional[str]:
+    """Client IP, preferring X-Forwarded-For (set by reverse proxies) over the raw socket peer."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
 def resolve_primary_blog_id(session: Session, user: Any) -> Optional[int]:
     """
     Best-effort tenant scope for account-level actions (login, profile edits,
@@ -103,9 +111,7 @@ def add_audit_log(
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
     if request is not None:
-        # Respect X-Forwarded-For from reverse proxies
-        forwarded = request.headers.get("x-forwarded-for")
-        ip_address = forwarded.split(",")[0].strip() if forwarded else request.client.host
+        ip_address = get_client_ip(request)
         user_agent = request.headers.get("user-agent")
 
     log = AuditLog(

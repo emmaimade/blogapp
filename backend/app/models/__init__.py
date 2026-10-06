@@ -4,7 +4,7 @@ from .moderation import ModerationAction, ModerationItem
 from .post import Post, PostTagLink, ProjectMetadata, Tag
 from .settings import SiteSettings, PlatformSettings
 from .user import User, PlatformRole
-from .auth_tokens import EmailVerification, PasswordResetToken, RefreshToken
+from .auth_tokens import EmailVerification, PasswordResetToken, RefreshToken, LoginAttempt
 from .support import SupportTicket, SupportMessage, TicketStatus
 from .notification import Notification
 from .blog import (
@@ -32,6 +32,7 @@ __all__ = [
     "EmailVerification",
     "PasswordResetToken",
     "RefreshToken",
+    "LoginAttempt",
     "Blog",
     "BlogMember",
     "BlogRole",
