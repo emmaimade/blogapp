@@ -19,9 +19,13 @@ export interface Post {
   excerpt?: string;
   thumbnail_url?: string;
   created_at: string;
+  /** When the post went live — kept across edits and republishing. */
+  published_at?: string | null;
   views?: number;
   is_project?: boolean;
+  is_featured?: boolean;
   is_sample?: boolean;
+  status?: 'published' | 'scheduled' | 'draft';
   author?: PostAuthor | null;
   tags: PostTag[];
 }
@@ -32,4 +36,21 @@ export interface PaginatedPosts {
   skip: number;
   limit: number;
   has_more: boolean;
+}
+
+export interface Comment {
+  id: number;
+  content: string;
+  user: {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+  };
+  created_at: string;
+  is_deleted?: boolean;
+}
+
+export interface PostDetail extends Post {
+  comments?: Comment[];
 }

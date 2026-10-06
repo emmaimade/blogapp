@@ -1,11 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/blogApi';
+import { useTenant } from '../contexts/TenantContext';
 
-const defaultSiteSettings = {
+/** How post lists render on the public blog — chosen in the admin's Appearance settings. */
+export type PostLayout = 'feed' | 'cards' | 'compact';
+
+const POST_LAYOUTS: readonly PostLayout[] = ['feed', 'cards', 'compact'];
+const DEFAULT_HOME_LAYOUT: PostLayout = 'feed';
+const DEFAULT_ARCHIVE_LAYOUT: PostLayout = 'compact';
+
+const toPostLayout = (value: unknown, fallback: PostLayout): PostLayout =>
+  POST_LAYOUTS.includes(value as PostLayout) ? (value as PostLayout) : fallback;
+
+// Fallbacks for a failed/slow settings fetch. Tenant-neutral on purpose: a
+// tenant's blog must never show up branded as the platform. The site name
+// comes from the resolved tenant itself (see useSiteSettings below).
+const buildDefaultSiteSettings = (siteName: string) => ({
   general: {
-    site_name: 'Inko',
-    site_tagline: 'Your ideas, amplified',
-    site_description: 'A modern blog CMS for sharing your stories and ideas',
+    site_name: siteName,
+    site_tagline: '',
+    site_description: '',
     timezone: 'UTC',
     language: 'en',
     posts_per_page: 10,
@@ -13,7 +27,7 @@ const defaultSiteSettings = {
   about: {
     bio_title: 'Welcome to My Blog',
     bio_subtitle: 'Sharing ideas, stories, and insights',
-    bio_content: 'This is a modern blog CMS. Customize this in your admin panel.',
+    bio_content: '',
     show_stats: true,
     show_contact_cta: true,
     email: null,
@@ -27,7 +41,7 @@ const defaultSiteSettings = {
     },
   },
   footer: {
-    footer_text: 'Your ideas, amplified.',
+    footer_text: '',
     show_social_links: true,
     social_links: {
       github: null,
@@ -37,7 +51,7 @@ const defaultSiteSettings = {
       youtube: null,
       facebook: null,
     },
-    copyright_text: '© {year} Inko. All rights reserved.',
+    copyright_text: `© {year} ${siteName}. All rights reserved.`,
     show_categories: true,
   },
   branding: {
@@ -48,6 +62,8 @@ const defaultSiteSettings = {
     favicon_url: null,
     font_heading: 'Inter',
     font_body: 'Inter',
+    home_layout: DEFAULT_HOME_LAYOUT,
+    archive_layout: DEFAULT_ARCHIVE_LAYOUT,
   },
   seo: {
     meta_title: '',
@@ -58,16 +74,19 @@ const defaultSiteSettings = {
     og_image: '',
     twitter_handle: '',
   },
-};
+});
 
-export const useSiteSettings = () =>
-  useQuery({
+export const useSiteSettings = () => {
+  const { blog } = useTenant();
+  const defaultSiteSettings = buildDefaultSiteSettings(blog?.name ?? '');
+
+  return useQuery({
     queryKey: ['allSettings'],
     queryFn: async () => {
       try {
         const res = await api.get('/settings/public');
         return res.data;
-      } catch (error) {
+      } catch {
         return defaultSiteSettings;
       }
     },
@@ -80,3 +99,20 @@ export const useSiteSettings = () =>
     // Navbar/Footer remount across client-side navigations.
     staleTime: 5 * 60 * 1000,
   });
+};
+
+/** The tenant's display name: its configured site name, else the blog's own name. */
+export const useSiteName = (): string => {
+  const { blog } = useTenant();
+  const { data } = useSiteSettings();
+  return data?.general?.site_name || blog?.name || '';
+};
+
+/** The owner's chosen post layouts for the home page and `/blog`, with safe defaults. */
+export const usePostLayouts = (): { homeLayout: PostLayout; archiveLayout: PostLayout } => {
+  const { data } = useSiteSettings();
+  return {
+    homeLayout: toPostLayout(data?.branding?.home_layout, DEFAULT_HOME_LAYOUT),
+    archiveLayout: toPostLayout(data?.branding?.archive_layout, DEFAULT_ARCHIVE_LAYOUT),
+  };
+};

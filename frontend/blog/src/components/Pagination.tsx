@@ -36,7 +36,7 @@ export const Pagination: React.FC<PaginationProps> = ({ page, totalPages, onPage
         onClick={() => onPageChange(page - 1)}
         disabled={page === 1}
         aria-label="Previous page"
-        className="p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-primary disabled:opacity-40 disabled:pointer-events-none transition-all"
+        className="p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-primary disabled:opacity-40 disabled:pointer-events-none transition-all dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
       >
         <ChevronLeft size={16} />
       </button>
@@ -54,7 +54,7 @@ export const Pagination: React.FC<PaginationProps> = ({ page, totalPages, onPage
             className={
               p === page
                 ? 'min-w-9 h-9 px-2 rounded-lg font-bold text-sm bg-primary text-white transition-all'
-                : 'min-w-9 h-9 px-2 rounded-lg font-bold text-sm text-zinc-600 hover:bg-zinc-50 transition-all'
+                : 'min-w-9 h-9 px-2 rounded-lg font-bold text-sm text-zinc-600 hover:bg-zinc-50 transition-all dark:text-zinc-400 dark:hover:bg-zinc-800'
             }
           >
             {p}
@@ -66,7 +66,7 @@ export const Pagination: React.FC<PaginationProps> = ({ page, totalPages, onPage
         onClick={() => onPageChange(page + 1)}
         disabled={page === totalPages}
         aria-label="Next page"
-        className="p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-primary disabled:opacity-40 disabled:pointer-events-none transition-all"
+        className="p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-primary disabled:opacity-40 disabled:pointer-events-none transition-all dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
       >
         <ChevronRight size={16} />
       </button>

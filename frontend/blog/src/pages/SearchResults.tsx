@@ -1,31 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Filter, ChevronDown, Loader2, ArrowLeft, X } from 'lucide-react';
+import { Search, Filter, ChevronDown, ArrowLeft, X } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
 import { PageLoader } from '../components/PageLoader';
-import { usePaginatedPosts } from '../hooks/usePaginatedPosts';
+import { Pagination } from '../components/Pagination';
+import { usePagedPosts, usePageParam } from '../hooks/usePagedPosts';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { tagUrl } from '../utils/posts';
 
 export const SearchResults: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const tagParam = searchParams.get('tag') || '';
+  usePageMeta(query ? `Search results for “${query}”` : 'Search');
   const [searchTerm, setSearchTerm] = useState(query);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
 
+  const { page, setPage } = usePageParam();
   const {
     posts: results,
     total,
+    totalPages,
+    pageSize,
     isLoading,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-  } = usePaginatedPosts(
+    isFetching,
+  } = usePagedPosts(
     ['search', query, tagParam],
     '/posts/search',
     { q: query || undefined, tag: tagParam || undefined },
-    !!query,
+    page,
+    Boolean(query),
   );
 
   const { data: tagsData } = useQuery({
@@ -50,6 +56,7 @@ export const SearchResults: React.FC = () => {
     if (searchTerm.trim()) {
       const next = new URLSearchParams(searchParams);
       next.set('q', searchTerm.trim());
+      next.delete('page');
       setSearchParams(next);
     }
   };
@@ -58,6 +65,7 @@ export const SearchResults: React.FC = () => {
     const next = new URLSearchParams(searchParams);
     if (tag) next.set('tag', tag);
     else next.delete('tag');
+    next.delete('page');
     setSearchParams(next);
     setShowTagDropdown(false);
   };
@@ -68,7 +76,7 @@ export const SearchResults: React.FC = () => {
       {/* Back Button */}
       <Link
         to="/"
-        className="inline-flex items-center gap-2 text-zinc-600 hover:text-primary mb-8 font-medium transition-colors"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-primary mb-8 font-medium transition-colors"
       >
         <ArrowLeft size={20} />
         Back to Home
@@ -76,14 +84,14 @@ export const SearchResults: React.FC = () => {
 
       {/* Search Box */}
       <div className="mb-12">
-        <h1 className="text-4xl font-black text-zinc-900 mb-6">Search Posts</h1>
+        <h1 className="text-4xl font-black text-zinc-900 dark:text-zinc-50 mb-6">Search Posts</h1>
         <form onSubmit={handleSearch} className="relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search for posts..."
-            className="w-full px-6 py-4 pr-32 rounded-2xl border-2 border-zinc-200 focus:border-primary outline-none transition-all text-lg"
+            className="w-full px-6 py-4 pr-32 rounded-2xl border-2 border-zinc-200 focus:border-primary outline-none transition-all text-lg dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
           />
           <button
             type="submit"
@@ -100,12 +108,12 @@ export const SearchResults: React.FC = () => {
         <>
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <div>
-              <p className="text-zinc-600">
+              <p className="text-zinc-600 dark:text-zinc-400">
                 {isLoading ? (
                   'Searching...'
                 ) : (
                   <>
-                    Found <span className="font-bold text-zinc-900">{total}</span> result
+                    Found <span className="font-bold text-zinc-900 dark:text-zinc-50">{total}</span> result
                     {total !== 1 ? 's' : ''} for "{query}"
                     {tagParam && <> tagged "{tagParam}"</>}
                   </>
@@ -115,7 +123,7 @@ export const SearchResults: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowTagDropdown((open) => !open)}
-                className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-xl text-sm font-medium hover:bg-zinc-200 transition-all"
+                className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-xl text-sm font-medium hover:bg-zinc-200 transition-all dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300"
               >
                 <Filter size={16} />
                 {tagParam || 'Filter by tag'}
@@ -133,11 +141,11 @@ export const SearchResults: React.FC = () => {
               </button>
 
               {showTagDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto dark:bg-zinc-900 dark:border-zinc-800">
                   <button
                     onClick={() => setTagFilter('')}
                     className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
-                      !tagParam ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50'
+                      !tagParam ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800'
                     }`}
                   >
                     All Tags
@@ -146,8 +154,8 @@ export const SearchResults: React.FC = () => {
                     <button
                       key={t}
                       onClick={() => setTagFilter(t)}
-                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 ${
-                        tagParam === t ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50'
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors border-t border-zinc-100 dark:border-zinc-800 ${
+                        tagParam === t ? 'bg-primary text-white' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800'
                       }`}
                     >
                       {t}
@@ -162,35 +170,28 @@ export const SearchResults: React.FC = () => {
             <PageLoader label="Searching posts" minHeight="18rem" />
           ) : results.length > 0 ? (
             <>
-              <div className="space-y-8">
+              <div className={`divide-y divide-zinc-200 dark:divide-zinc-800 transition-opacity ${isFetching ? 'opacity-50' : 'opacity-100'}`}>
                 {results.map((post) => (
-                  <div key={post.id} className="relative">
-                    <PostCard post={post} />
-                    {/* Highlight search term in title/content if needed */}
-                  </div>
+                  <PostCard key={post.id} post={post} variant="feed" />
                 ))}
               </div>
 
-              {hasNextPage && (
-                <div className="mt-12 flex justify-center">
-                  <button
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                  >
-                    {isFetchingNextPage && <Loader2 className="animate-spin" size={16} />}
-                    Load More Results
-                  </button>
+              {totalPages > 1 && (
+                <div className="mt-12 flex flex-col items-center gap-4">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of {total}
+                  </p>
+                  <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                 </div>
               )}
             </>
           ) : (
-            <div className="text-center py-20 bg-zinc-50 rounded-3xl border border-dashed border-zinc-200">
-              <Search className="mx-auto mb-4 text-zinc-300" size={64} />
-              <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+            <div className="text-center py-20 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 dark:bg-zinc-900 dark:border-zinc-700">
+              <Search className="mx-auto mb-4 text-zinc-300 dark:text-zinc-600" size={64} />
+              <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
                 No results found
               </h3>
-              <p className="text-zinc-600 mb-6">
+              <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                 We couldn't find any posts matching "{query}". Try different keywords!
               </p>
               <div className="flex gap-4 justify-center">
@@ -201,8 +202,11 @@ export const SearchResults: React.FC = () => {
                   Browse All Posts
                 </Link>
                 <button
-                  onClick={() => setSearchTerm('')}
-                  className="bg-zinc-100 text-zinc-900 px-6 py-3 rounded-full font-bold hover:bg-zinc-200 transition-all"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSearchParams({});
+                  }}
+                  className="bg-zinc-100 text-zinc-900 px-6 py-3 rounded-full font-bold hover:bg-zinc-200 transition-all dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
                 >
                   Clear Search
                 </button>
@@ -214,11 +218,11 @@ export const SearchResults: React.FC = () => {
 
       {!query && (
         <div className="text-center py-20">
-          <Search className="mx-auto mb-4 text-zinc-300" size={64} />
-          <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+          <Search className="mx-auto mb-4 text-zinc-300 dark:text-zinc-600" size={64} />
+          <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
             Start Searching
           </h3>
-          <p className="text-zinc-600">
+          <p className="text-zinc-600 dark:text-zinc-400">
             Enter keywords to find relevant posts
           </p>
         </div>
@@ -226,14 +230,14 @@ export const SearchResults: React.FC = () => {
 
       {/* Popular Tags — real tags for this blog, not placeholder topics */}
       {!query && popularTags?.length > 0 && (
-        <div className="mt-12 bg-white rounded-3xl p-8 border border-zinc-100">
-          <h3 className="text-lg font-bold text-zinc-900 mb-4">Popular Tags</h3>
+        <div className="card mt-12 p-8">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">Popular Tags</h3>
           <div className="flex flex-wrap gap-3">
             {popularTags.map((tag: { id: number; name: string }) => (
               <Link
                 key={tag.id}
-                to={`/tag/${tag.name}`}
-                className="px-4 py-2 bg-zinc-50 hover:bg-zinc-50 hover:text-primary rounded-full text-sm font-medium transition-all"
+                to={tagUrl(tag.name)}
+                className="px-4 py-2 bg-zinc-100 text-zinc-700 hover:bg-primary/10 hover:text-primary rounded-full text-sm font-medium transition-colors dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-primary/20"
               >
                 {tag.name}
               </Link>

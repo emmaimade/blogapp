@@ -12,8 +12,8 @@ export const PageLoader: React.FC<PageLoaderProps> = ({ label, minHeight = '60vh
     className="flex flex-col items-center justify-center"
     style={{ minHeight }}
   >
-    <Loader2 className="animate-spin text-zinc-900 mb-4" size={40} />
-    <p className="text-zinc-500 font-medium tracking-widest uppercase text-xs">
+    <Loader2 className="animate-spin text-zinc-900 dark:text-zinc-100 mb-4" size={40} />
+    <p className="text-zinc-500 dark:text-zinc-400 font-medium tracking-widest uppercase text-xs">
       {label}
     </p>
   </div>

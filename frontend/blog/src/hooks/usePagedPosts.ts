@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/blogApi';
 import type { Post, PaginatedPosts } from '../types/post';
 
@@ -6,7 +7,7 @@ const PAGE_SIZE = 12;
 
 /**
  * True page-based pagination — each page replaces the last rather than
- * accumulating (unlike usePaginatedPosts' infinite-scroll "Load More").
+ * accumulating, so every listing page pages the same way.
  * Keeps the previous page's data visible while the next page loads, so
  * paging doesn't flash a full loading state on every click.
  */
@@ -15,6 +16,7 @@ export function usePagedPosts(
   endpoint: string,
   params: Record<string, string | undefined>,
   page: number,
+  enabled: boolean = true,
 ) {
   const query = useQuery<PaginatedPosts>({
     queryKey: [...queryKey, page],
@@ -25,6 +27,7 @@ export function usePagedPosts(
       return res.data;
     },
     placeholderData: keepPreviousData,
+    enabled,
   });
 
   const posts: Post[] = query.data?.items ?? [];
@@ -32,4 +35,19 @@ export function usePagedPosts(
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return { ...query, posts, total, totalPages, pageSize: PAGE_SIZE };
+}
+
+/** `?page=` as the source of truth for the current page, so paged listings are linkable. */
+export function usePageParam() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+
+  const setPage = (next: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', String(next));
+    setSearchParams(params);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return { page, setPage };
 }

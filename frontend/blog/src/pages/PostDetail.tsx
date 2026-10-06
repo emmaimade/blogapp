@@ -1,114 +1,67 @@
 import React from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import 'highlight.js/styles/atom-one-dark.css';
-import { AlertTriangle, Calendar, Clock, Eye, FileQuestion } from 'lucide-react';
-import { formatLocalDate } from '../utils/dates';
-import { getPlainExcerpt, getReadingTime } from '../utils/posts';
+import { isAxiosError } from 'axios';
+import { AlertTriangle, ArrowUp, EyeOff, FileQuestion } from 'lucide-react';
+import { countMarkdownHeadings, getPlainExcerpt, slugify } from '../utils/posts';
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import api from '../api/blogApi';
-import { Sidebar } from '../components/Sidebar';
 import { Comments } from '../components/Comments';
-import { PageLoader } from '../components/PageLoader';
-import { useSiteSettings } from '../hooks/useSiteSettings';
+import { ArticleSkeleton } from '../components/Skeletons';
+import { ArticleHeader } from '../components/post/ArticleHeader';
+import { ArticleBody } from '../components/post/ArticleBody';
+import { MobileTableOfContents, TableOfContents, type TocEntry } from '../components/post/TableOfContents';
+import { RelatedPosts } from '../components/post/RelatedPosts';
+import { useSiteName } from '../hooks/useSiteSettings';
+import { useSidebarData } from '../hooks/useSidebarData';
 import { applyPageMeta, captureCurrentMeta } from '../utils/seo';
-import type { PaginatedPosts, PostAuthor } from '../types/post';
+import type { Post, PostDetail as PostDetailData } from '../types/post';
 
-type PostDetailResponse = {
-  id: number;
-  title: string;
-  content: string;
-  slug: string;
-  created_at: string;
-  views?: number;
-  thumbnail_url?: string;
-  excerpt?: string;
-  author_id?: number | null;
-  author?: PostAuthor | null;
-  tags: Array<{ id: number; name: string }>;
-  comments?: any[];
-};
+const isNotFound = (err: unknown) => isAxiosError(err) && err.response?.status === 404;
 
 export const PostDetail = () => {
   const { slug } = useParams();
   const location = useLocation();
-  const initialPost = location.state?.post as PostDetailResponse | undefined;
+  const initialPost = location.state?.post as PostDetailData | undefined;
 
-  const { data: post, isLoading, isError, error } = useQuery<PostDetailResponse>({
+  const { data: post, isLoading, isError, error } = useQuery<PostDetailData>({
     queryKey: ['post', slug],
     queryFn: async () => (await api.get(`/posts/slug/${slug}`)).data,
     initialData: initialPost,
     staleTime: initialPost ? 1000 * 60 * 5 : 0, // keep initial data fresh for 5 minutes
-    retry: (failureCount, err: any) => err?.response?.status !== 404 && failureCount < 2,
+    retry: (failureCount, err) => !isNotFound(err) && failureCount < 2,
   });
 
-  // Reuse a bounded posts fetch to provide sidebar tags/popular posts and
-  // compute "related" via tag overlap — a deliberately bounded 100 posts is
-  // plenty for this best-effort feature without fetching the whole archive.
-  const { data: postsCacheData } = useQuery<PaginatedPosts>({
-    queryKey: ['posts', 'related-sidebar'],
-    queryFn: async () => (await api.get('/posts/', { params: { limit: 100, sort: 'latest' } })).data,
-    // we don't need to block rendering for sidebar; keep default options
+  // Related posts are ranked by tag overlap on the server, across the whole
+  // blog. When a post has none, popular posts stand in so the end of the
+  // article always offers somewhere to go next.
+  const { data: relatedPosts = [] } = useQuery<Post[]>({
+    queryKey: ['posts', 'related', slug],
+    queryFn: async () => (await api.get(`/posts/slug/${slug}/related`, { params: { limit: 3 } })).data,
+    enabled: Boolean(slug),
     staleTime: 5 * 60 * 1000,
   });
-  const postsCache = postsCacheData?.items;
+  const { popularPosts } = useSidebarData();
 
-  const allTags = React.useMemo(() => {
-    const set = new Set<string>();
-    postsCache?.forEach((p) =>
-      p.tags?.forEach((t) => set.add(t.name)),
-    );
-    return Array.from(set).sort();
-  }, [postsCache]);
-
-  const popularPosts = React.useMemo(() => {
-    return [...(postsCache || [])]
-      .sort((a, b) => (b.views || 0) - (a.views || 0))
-      .slice(0, 5);
-  }, [postsCache]);
-
-  const relatedPosts = React.useMemo(() => {
-    if (!post || !postsCache?.length) return [];
-
-    const currentTagNames = new Set(post.tags.map((tag) => tag.name));
-
-    return postsCache
-      .filter((candidate) => candidate.slug !== post.slug)
-      .map((candidate) => {
-        const sharedTags = candidate.tags?.filter((tag) => currentTagNames.has(tag.name)).length || 0;
-        return { candidate, sharedTags };
-      })
-      .filter((item) => item.sharedTags > 0)
-      .sort((a, b) => {
-        if (b.sharedTags !== a.sharedTags) return b.sharedTags - a.sharedTags;
-        return new Date(b.candidate.created_at).getTime() - new Date(a.candidate.created_at).getTime();
-      })
-      .slice(0, 3)
-      .map((item) => item.candidate);
-  }, [post, postsCache]);
-
-  const { data: siteSettings } = useSiteSettings();
+  const siteName = useSiteName();
 
   React.useEffect(() => {
     if (!post) return;
     const previous = captureCurrentMeta();
-    const siteName = siteSettings?.general?.site_name || 'Inko';
     applyPageMeta({
       title: `${post.title} · ${siteName}`,
       description: getPlainExcerpt(post.content),
       ogImage: post.thumbnail_url,
     });
     return () => applyPageMeta(previous);
-  }, [post, siteSettings]);
+  }, [post, siteName]);
 
   // Reading progress, measured against the article body itself (not the
   // whole page) so the bar fills exactly as the reader moves through it —
   // unaffected by the header/sidebar/comments around it.
   const articleRef = React.useRef<HTMLElement>(null);
   const [readingProgress, setReadingProgress] = React.useState(0);
+  const [showBackToTop, setShowBackToTop] = React.useState(false);
 
   React.useEffect(() => {
     if (!post) return;
@@ -121,6 +74,7 @@ export const PostDetail = () => {
       const scrolled = -rect.top;
       const progress = scrollable > 0 ? (scrolled / scrollable) * 100 : 0;
       setReadingProgress(Math.min(100, Math.max(0, progress)));
+      setShowBackToTop(window.scrollY > 800);
     };
 
     handleScroll();
@@ -128,26 +82,54 @@ export const PostDetail = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [post]);
 
+  // Table of contents, built from the rendered article headings (h2-h4 — the
+  // body only demotes an author's `#`, so the page keeps a single <h1>). Runs
+  // after the markdown commits so the heading elements exist to tag with ids.
+  const [toc, setToc] = React.useState<TocEntry[]>([]);
+
+  React.useEffect(() => {
+    if (!post) return;
+    const el = articleRef.current;
+    if (!el) return;
+
+    const headings = Array.from(el.querySelectorAll('h2, h3, h4')) as HTMLElement[];
+    const seen = new Map<string, number>();
+    const entries = headings.map((heading) => {
+      const text = heading.textContent || '';
+      const base = slugify(text) || 'section';
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      const id = count === 0 ? base : `${base}-${count}`;
+      heading.id = id;
+      return { id, text, level: Number(heading.tagName[1]) };
+    });
+    setToc(entries);
+  }, [post]);
+
   if (isLoading) {
-    return <PageLoader label="Loading story" minHeight="100vh" />;
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <ArticleSkeleton />
+      </div>
+    );
   }
 
   if (!post) {
-    const isNetworkError = isError && (error as any)?.response?.status !== 404;
+    const isNetworkError = isError && !isNotFound(error);
 
     return (
       <div className="h-screen flex flex-col items-center justify-center text-center px-6">
-        <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-4">
+        <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-4 dark:bg-zinc-800">
           {isNetworkError ? (
             <AlertTriangle className="text-zinc-400" size={28} />
           ) : (
             <FileQuestion className="text-zinc-400" size={28} />
           )}
         </div>
-        <h1 className="text-xl font-bold text-zinc-900 mb-2">
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
           {isNetworkError ? 'Something went wrong' : 'Post not found'}
         </h1>
-        <p className="text-zinc-600 mb-6 max-w-sm">
+        <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-sm">
           {isNetworkError
             ? "We couldn't load this post. Check your connection and try again."
             : 'This post may have been moved or no longer exists.'}
@@ -155,14 +137,14 @@ export const PostDetail = () => {
         {isNetworkError ? (
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2.5 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
+            className="btn-primary"
           >
             Try again
           </button>
         ) : (
           <Link
             to="/blog"
-            className="px-6 py-2.5 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
+            className="btn-primary"
           >
             Browse all posts
           </Link>
@@ -171,267 +153,107 @@ export const PostDetail = () => {
     );
   }
 
-  const authorName = post.author?.first_name || post.author?.last_name ? `${post.author?.first_name} ${post.author?.last_name}` : 'Unknown author';
+  // The layout is decided from the Markdown source, before render — the TOC
+  // entries themselves only exist after the body mounts, and switching
+  // between the centred and sidebar layouts then would shift the article.
+  const hasToc = countMarkdownHeadings(post.content) > 1;
+  const nextPosts = relatedPosts.length > 0
+    ? relatedPosts
+    : popularPosts.filter((p) => p.id !== post.id).slice(0, 3);
 
   return (
     <>
-      {/* Reading progress */}
-      <div className="fixed top-0 left-0 right-0 z-60 h-1 bg-zinc-100">
+      {/* Reading progress — a thin line along the sticky navbar's bottom edge
+          (h-16), below it in the stack so the navbar's menus open over it. */}
+      <div
+        role="progressbar"
+        aria-label="Reading progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(readingProgress)}
+        className="fixed top-16 left-0 right-0 z-40 h-0.5 pointer-events-none"
+      >
         <div
           className="h-full bg-primary transition-[width] duration-150 motion-reduce:transition-none"
           style={{ width: `${readingProgress}%` }}
         />
       </div>
 
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-      <div className="lg:col-span-8">
-        {/* Article Header */}
-        <header className="mb-10">
-          <div className="flex flex-wrap gap-2 mb-4">
-            {post.tags.map((tag: any) => (
-              <span
-                key={tag.id}
-                className="bg-primary text-white text-[10px] px-3 py-1 rounded-full font-bold"
+      <div
+        className={
+          hasToc
+            ? 'max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12'
+            : 'max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10'
+        }
+      >
+        {/* One reading column: header, image, body, related and comments all
+            share the same left edge and a comfortable line length. */}
+        <div className={hasToc ? 'lg:col-span-8 min-w-0' : 'min-w-0'}>
+          <div className="max-w-3xl mx-auto lg:mx-0">
+            {/* Only staff ever get an unpublished post back (signed in, by
+                direct link) — make it unmistakable that it isn't live. */}
+            {post.status && post.status !== 'published' && (
+              <div
+                role="status"
+                className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
               >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 leading-tight mb-6 break-words">
-            {post.title}
-          </h1>
-
-          {/* Author & Date */}
-          <div className="flex flex-wrap items-center gap-6 text-zinc-500 border-y border-zinc-100 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-primary text-white rounded-2xl flex items-center justify-center font-bold shadow-inner">
-                {authorName.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-zinc-900">
-                  Written by {authorName}
-                </span>
-                {post.author?.role && (
-                  <span className="ml-2 text-[10px] uppercase tracking-widest bg-zinc-100 text-zinc-500 px-2 py-px rounded">
-                    {post.author.role}
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className="flex items-center gap-1 text-sm">
-              <Calendar size={14} />{" "}
-              {formatLocalDate(post.created_at)}
-            </span>
-            <span className="flex items-center gap-1 text-sm">
-              <Clock size={14} />
-              {getReadingTime(post.content)} min read
-            </span>
-            <span className="flex items-center gap-1 text-sm">
-              <Eye size={14} />
-              {(post.views || 0).toLocaleString()} views
-            </span>
-          </div>
-        </header>
-
-        {/* Featured Thumbnail */}
-        {post.thumbnail_url && (
-          <div className="mb-10 aspect-video overflow-hidden rounded-3xl bg-zinc-100">
-            <img
-              src={getThumbnailUrl(post.thumbnail_url, 1200)}
-              onError={handleThumbnailError}
-              alt={post.title}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        )}
-
-        {/* Article Content */}
-        <article
-          ref={articleRef}
-          className="prose prose-slate prose-img:rounded-3xl prose-headings:font-black prose-a:text-zinc-900 prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto"
-        >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              // Shifted one level below the page's own <h1> (the post title,
-              // rendered above this article) so author-written Markdown
-              // headings never produce a second top-level heading.
-              h1: ({ node, ...props }) => (
-                <h2
-                  className="text-4xl font-bold mb-6 mt-8 text-zinc-900"
-                  {...props}
-                />
-              ),
-              h2: ({ node, ...props }) => (
-                <h3
-                  className="text-3xl font-bold mb-5 mt-7 text-zinc-900"
-                  {...props}
-                />
-              ),
-              h3: ({ node, ...props }) => (
-                <h4
-                  className="text-2xl font-bold mb-4 mt-6 text-zinc-900"
-                  {...props}
-                />
-              ),
-              h4: ({ node, ...props }) => <h5 {...props} />,
-              p: ({ node, ...props }) => (
-                <p className="mb-4 text-zinc-700 leading-relaxed" {...props} />
-              ),
-              ul: ({ node, ...props }) => (
-                <ul
-                  className="list-disc list-inside mb-4 text-zinc-700 space-y-2"
-                  {...props}
-                />
-              ),
-              ol: ({ node, ...props }) => (
-                <ol
-                  className="list-decimal list-inside mb-4 text-zinc-700 space-y-2"
-                  {...props}
-                />
-              ),
-              li: ({ node, ...props }) => <li className="ml-4" {...props} />,
-              blockquote: ({ node, ...props }) => (
-                <blockquote
-                  className="border-l-4 border-zinc-300 pl-4 py-2 my-4 bg-zinc-50 italic text-zinc-700"
-                  {...props}
-                />
-              ),
-              code: ({ node, className, children, ...props }) => {
-                const isBlock = Boolean(className) || String(children).includes('\n');
-
-                return !isBlock ? (
-                  <code
-                    className="bg-zinc-100 px-2 py-1 rounded text-sm font-mono text-rose-600"
-                    {...props}
-                  >
-                    {children}
-                  </code>
-                ) : (
-                  <code
-                    className={`block bg-zinc-900 text-zinc-100 p-4 rounded-lg overflow-x-auto font-mono text-sm my-4 ${className || ''}`.trim()}
-                    {...props}
-                  >
-                    {children}
-                  </code>
-                );
-              },
-              pre: ({ node, ...props }) => (
-                <pre
-                  className="bg-zinc-900 p-4 rounded-lg overflow-x-auto my-4 scroll-shadows [--scroll-shadow-bg:#18181b]"
-                  {...props}
-                />
-              ),
-              a: ({ node, ...props }) => (
-                <a
-                  className="text-zinc-900 hover:text-zinc-950 underline"
-                  {...props}
-                />
-              ),
-              img: ({ node, ...props }) => (
-                <img
-                  className="max-w-full h-auto rounded-3xl my-4 shadow-md"
-                  loading="lazy"
-                  decoding="async"
-                  {...props}
-                />
-              ),
-              table: ({ node, ...props }) => (
-                <table
-                  className="w-full border-collapse border border-zinc-300 my-4 scroll-shadows"
-                  {...props}
-                />
-              ),
-              thead: ({ node, ...props }) => (
-                <thead className="bg-zinc-100" {...props} />
-              ),
-              th: ({ node, ...props }) => (
-                <th
-                  className="border border-zinc-300 px-4 py-2 text-left font-semibold"
-                  {...props}
-                />
-              ),
-              td: ({ node, ...props }) => (
-                <td className="border border-zinc-300 px-4 py-2" {...props} />
-              ),
-            }}
-          >
-            {post.content}
-          </ReactMarkdown>
-        </article>
-
-        {relatedPosts.length > 0 && (
-          <section className="mt-12 pt-8 border-t border-zinc-100">
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-2xl font-black text-zinc-900">Related Posts</h2>
-                <p className="text-sm text-zinc-600 mt-1">
-                  More stories in a similar vein.
+                <EyeOff size={18} className="mt-0.5 shrink-0" />
+                <p>
+                  <span className="font-bold">{post.status === 'scheduled' ? 'Scheduled' : 'Draft'}</span>
+                  {' — '}only visible to you because you're signed in as staff. Readers can't see this post yet.
                 </p>
               </div>
+            )}
+
+            <ArticleHeader post={post} />
+
+            {post.thumbnail_url && (
+              <div className="mb-10 aspect-video overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800">
+                <img
+                  src={getThumbnailUrl(post.thumbnail_url, 1200)}
+                  onError={handleThumbnailError}
+                  alt={post.title}
+                  className="h-full w-full object-cover"
+                  // The page's largest above-the-fold image — load it first, not lazily.
+                  fetchPriority="high"
+                />
+              </div>
+            )}
+
+            {toc.length > 1 && <MobileTableOfContents entries={toc} />}
+
+            <ArticleBody ref={articleRef} content={post.content} />
+
+            {relatedPosts.length > 0 ? (
+              <RelatedPosts posts={nextPosts} />
+            ) : (
+              <RelatedPosts posts={nextPosts} title="Popular posts" subtitle="What other readers are enjoying." />
+            )}
+
+            <Comments postId={post.id} comments={post.comments || []} />
+          </div>
+        </div>
+
+        {/* Sidebar — the table of contents only, so nothing competes with the article */}
+        {hasToc && (
+          <div className="lg:col-span-4">
+            <div className="lg:sticky lg:top-24">
+              {toc.length > 1 && <TableOfContents entries={toc} />}
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {relatedPosts.map((relatedPost: any) => (
-                <Link
-                  key={relatedPost.id}
-                  to={`/post/${relatedPost.slug}`}
-                  className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-200 hover:shadow-lg"
-                >
-                  <div className="aspect-[16/10] overflow-hidden bg-zinc-100">
-                    <img
-                      src={getThumbnailUrl(relatedPost.thumbnail_url, 400)}
-                      onError={handleThumbnailError}
-                      alt={relatedPost.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-
-                  <div className="p-5">
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {relatedPost.tags?.slice(0, 2).map((tag: any) => (
-                        <span
-                          key={`${relatedPost.id}-${tag.id ?? tag.name}`}
-                          className="rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-bold text-zinc-900"
-                        >
-                          {tag.name}
-                        </span>
-                      ))}
-                    </div>
-
-                    <h3 className="text-lg font-bold leading-snug text-zinc-900 transition-colors group-hover:text-primary line-clamp-2">
-                      {relatedPost.title}
-                    </h3>
-
-                    <p className="mt-3 text-sm leading-relaxed text-zinc-600 line-clamp-2">
-                      {relatedPost.excerpt || getPlainExcerpt(relatedPost.content, 120)}
-                    </p>
-
-                    <div className="mt-4 flex items-center gap-2 text-xs font-medium text-zinc-500">
-                      <Calendar size={13} />
-                      <span>{formatLocalDate(relatedPost.created_at)}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
+          </div>
         )}
-
-        {/* Comments Section */}
-        <Comments postId={post.id} comments={post.comments || []} />
       </div>
 
-      {/* Sidebar */}
-      <div className="lg:col-span-4">
-        <Sidebar popularPosts={popularPosts} tags={allTags} />
-      </div>
-    </div>
+      {/* Back to top */}
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Back to top"
+          className="fixed bottom-6 right-6 z-50 p-3 bg-zinc-900 text-white rounded-full shadow-lg hover:bg-zinc-700 transition-all animate-fadeIn dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        >
+          <ArrowUp size={20} />
+        </button>
+      )}
     </>
   );
 };

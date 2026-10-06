@@ -1,299 +1,267 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Clock, Eye, TrendingUp } from 'lucide-react';
+import { ArrowRight, Eye, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
-import { PostCard } from '../components/PostCard';
-import { Sidebar } from '../components/Sidebar';
-import { PageLoader } from '../components/PageLoader';
+import { PostList, PostListSkeleton } from '../components/PostList';
+import { HeroSkeleton } from '../components/Skeletons';
 import { formatLocalDate } from '../utils/dates';
-import { getReadingTime, getPlainExcerpt } from '../utils/posts';
+import { getPostDate, getPlainExcerpt, shouldShowViews } from '../utils/posts';
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
-import type { PaginatedPosts } from '../types/post';
+import { usePostLayouts, useSiteName, useSiteSettings } from '../hooks/useSiteSettings';
+import { useSidebarData } from '../hooks/useSidebarData';
+import { useBlogStats } from '../hooks/useBlogStats';
+import { applyPageMeta } from '../utils/seo';
+import type { PaginatedPosts, Post } from '../types/post';
 
-// The homepage is a bounded teaser (featured + trending + a handful of
-// recent posts), not the full archive — /blog is the real paginated listing.
-const HOME_POST_LIMIT = 20;
+// The homepage is a short teaser — one hero plus the next six in the owner's
+// chosen layout — not the archive. /blog is the real paginated listing.
+const GRID_POST_COUNT = 6;
+const HOME_POST_LIMIT = GRID_POST_COUNT + 1;
+
+// "Most read" only lists posts the page isn't already showing, and only when
+// there are enough of them to fill its row. Fetching more popular posts than
+// it shows leaves room for the ones the hero and grid already cover.
+const MOST_READ_COUNT = 3;
+const POPULAR_FETCH_LIMIT = 10;
 
 export const Home: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'projects'>('all');
 
+  // The homepage is the site's own identity, not "just another page" — it
+  // keeps the brand-first title (and respects a tenant's custom SEO title
+  // override verbatim) instead of the "{page} · {siteName}" pattern every
+  // other page uses.
+  const { data: siteSettings } = useSiteSettings();
+  const siteName = useSiteName();
+  React.useEffect(() => {
+    const general = siteSettings?.general;
+    const seo = siteSettings?.seo;
+    const siteTagline = general?.site_tagline;
+
+    // Same title rule as middleware.ts, so it doesn't change on hydration.
+    applyPageMeta({
+      title: seo?.meta_title || (siteTagline ? `${siteName} - ${siteTagline}` : siteName),
+      description: seo?.meta_description || general?.site_description || '',
+      ogImage: seo?.og_image,
+    });
+  }, [siteSettings, siteName]);
+
+  const { homeLayout } = usePostLayouts();
+  // Feed and compact read best as a single centred column; cards use the full width.
+  const listWidthClass = homeLayout === 'cards' ? '' : 'max-w-3xl mx-auto';
+
+  // Blogs that never publish projects don't get an always-empty Projects tab.
+  const { hasProjects } = useBlogStats();
+  const activeFilter = hasProjects === false ? 'all' : filter;
+
+  // The Projects toggle asks the server for projects, so it covers the whole
+  // blog rather than filtering whichever posts were already loaded. The
+  // server sorts the owner's featured post (if any) first.
   const { data, isLoading } = useQuery<PaginatedPosts>({
-    queryKey: ['posts', 'home'],
+    queryKey: ['posts', 'home', activeFilter, HOME_POST_LIMIT],
     queryFn: async () => {
-      const res = await api.get('/posts/', { params: { limit: HOME_POST_LIMIT, sort: 'latest' } });
+      const res = await api.get('/posts/', {
+        params: {
+          limit: HOME_POST_LIMIT,
+          sort: 'latest',
+          filter: activeFilter === 'projects' ? 'projects' : undefined,
+        },
+      });
       return res.data;
     },
+    placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
   });
 
-  // Exclude sample/welcome posts from all public display.
-  // They exist to show owners the dashboard has content — readers shouldn't see them.
-  const displayPosts = React.useMemo(
-    () => (data?.items ?? []).filter((p) => !p.is_sample),
-    [data]
-  );
+  const { popularPosts } = useSidebarData(POPULAR_FETCH_LIMIT);
 
-  const tags = React.useMemo(() => {
-    const set = new Set<string>();
-    displayPosts.forEach((p: any) => p.tags?.forEach((t: any) => set.add(t.name)));
-    return Array.from(set).sort();
-  }, [displayPosts]);
+  const getVisibleTags = (post: Post, limit: number) => post.tags.slice(0, limit);
+  const getRemainingTagCount = (post: Post, limit: number) => Math.max(post.tags.length - limit, 0);
 
-  const popularPosts = React.useMemo(() => {
-    return [...displayPosts]
-      .sort((a: any, b: any) => (b.views || 0) - (a.views || 0))
-      .slice(0, 5);
-  }, [displayPosts]);
+  const posts = data?.items ?? [];
+  const totalPosts = data?.total ?? 0;
 
-  const getVisibleTags = (post: any, limit: number) => post.tags?.slice(0, limit) || [];
-  const getRemainingTagCount = (post: any, limit: number) => Math.max((post.tags?.length || 0) - limit, 0);
+  const heroPost = posts[0];
+  const gridPosts = posts.slice(1, HOME_POST_LIMIT);
+  const blogLink = activeFilter === 'projects' ? '/blog?filter=projects' : '/blog';
 
-  const filteredPosts = filter === 'projects'
-    ? displayPosts.filter((p: any) => p.is_project)
-    : displayPosts;
+  const shownPostIds = new Set(posts.map((post) => post.id));
+  const mostReadPosts = popularPosts
+    .filter((post) => !shownPostIds.has(post.id))
+    .slice(0, MOST_READ_COUNT);
+  const showMostRead = mostReadPosts.length === MOST_READ_COUNT;
 
-  const featuredPost = filteredPosts?.[0];
-  const trendingPosts = filteredPosts?.slice(1, 5) || [];
-  const regularPosts = filteredPosts?.slice(5) || [];
-
-  // The featured-post hero (rendered only when featuredPost exists) carries
-  // the page's <h1>. Without it, this section heading needs to be the <h1>
-  // instead, so the page always has exactly one.
-  const SectionHeading = featuredPost ? 'h2' : 'h1';
+  // The hero (rendered only when heroPost exists) carries the page's <h1>.
+  // Without it, this section heading needs to be the <h1> instead, so the
+  // page always has exactly one.
+  const SectionHeading = heroPost ? 'h2' : 'h1';
 
   if (isLoading) {
-    return <PageLoader label="Loading stories" />;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <HeroSkeleton />
+        <div className={`mt-12 ${listWidthClass}`}>
+          <PostListSkeleton layout={homeLayout} count={GRID_POST_COUNT} />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
-      {featuredPost && (
-        <div className="bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            <Link to={`/post/${featuredPost.slug}`} className="block group">
-              <article className="bg-white rounded-3xl overflow-hidden border border-zinc-200 shadow-lg hover:shadow-2xl transition-all duration-500">
-                <div className="relative overflow-hidden h-[440px] sm:h-[500px] md:h-[600px]">
-                  <img
-                    src={getThumbnailUrl(featuredPost.thumbnail_url, 1200)}
-                    onError={handleThumbnailError}
-                    alt={featuredPost.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
+    <div>
+      {heroPost && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+          <Link to={`/post/${heroPost.slug}`} className="block group">
+            <article className="relative overflow-hidden rounded-2xl h-[380px] sm:h-[420px] md:h-[480px] bg-zinc-900">
+              <img
+                src={getThumbnailUrl(heroPost.thumbnail_url, 1200)}
+                onError={handleThumbnailError}
+                alt=""
+                fetchPriority="high"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 motion-reduce:transition-none"
+              />
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
 
-                  <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
-                    <span className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 bg-white/95 backdrop-blur-sm rounded-full text-xs sm:text-sm font-bold text-zinc-900 shadow-lg">
-                      Featured Story
-                    </span>
-                  </div>
+              <div className="absolute top-4 left-4 right-4 sm:top-8 sm:left-8 sm:right-8 flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1.5 bg-white/95 rounded-full text-xs sm:text-sm font-bold text-zinc-900">
+                  {heroPost.is_featured ? 'Featured' : 'Latest'}
+                </span>
+                {getVisibleTags(heroPost, 3).map((tag) => (
+                  <span
+                    key={tag.id ?? tag.name}
+                    className="px-3 py-1.5 bg-white/20 backdrop-blur-md text-white text-xs sm:text-sm font-semibold rounded-full border border-white/30"
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+                {getRemainingTagCount(heroPost, 3) > 0 && (
+                  <span className="px-2 py-1.5 text-white/80 text-xs sm:text-sm font-semibold">
+                    +{getRemainingTagCount(heroPost, 3)} more
+                  </span>
+                )}
+              </div>
 
-                  <div className="absolute top-16 left-4 right-4 sm:top-8 sm:left-auto sm:right-8 flex flex-wrap justify-start sm:justify-end gap-2">
-                    {getVisibleTags(featuredPost, 3).map((tag: any) => (
-                      <span
-                        key={tag.id}
-                        className="px-3 py-1.5 bg-white/20 backdrop-blur-md text-white text-xs sm:text-sm font-bold rounded-full border border-white/30"
-                      >
-                        {tag.name}
-                      </span>
-                    ))}
-                    {getRemainingTagCount(featuredPost, 3) > 0 && (
-                      <span className="px-3 py-1.5 bg-black/25 backdrop-blur-md text-white text-xs sm:text-sm font-bold rounded-full border border-white/20">
-                        +{getRemainingTagCount(featuredPost, 3)} more
-                      </span>
-                    )}
-                  </div>
+              <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 md:p-12">
+                <div className="max-w-4xl">
+                  <h1 className="text-2xl sm:text-3xl md:text-5xl font-black text-white mb-4 leading-tight underline decoration-transparent decoration-2 underline-offset-4 group-hover:decoration-white/70 transition-[text-decoration-color]">
+                    {heroPost.title}
+                  </h1>
 
-                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 md:p-12">
-                    <div className="max-w-4xl">
-                      <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 leading-tight group-hover:text-zinc-500 transition-colors">
-                        {featuredPost.title}
-                      </h1>
+                  <p className="text-white/95 text-sm sm:text-lg mb-5 line-clamp-2 leading-relaxed">
+                    {heroPost.excerpt || getPlainExcerpt(heroPost.content, 160)}
+                  </p>
 
-                      <p className="text-white/95 text-sm sm:text-lg md:text-xl mb-5 sm:mb-6 line-clamp-3 sm:line-clamp-2 leading-relaxed">
-                        {getPlainExcerpt(featuredPost.content, 160)}
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base text-white/90">
-                        <div className="flex items-center gap-2">
-                          <Clock size={18} className="text-white/80" />
-                          <span className="font-medium">
-                            {getReadingTime(featuredPost.content)} min
-                            read
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Eye size={18} className="text-white/80" />
-                          <span className="font-medium">
-                            {featuredPost.views || 0} views
-                          </span>
-                        </div>
-                        <span className="text-white/70">&bull;</span>
-                        <span className="font-medium">
-                          {formatLocalDate(featuredPost.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="text-sm font-medium text-white/90">
+                    {formatLocalDate(getPostDate(heroPost))}
+                  </p>
                 </div>
-              </article>
-            </Link>
-          </div>
+              </div>
+            </article>
+          </Link>
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <SectionHeading className="text-2xl md:text-3xl font-black text-zinc-900">
-              {filter === "all" ? "Latest Articles" : "Featured Projects"}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-16">
+        {/* Latest posts */}
+        <section>
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:flex-col lg:items-center lg:justify-start lg:text-center">
+            <SectionHeading className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              {activeFilter === 'projects' ? 'Latest projects' : 'Latest posts'}
             </SectionHeading>
-            <p className="text-zinc-600 mt-1">
-              {filteredPosts?.length || 0}{" "}
-              {filter === "all" ? "posts" : "projects"} &bull; Updated daily
-            </p>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 bg-white rounded-xl p-1.5 border border-zinc-200 shadow-sm w-full md:w-auto">
-            <button
-              onClick={() => setFilter("all")}
-              className={
-                filter === "all"
-                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-primary text-white shadow-sm"
-                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-primary hover:bg-zinc-50"
-              }
-            >
-              All Posts
-            </button>
-            <button
-              onClick={() => setFilter("projects")}
-              className={
-                filter === "projects"
-                  ? "px-4 py-2 rounded-lg font-bold text-sm transition-all bg-primary text-white shadow-sm"
-                  : "px-4 py-2 rounded-lg font-bold text-sm transition-all text-zinc-600 hover:text-primary hover:bg-zinc-50"
-              }
-            >
-              Projects
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          <div className="lg:col-span-8 space-y-12">
-            {trendingPosts.length > 0 && (
-              <div>
-                <h3 className="text-xl font-black text-zinc-900 mb-6 flex items-center gap-2">
-                  <TrendingUp size={22} className="text-zinc-900" />
-                  Trending Now
-                </h3>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  {trendingPosts.map((post: any) => (
-                    <Link
-                      key={post.id}
-                      to={`/post/${post.slug}`}
-                      className="group bg-white rounded-2xl overflow-hidden border border-zinc-200 hover:shadow-xl hover:border-zinc-200 transition-all duration-300"
-                    >
-                      <div className="relative h-52 overflow-hidden">
-                        <img
-                          src={getThumbnailUrl(post.thumbnail_url, 500)}
-                          onError={handleThumbnailError}
-                          alt={post.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {getVisibleTags(post, 2).map((tag: any) => (
-                            <span
-                              key={tag.id}
-                              className="text-xs px-2.5 py-1 bg-zinc-50 text-zinc-900 rounded-full font-bold"
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                          {getRemainingTagCount(post, 2) > 0 && (
-                            <span className="text-xs px-2.5 py-1 bg-zinc-100 text-zinc-600 rounded-full font-bold">
-                              +{getRemainingTagCount(post, 2)} more
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="text-lg font-bold text-zinc-900 mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
-                          {post.title}
-                        </h3>
-
-                        <p className="text-sm text-zinc-600 mb-4 line-clamp-2 leading-relaxed">
-                          {getPlainExcerpt(post.content, 100)}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
-                          <span className="flex items-center gap-1.5">
-                            <Clock size={14} />
-                            {getReadingTime(post.content)} min
-                          </span>
-                          <span>&bull;</span>
-                          <span>
-                            {formatLocalDate(post.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {regularPosts.length > 0 && (
-              <div>
-                <h3 className="text-xl font-black text-zinc-900 mb-6">
-                  More Articles
-                </h3>
-                <div className="space-y-6">
-                  {regularPosts.map((post: any) => (
-                    <PostCard key={post.id} post={post} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {filteredPosts?.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-2xl border border-zinc-200">
-                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <TrendingUp className="text-zinc-400" size={28} />
-                </div>
-                <h3 className="text-lg font-bold text-zinc-900 mb-2">
-                  {filter === 'all' ? 'No posts yet' : 'No projects yet'}
-                </h3>
-                <p className="text-zinc-600">
-                  Check back soon for new content!
-                </p>
-              </div>
-            )}
-
-            {regularPosts.length >= 8 && (
-              <div className="flex justify-center pt-6">
-                <Link
-                  to="/blog"
-                  className="px-8 py-3 bg-white border-2 border-zinc-200 text-zinc-700 rounded-xl font-bold hover:border-zinc-300 hover:text-primary hover:shadow-md transition-all"
-                >
-                  Load More Posts
-                </Link>
+            {hasProjects && (
+              <div className="inline-grid grid-cols-2 gap-1 self-start lg:self-center rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900">
+                {(['all', 'projects'] as const).map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setFilter(value)}
+                    aria-pressed={activeFilter === value}
+                    className={
+                      activeFilter === value
+                        ? 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-primary text-white'
+                        : 'px-4 py-2 rounded-lg font-bold text-sm transition-colors text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                    }
+                  >
+                    {value === 'all' ? 'All posts' : 'Projects'}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="lg:col-span-4">
-            <div className="lg:sticky lg:top-24">
-              <Sidebar popularPosts={popularPosts} tags={tags} />
+          {gridPosts.length > 0 && (
+            <div className={listWidthClass}>
+              <PostList posts={gridPosts} layout={homeLayout} headingAs="h3" />
             </div>
-          </div>
-        </div>
+          )}
+
+          {posts.length === 0 && (
+            <div className="card text-center py-20 px-6">
+              <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-zinc-800">
+                <TrendingUp className="text-zinc-400" size={28} />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+                {activeFilter === 'all' ? 'No posts yet' : 'No projects yet'}
+              </h3>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Check back soon for new content.
+              </p>
+            </div>
+          )}
+
+          {totalPosts > posts.length && (
+            <div className="mt-10 flex justify-center">
+              <Link to={blogLink} className="btn-secondary">
+                View all posts <ArrowRight size={16} />
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {/* Most read — popular posts not already on the page */}
+        {showMostRead && (
+          <section>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-6 lg:text-center">Most read</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              {mostReadPosts.map((post) => (
+                <Link
+                  key={post.id}
+                  to={`/post/${post.slug}`}
+                  className="card group flex items-center gap-4 p-3 transition hover:border-zinc-300 hover:shadow-md dark:hover:border-zinc-700"
+                >
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800">
+                    <img
+                      src={getThumbnailUrl(post.thumbnail_url, 200)}
+                      onError={handleThumbnailError}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold leading-snug text-zinc-900 line-clamp-2 group-hover:text-primary transition-colors dark:text-zinc-50">
+                      {post.title}
+                    </h3>
+                    <p className="mt-1 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      {formatLocalDate(getPostDate(post))}
+                      {shouldShowViews(post.views) && (
+                        <>
+                          <span aria-hidden="true">&bull;</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Eye size={12} aria-hidden="true" /> {post.views.toLocaleString()} views
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

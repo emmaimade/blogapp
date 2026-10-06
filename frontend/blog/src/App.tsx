@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Home } from './pages/Home';
 import { PostDetail } from './pages/PostDetail';
@@ -7,15 +7,14 @@ import BlogList from './pages/BlogList';
 import { AuthPage } from './pages/Auth';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
-import { TagPosts } from './pages/TagPosts';
 import { SearchResults } from './pages/SearchResults';
 import { NotFound } from './pages/NotFound';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
-// NewsletterPopup is unmounted below until an email-list provider is wired up.
-// import { NewsletterPopup } from './components/NewsletterPopup';
-import { useSiteSettings } from './hooks/useSiteSettings';
+import { useSiteName, useSiteSettings } from './hooks/useSiteSettings';
 import { upsertHeadElement } from './utils/seo';
+import { letterFavicon } from './utils/favicon';
+import { tagUrl } from './utils/posts';
 
 const applyFontLink = (fontHeading: string, fontBody: string) => {
   const families = Array.from(new Set([fontHeading, fontBody].filter(Boolean)));
@@ -50,29 +49,30 @@ const applyTypographyRules = () => {
   `;
 };
 
+// Tags are browsed on the blog list (`/blog?tag=`); old `/tag/:tag` links
+// still work. On Vercel the middleware answers these with a real 301 first.
+const TagRedirect = () => {
+  const { tag = '' } = useParams();
+  return <Navigate to={tag ? tagUrl(tag) : '/blog'} replace />;
+};
+
 function App() {
   const { data: siteSettings } = useSiteSettings();
+  const siteName = useSiteName();
 
   useEffect(() => {
     const general = siteSettings?.general;
     const branding = siteSettings?.branding;
     const seo = siteSettings?.seo;
 
-    const siteName = general?.site_name || 'Inko';
-    const siteTagline = general?.site_tagline || 'Your ideas, amplified';
-    const siteDescription =
-      seo?.meta_description || general?.site_description || 'A modern blog CMS for sharing your stories and ideas';
-    const metaTitle = seo?.meta_title || `${siteName} - ${siteTagline}`;
     const primaryColor = branding?.primary_color || '#9333EA';
     const secondaryColor = branding?.secondary_color || '#18181B';
     const accentColor = branding?.accent_color || '#A855F7';
-    const faviconUrl = branding?.favicon_url || '/inko-logo.svg';
-    const ogImage = seo?.og_image || 'https://yourdomain.com/og-image.png';
+    const faviconUrl = branding?.favicon_url || letterFavicon(siteName, primaryColor);
     const twitterHandle = seo?.twitter_handle
       ? seo.twitter_handle.startsWith('@') ? seo.twitter_handle : `@${seo.twitter_handle}`
-      : '@InkoCMS';
+      : '';
 
-    document.title = metaTitle;
     document.documentElement.lang = general?.language || 'en';
     document.documentElement.style.setProperty('--brand-primary', primaryColor);
     document.documentElement.style.setProperty('--brand-secondary', secondaryColor);
@@ -83,8 +83,10 @@ function App() {
     applyFontLink(branding?.font_heading || 'Inter', branding?.font_body || 'Inter');
     applyTypographyRules();
 
-    upsertHeadElement('meta[name="title"]', 'meta', { name: 'title', content: metaTitle });
-    upsertHeadElement('meta[name="description"]', 'meta', { name: 'description', content: siteDescription });
+    // Title/description/OG/Twitter content tags are page-owned (via usePageMeta /
+    // applyPageMeta) — don't set them here. This effect fires after each page's
+    // own mount effect (React runs child effects before parent effects), so
+    // anything set here would clobber the page-specific values on first load.
     upsertHeadElement('meta[name="keywords"]', 'meta', { name: 'keywords', content: seo?.meta_keywords || '' });
     upsertHeadElement('meta[name="author"]', 'meta', { name: 'author', content: siteName });
     upsertHeadElement('meta[name="language"]', 'meta', { name: 'language', content: general?.language || 'English' });
@@ -94,22 +96,31 @@ function App() {
       name: 'google-site-verification',
       content: seo?.google_site_verification || '',
     });
-    upsertHeadElement('meta[property="og:title"]', 'meta', { property: 'og:title', content: metaTitle });
-    upsertHeadElement('meta[property="og:description"]', 'meta', { property: 'og:description', content: siteDescription });
-    upsertHeadElement('meta[property="og:image"]', 'meta', { property: 'og:image', content: ogImage });
     upsertHeadElement('meta[property="og:site_name"]', 'meta', { property: 'og:site_name', content: siteName });
-    upsertHeadElement('meta[name="twitter:title"]', 'meta', { name: 'twitter:title', content: metaTitle });
-    upsertHeadElement('meta[name="twitter:description"]', 'meta', { name: 'twitter:description', content: siteDescription });
-    upsertHeadElement('meta[name="twitter:image"]', 'meta', { name: 'twitter:image', content: ogImage });
-    upsertHeadElement('meta[name="twitter:creator"]', 'meta', { name: 'twitter:creator', content: twitterHandle });
+    // A tenant without a handle gets no creator tag rather than the platform's.
+    if (twitterHandle) {
+      upsertHeadElement('meta[name="twitter:creator"]', 'meta', { name: 'twitter:creator', content: twitterHandle });
+    } else {
+      document.head.querySelector('meta[name="twitter:creator"]')?.remove();
+    }
     upsertHeadElement('link[rel="icon"]', 'link', { rel: 'icon', href: faviconUrl });
-    upsertHeadElement('link[rel="apple-touch-icon"]', 'link', { rel: 'apple-touch-icon', href: faviconUrl });
-  }, [siteSettings]);
+    // iOS ignores SVG/data-URI touch icons, so only a real uploaded favicon is used there.
+    if (branding?.favicon_url) {
+      upsertHeadElement('link[rel="apple-touch-icon"]', 'link', { rel: 'apple-touch-icon', href: branding.favicon_url });
+    } else {
+      document.head.querySelector('link[rel="apple-touch-icon"]')?.remove();
+    }
+  }, [siteSettings, siteName]);
 
   return (
     <Router>
-      <Toaster position="top-right" />
-      <div className="min-h-screen bg-white text-zinc-900 font-sans flex flex-col">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          className: 'dark:bg-zinc-800 dark:text-zinc-50',
+        }}
+      />
+      <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 font-sans flex flex-col">
         <Navbar />
         <main className="flex-1">
           <Routes>
@@ -126,7 +137,7 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             
             {/* Dynamic Pages */}
-            <Route path="/tag/:tag" element={<TagPosts />} />
+            <Route path="/tag/:tag" element={<TagRedirect />} />
             <Route path="/search" element={<SearchResults />} />
             
             {/* 404 */}
@@ -134,8 +145,6 @@ function App() {
           </Routes>
         </main>
         <Footer />
-        {/* No email-list provider is wired up yet — re-enable once one is chosen. */}
-        {/* <NewsletterPopup /> */}
       </div>
     </Router>
   );

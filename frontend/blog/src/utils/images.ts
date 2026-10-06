@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from 'react';
 
-const PLACEHOLDER = '/placeholder.jpg';
+const PLACEHOLDER = '/placeholder.svg';
 
 /**
  * Applies a Cloudinary resize/format transform so a thumbnail isn't

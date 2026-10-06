@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Search, ArrowLeft, Newspaper, TrendingUp, User } from 'lucide-react';
+import { Home, Search } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 export const NotFound: React.FC = () => {
+  usePageMeta('Page not found');
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-
-  const popularLinks = [
-    { title: 'Home', path: '/', icon: Home },
-    { title: 'About Me', path: '/about', icon: User },
-    { title: 'All Posts', path: '/blog', icon: Newspaper },
-    { title: 'Projects', path: '/blog?filter=projects', icon: TrendingUp }
-  ];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,93 +15,42 @@ export const NotFound: React.FC = () => {
     }
   };
 
+  // One way to search and one way home — enough to recover without a menu
+  // of competing exits.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-6">
-      <div className="max-w-2xl w-full text-center">
-        
-        {/* 404 Illustration */}
-        <div className="mb-8">
-          <div className="text-9xl font-black text-transparent bg-clip-text bg-zinc-900 mb-4">
-            404
-          </div>
-          <div className="text-6xl mb-6">🤔</div>
-        </div>
-
-        {/* Message */}
-        <h1 className="text-4xl md:text-5xl font-black text-zinc-900 mb-4">
-          Page Not Found
+    <div className="flex items-center justify-center px-6 py-24 sm:py-32">
+      <div className="max-w-xl w-full text-center">
+        <p className="text-sm font-bold uppercase tracking-widest text-primary mb-4">404</p>
+        <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-zinc-50 mb-4">
+          Page not found
         </h1>
-        <p className="text-xl text-zinc-600 mb-8">
-          Oops! The page you're looking for seems to have wandered off.
-          Don't worry, even the best developers get lost sometimes.
+        <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-10">
+          This page doesn't exist or has moved. Try searching for what you were after.
         </p>
 
-        {/* Search Box */}
-        <div className="mb-12">
-          <form onSubmit={handleSearch} className="relative max-w-md mx-auto">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search for posts..."
-              className="w-full px-6 py-4 pr-12 rounded-full border-2 border-zinc-200 focus:border-primary outline-none transition-all"
-            />
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white p-3 rounded-full hover:bg-primary-hover transition-all"
-            >
-              <Search size={20} />
-            </button>
-          </form>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-          <Link
-            to="/"
-            className="flex items-center justify-center gap-2 bg-primary text-white px-8 py-4 rounded-full font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/10"
-          >
-            <Home size={20} />
-            Go Home
-          </Link>
+        <form onSubmit={handleSearch} role="search" className="relative max-w-md mx-auto mb-8">
+          <label htmlFor="not-found-search" className="sr-only">Search posts</label>
+          <input
+            id="not-found-search"
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search posts..."
+            className="w-full px-5 py-3 pr-14 rounded-xl border-2 border-zinc-300 bg-white focus:border-primary outline-none transition-colors dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
+          />
           <button
-            onClick={() => window.history.back()}
-            className="flex items-center justify-center gap-2 bg-zinc-100 text-zinc-900 px-8 py-4 rounded-full font-bold hover:bg-zinc-200 transition-all"
+            type="submit"
+            aria-label="Search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white p-2 rounded-lg hover:bg-primary-hover transition-colors"
           >
-            <ArrowLeft size={20} />
-            Go Back
+            <Search size={18} />
           </button>
-        </div>
+        </form>
 
-        {/* Popular Links */}
-        <div className="bg-white rounded-3xl p-8 border border-zinc-100 shadow-xl">
-          <h2 className="text-xl font-bold text-zinc-900 mb-6">
-            🔗 Popular Pages
-          </h2>
-          <div className="grid grid-cols-2 gap-4">
-            {popularLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-50 hover:text-primary rounded-xl transition-all group"
-              >
-                <link.icon size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">{link.title}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Fun Message */}
-        <div className="mt-12 text-sm text-zinc-500">
-          <p>Error Code: 404 | Page Status: Lost in the void 🌌</p>
-          <p className="mt-2">
-            If you think this is a mistake, please{' '}
-            <Link to="/contact" className="text-zinc-900 hover:underline font-medium">
-              let me know
-            </Link>
-          </p>
-        </div>
+        <Link to="/" className="btn-secondary">
+          <Home size={18} aria-hidden="true" />
+          Go to the homepage
+        </Link>
       </div>
     </div>
   );

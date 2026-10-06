@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Class-based dark mode (a `.dark` class on <html>, toggled by useTheme)
+   instead of Tailwind's default media-query-only dark: variant — a visitor's
+   explicit choice needs to be able to override their OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Falls back to the static brand purple until App.tsx sets --brand-primary
      from the tenant's site settings, then tracks that color everywhere. */
@@ -11,8 +16,39 @@
   --color-primary-hover: color-mix(in srgb, var(--color-primary) 82%, black);
 }
 
+/* Shared surface + button styles, so every page draws from one radius and
+   weight scale: cards are rounded-2xl, controls rounded-xl, chips rounded-full.
+   Buttons have a fixed size — add layout classes (w-full) but not padding,
+   which would fight these for precedence. */
+@utility card {
+  @apply rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900;
+}
+
+@utility btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-bold text-zinc-800 transition-colors hover:bg-zinc-50 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50;
+}
+
+@utility btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50;
+}
+
 html {
   scroll-behavior: smooth;
+}
+
+/* Visible keyboard-focus ring for interactive chrome (links, buttons, menu
+   items). Form fields already get their own focus treatment inline (border/
+   ring color swap), so they're left out here rather than double up. */
+a:focus-visible,
+button:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 body {
@@ -66,5 +102,5 @@ body {
   border-radius: 20px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9333ea;
+  background: var(--color-primary);
 }

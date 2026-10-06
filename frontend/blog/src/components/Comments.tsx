@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/blogApi';
+import { getApiErrorMessage } from '../api/errors';
 import toast from 'react-hot-toast';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,19 +8,7 @@ import { Edit2, Trash2, X, Check, MoreVertical } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
-
-interface Comment {
-  id: number;
-  content: string;
-  user: {
-    id: number;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
-  created_at: string;
-  is_deleted?: boolean;
-}
+import type { Comment } from '../types/post';
 
 export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ postId, comments }) => {
   const [text, setText] = useState('');
@@ -55,8 +44,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       toast.success('Comment posted!');
       queryClient.invalidateQueries({ queryKey: ['comments', postId] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to post comment');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to post comment'));
     }
   };
 
@@ -89,8 +78,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       setEditText('');
       queryClient.invalidateQueries({ queryKey: ['comments', postId] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to update comment');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to update comment'));
     }
   };
 
@@ -102,8 +91,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       setMenuOpen(null);
       queryClient.invalidateQueries({ queryKey: ['comments', postId] });
       queryClient.invalidateQueries({ queryKey: ['post'] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to delete comment');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to delete comment'));
     }
   };
 
@@ -111,11 +100,11 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
     setMenuOpen(null);
     toast((t) => (
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-bold text-zinc-900">Delete this comment?</p>
+        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Delete this comment?</p>
         <div className="flex justify-end gap-2">
           <button
             onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1.5 rounded-lg text-sm font-bold text-zinc-600 hover:bg-zinc-100 transition-colors"
+            className="px-3 py-1.5 rounded-lg text-sm font-bold text-zinc-600 hover:bg-zinc-100 transition-colors dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Cancel
           </button>
@@ -137,7 +126,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
 
   // Prefill draft if redirected from login
   useEffect(() => {
-    const draft = (location.state as any)?.draft;
+    const draft = (location.state as { draft?: unknown } | null)?.draft;
     if (draft && typeof draft === 'string' && !text) {
       setText(draft);
     }
@@ -145,51 +134,47 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
 
   return (
     <div className="mt-12">
-      <h3 className="text-2xl font-bold mb-6">
+      <h2 className="text-2xl font-bold mb-6">
         Comments ({displayComments.length})
-      </h3>
+      </h2>
 
       {/* Comment Input */}
       {!commentsEnabled ? (
-        <div className="p-8 bg-zinc-50 rounded-2xl text-center mb-10 border border-zinc-300">
-          <p className="text-zinc-600">Comments are disabled for this blog.</p>
+        <div className="p-8 bg-zinc-50 rounded-2xl text-center mb-10 border border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700">
+          <p className="text-zinc-600 dark:text-zinc-400">Comments are disabled for this blog.</p>
         </div>
       ) : isLoggedIn ? (
         <div className="mb-10">
+          <label htmlFor="comment-text" className="sr-only">Your comment</label>
           <textarea
-            className="w-full p-4 bg-zinc-50 rounded-2xl border-2 border-transparent focus:border-primary focus:bg-white outline-none mb-4 transition-all"
+            id="comment-text"
+            className="w-full p-4 bg-zinc-50 rounded-xl border-2 border-zinc-300 focus:border-primary focus:bg-white outline-none mb-4 transition-all dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100 dark:focus:bg-zinc-800"
             placeholder="Write a thoughtful response..."
             rows={4}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <div className="flex gap-3">
-            <button
-              onClick={postComment}
-              className="bg-primary text-white px-8 py-2.5 rounded-full font-bold hover:bg-purple-700 transition-all"
-            >
-              Post Comment
+            <button onClick={postComment} className="btn-primary">
+              Post comment
             </button>
             {text && (
-              <button
-                onClick={() => setText('')}
-                className="px-6 py-2.5 text-zinc-600 hover:text-zinc-900 font-bold transition-all"
-              >
+              <button onClick={() => setText('')} className="btn-ghost">
                 Cancel
               </button>
             )}
           </div>
         </div>
       ) : (
-        <div className="p-8 bg-zinc-50 rounded-2xl text-center mb-10 border border-zinc-300">
-          <p className="text-zinc-900 font-bold mb-2">Join the conversation</p>
-          <p className="text-zinc-600 mb-4">Sign in to leave a comment</p>
+        <div className="p-8 bg-zinc-50 rounded-2xl text-center mb-10 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
+          <p className="text-zinc-900 dark:text-zinc-50 font-bold mb-2">Join the conversation</p>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">Sign in to leave a comment</p>
           <Link
             to="/auth"
             state={{ from: location.pathname + location.search, draft: text }}
-            className="inline-block bg-primary text-white px-6 py-2.5 rounded-full font-bold hover:bg-purple-700 transition-all"
+            className="btn-primary"
           >
-            Sign In
+            Sign in
           </Link>
         </div>
       )}
@@ -197,8 +182,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
       {/* Comments List */}
       <div className="space-y-6">
         {displayComments.length === 0 ? (
-          <div className="text-center py-12 bg-zinc-50 rounded-2xl">
-            <p className="text-zinc-500 font-medium">No comments yet. Be the first to share your thoughts!</p>
+          <div className="text-center py-12 bg-zinc-50 rounded-2xl dark:bg-zinc-900">
+            <p className="text-zinc-500 dark:text-zinc-400 font-medium">No comments yet. Be the first to share your thoughts!</p>
           </div>
         ) : (
           displayComments.map((comment: Comment) => {
@@ -211,8 +196,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                 key={comment.id}
                 className={`p-6 rounded-2xl border transition-all ${
  isDeleted
- ? 'bg-zinc-50 border-zinc-200'
- : 'bg-white border-zinc-100 hover:border-zinc-200'
+ ? 'bg-zinc-50 border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800'
+ : 'bg-white border-zinc-100 hover:border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-zinc-700'
  }`}
               >
                 <div className="flex gap-4">
@@ -227,10 +212,10 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="font-bold text-zinc-900">
+                        <p className="font-bold text-zinc-900 dark:text-zinc-50">
                           {comment.user?.first_name || 'Anonymous'}
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
                           {formatLocalDate(comment.created_at)}
                         </p>
                       </div>
@@ -240,7 +225,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                         <div className="relative">
                           <button
                             onClick={() => setMenuOpen(menuOpen === comment.id ? null : comment.id)}
-                            className="p-2 hover:bg-zinc-100 rounded-lg transition-all"
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all"
                             aria-label="More options"
                           >
                             <MoreVertical size={18} className="text-zinc-400" />
@@ -256,17 +241,17 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                               />
 
                               {/* Menu */}
-                              <div className="absolute right-0 top-10 z-20 bg-white rounded-xl shadow-lg border border-zinc-200 py-2 w-40">
+                              <div className="absolute right-0 top-10 z-20 bg-white rounded-xl shadow-lg border border-zinc-200 py-2 w-40 dark:bg-zinc-900 dark:border-zinc-800">
                                 <button
                                   onClick={() => startEdit(comment)}
-                                  className="w-full px-4 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center gap-2 transition-all"
+                                  className="w-full px-4 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-50 flex items-center gap-2 transition-all dark:text-zinc-300 dark:hover:bg-zinc-800"
                                 >
-                                  <Edit2 size={16} className="text-zinc-900" />
+                                  <Edit2 size={16} className="text-zinc-900 dark:text-zinc-100" />
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => deleteComment(comment.id)}
-                                  className="w-full px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-all"
+                                  className="w-full px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-all dark:text-red-400 dark:hover:bg-red-950/40"
                                 >
                                   <Trash2 size={16} />
                                   Delete
@@ -282,7 +267,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                     {isEditing ? (
                       <div className="mt-3">
                         <textarea
-                          className="w-full p-3 bg-zinc-50 rounded-xl border-2 border-zinc-300 outline-none mb-3"
+                          className="w-full p-3 bg-zinc-50 rounded-xl border-2 border-zinc-300 outline-none mb-3 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                           rows={3}
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
@@ -291,14 +276,14 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                         <div className="flex gap-2">
                           <button
                             onClick={() => saveEdit(comment.id)}
-                            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-purple-700 transition-all"
+                            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary-hover transition-all"
                           >
                             <Check size={16} />
                             Save
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-zinc-600 hover:bg-zinc-100 transition-all"
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-zinc-600 hover:bg-zinc-100 transition-all dark:text-zinc-400 dark:hover:bg-zinc-800"
                           >
                             <X size={16} />
                             Cancel
@@ -306,8 +291,8 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
                         </div>
                       </div>
                     ) : (
-                      <p className={`text-zinc-700 mt-2 leading-relaxed ${
- isDeleted ? 'italic text-zinc-500' : ''
+                      <p className={`text-zinc-700 dark:text-zinc-300 mt-2 leading-relaxed ${
+ isDeleted ? 'italic text-zinc-500 dark:text-zinc-500' : ''
  }`}>
                         {comment.content}
                       </p>

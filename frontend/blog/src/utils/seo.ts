@@ -36,9 +36,15 @@ export const captureCurrentMeta = (): PageMeta => ({
   ogImage: readMetaContent('meta[property="og:image"]'),
 });
 
-/** Overrides title/description/OG/Twitter tags for the current route. */
+/** Overrides title/description/canonical/OG/Twitter tags for the current route. */
 export const applyPageMeta = ({ title, description, ogImage }: PageMeta) => {
+  // Query strings (filters, pagination, search terms) are left out so every
+  // variant of a page points crawlers at the one canonical URL.
+  const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
+
   document.title = title;
+  upsertHeadElement('link[rel="canonical"]', 'link', { rel: 'canonical', href: canonicalUrl });
+  upsertHeadElement('meta[property="og:url"]', 'meta', { property: 'og:url', content: canonicalUrl });
   upsertHeadElement('meta[name="title"]', 'meta', { name: 'title', content: title });
   upsertHeadElement('meta[name="description"]', 'meta', { name: 'description', content: description });
   upsertHeadElement('meta[property="og:title"]', 'meta', { property: 'og:title', content: title });

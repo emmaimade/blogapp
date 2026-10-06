@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import api from "../api/blogApi";
+import { getApiErrorMessage, getErrorStatus } from "../api/errors";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -19,8 +20,8 @@ const loginWithFallback = async (payload: URLSearchParams) => {
     return await api.post("/auth/login", payload.toString(), {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
-  } catch (error: any) {
-    if (error.response?.status !== 404) {
+  } catch (error) {
+    if (getErrorStatus(error) !== 404) {
       throw error;
     }
 
@@ -29,6 +30,7 @@ const loginWithFallback = async (payload: URLSearchParams) => {
     });
   }
 };
+import { usePageMeta } from "../hooks/usePageMeta";
 
 export const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -46,6 +48,7 @@ export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  usePageMeta(step === "forgot" ? "Reset password" : mode === "login" ? "Sign in" : "Create account");
 
   // Reset to email step when switching modes
   const switchMode = (newMode: "login" | "signup") => {
@@ -105,8 +108,9 @@ export const AuthPage: React.FC = () => {
 
         toast.success("Welcome back!");
 
-        const from = (location.state as any)?.from;
-        const draft = (location.state as any)?.draft;
+        const returnState = location.state as { from?: unknown; draft?: unknown } | null;
+        const from = returnState?.from;
+        const draft = returnState?.draft;
         const safeReturn =
           typeof from === "string" && from.startsWith("/") ? from : "/";
         if (draft) {
@@ -115,21 +119,8 @@ export const AuthPage: React.FC = () => {
           navigate(safeReturn);
         }
       }
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      let errorMsg = "Authentication failed";
-      if (detail) {
-        if (Array.isArray(detail)) {
-          errorMsg = detail
-            .map((d: any) => d.msg || JSON.stringify(d))
-            .join("; ");
-        } else if (typeof detail === "object") {
-          errorMsg = detail.message || JSON.stringify(detail);
-        } else {
-          errorMsg = String(detail);
-        }
-      }
-      toast.error(errorMsg);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Authentication failed"));
     } finally {
       setIsLoading(false);
     }
@@ -171,10 +162,8 @@ export const AuthPage: React.FC = () => {
     try {
       await api.post("/auth/forgot-password", { email: forgotEmail.trim() });
       setResetEmailSent(true);
-    } catch (err: any) {
-      toast.error(
-        err.response?.data?.detail || "Unable to send the recovery email right now.",
-      );
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Unable to send the recovery email right now."));
     } finally {
       setIsSendingReset(false);
     }
@@ -207,31 +196,31 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 py-12 px-4">
       <div className="max-w-md w-full">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-black text-zinc-900">
+          <h2 className="text-3xl font-black text-zinc-900 dark:text-zinc-50">
             {step === "forgot"
               ? "Reset your password"
               : mode === "login"
                 ? "Welcome Back!"
                 : "Join the Community"}
           </h2>
-          <p className="text-zinc-600 mt-2">{getMessage()}</p>
+          <p className="text-zinc-600 dark:text-zinc-400 mt-2">{getMessage()}</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl shadow-xl border border-zinc-100 p-8">
+        <div className="bg-white rounded-2xl shadow-xl border border-zinc-100 p-8 dark:bg-zinc-900 dark:border-zinc-800">
           {/* Tabs - Only show on email step */}
           {step === "email" && (
-            <div className="flex gap-2 mb-8 bg-zinc-100 p-1 rounded-xl">
+            <div className="flex gap-2 mb-8 bg-zinc-100 p-1 rounded-xl dark:bg-zinc-800">
               <button
                 onClick={() => switchMode("login")}
                 className={`flex-1 py-3 rounded-lg font-bold transition-all ${
                   mode === "login"
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
                 }`}
               >
                 Login
@@ -240,8 +229,8 @@ export const AuthPage: React.FC = () => {
                 onClick={() => switchMode("signup")}
                 className={`flex-1 py-3 rounded-lg font-bold transition-all ${
                   mode === "signup"
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
                 }`}
               >
                 Sign Up
@@ -255,7 +244,7 @@ export const AuthPage: React.FC = () => {
               <div className="flex items-center gap-2 mb-4">
                 <button
                   onClick={goBack}
-                  className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+                  className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 transition-colors dark:text-zinc-400 dark:hover:text-zinc-50"
                 >
                   <ArrowLeft size={16} />
                   Back
@@ -267,8 +256,8 @@ export const AuthPage: React.FC = () => {
                       key={i}
                       className={`w-8 h-1 rounded-full transition-colors ${
                         i < getCurrentStepNumber()
-                          ? "bg-zinc-900"
-                          : "bg-zinc-200"
+                          ? "bg-zinc-900 dark:bg-zinc-100"
+                          : "bg-zinc-200 dark:bg-zinc-700"
                       }`}
                     ></div>
                   ))}
@@ -281,7 +270,7 @@ export const AuthPage: React.FC = () => {
           {step === "email" && (
             <form onSubmit={handleEmailSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
                   {mode === "signup" ? "Email Address" : "Email or Username"}
                 </label>
                 <div className="relative">
@@ -290,7 +279,7 @@ export const AuthPage: React.FC = () => {
                   </div>
                   <input
                     autoFocus
-                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
+                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                     placeholder={
                       mode === "signup"
                         ? "you@example.com"
@@ -320,7 +309,7 @@ export const AuthPage: React.FC = () => {
           {step === "username" && mode === "signup" && (
             <form onSubmit={handleUsernameSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
                   Username
                 </label>
                 <div className="relative">
@@ -329,7 +318,7 @@ export const AuthPage: React.FC = () => {
                   </div>
                   <input
                     autoFocus
-                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
+                    className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                     value={formData.username}
                     onChange={(e) =>
                       setFormData({ ...formData, username: e.target.value })
@@ -337,7 +326,7 @@ export const AuthPage: React.FC = () => {
                     required
                   />
                 </div>
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                   This is how others will see you on the platform
                 </p>
               </div>
@@ -356,7 +345,7 @@ export const AuthPage: React.FC = () => {
           {step === "password" && (
             <form onSubmit={handlePasswordSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -365,7 +354,7 @@ export const AuthPage: React.FC = () => {
                   </div>
                   <input
                     autoFocus
-                    className="w-full pl-12 pr-12 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
+                    className="w-full pl-12 pr-12 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                     placeholder="••••••••"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
@@ -384,7 +373,7 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
                 {mode === "signup" && (
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                     Must be at least 8 characters
                   </p>
                 )}
@@ -395,7 +384,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={openForgotPassword}
-                    className="text-sm text-zinc-900 hover:text-zinc-950 font-medium"
+                    className="text-sm text-zinc-900 hover:text-zinc-950 font-medium dark:text-zinc-100 dark:hover:text-white"
                   >
                     Forgot password?
                   </button>
@@ -424,21 +413,21 @@ export const AuthPage: React.FC = () => {
           {/* STEP: Forgot password */}
           {step === "forgot" && (
             resetEmailSent ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-                <CheckCircle2 className="mx-auto mb-3 text-emerald-600" size={36} />
-                <h3 className="text-lg font-bold text-zinc-900">Check your inbox</h3>
-                <p className="mt-2 text-sm text-zinc-600">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center dark:border-emerald-900 dark:bg-emerald-950/30">
+                <CheckCircle2 className="mx-auto mb-3 text-emerald-600 dark:text-emerald-400" size={36} />
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Check your inbox</h3>
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
                   If that email is registered, we've sent a link to reset your password.
                 </p>
                 <button
                   type="button"
                   onClick={() => handleForgotPasswordSubmit()}
                   disabled={isSendingReset}
-                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                 >
                   {isSendingReset ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-emerald-700 dark:border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
                       Sending...
                     </>
                   ) : (
@@ -449,7 +438,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={backToSignIn}
-                    className="inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-900"
+                    className="inline-flex items-center gap-2 text-sm font-bold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
                   >
                     <ArrowLeft size={16} />
                     Back to sign in
@@ -461,14 +450,14 @@ export const AuthPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={backToSignIn}
-                  className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 transition-colors -mt-2 mb-2"
+                  className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 transition-colors -mt-2 mb-2 dark:text-zinc-400 dark:hover:text-zinc-50"
                 >
                   <ArrowLeft size={16} />
                   Back to sign in
                 </button>
 
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                  <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
                     Email Address
                   </label>
                   <div className="relative">
@@ -478,7 +467,7 @@ export const AuthPage: React.FC = () => {
                     <input
                       autoFocus
                       type="email"
-                      className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base"
+                      className="w-full pl-12 pr-4 py-3 bg-zinc-50 rounded-xl border-2 border-transparent focus:border-primary focus:bg-white outline-none transition-all text-base dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                       placeholder="you@example.com"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
@@ -507,7 +496,7 @@ export const AuthPage: React.FC = () => {
 
           {/* Footer - Only show on email step */}
           {step === "email" && (
-            <p className="mt-6 text-center text-sm text-zinc-600">
+            <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
               {mode === "login"
                 ? "Don't have an account?"
                 : "Already have an account?"}{" "}
@@ -515,7 +504,7 @@ export const AuthPage: React.FC = () => {
                 onClick={() =>
                   switchMode(mode === "login" ? "signup" : "login")
                 }
-                className="text-zinc-900 hover:text-zinc-950 font-bold"
+                className="text-zinc-900 hover:text-zinc-950 font-bold dark:text-zinc-100 dark:hover:text-white"
               >
                 {mode === "login" ? "Sign up" : "Sign in"}
               </button>
