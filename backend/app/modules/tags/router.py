@@ -84,7 +84,7 @@ def read_popular_tags(
     )
 
     rows = session.exec(statement).all()
-    return [PopularTagRead(id=row.id, name=row.name, count=row.count) for row in rows]
+    return [PopularTagRead(id=row.id, name=row.name, blog_id=blog_id, count=row.count) for row in rows]
 
 
 @router.patch("/{tag_id}", response_model=TagRead)

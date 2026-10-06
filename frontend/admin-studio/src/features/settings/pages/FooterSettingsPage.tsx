@@ -359,7 +359,7 @@ export const FooterSettings: React.FC = () => {
               />
               <div>
                 <div className="font-bold text-zinc-900">Show Popular Topics</div>
-                <div className="text-sm text-zinc-600">Display top tags/categories from your posts</div>
+                <div className="text-sm text-zinc-600">Shows your most-used tags from published posts. Hidden until at least one published post has a tag.</div>
               </div>
             </label>
           </div>
