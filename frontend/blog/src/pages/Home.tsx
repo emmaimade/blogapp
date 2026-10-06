@@ -52,7 +52,7 @@ export const Home: React.FC = () => {
   }, [siteSettings, siteName]);
 
   const { homeLayout } = usePostLayouts();
-  // Feed and compact read best as a single centred column; cards use the full width.
+  // Feed, list and compact read best as a single centred column; cards use the full width.
   const listWidthClass = homeLayout === 'cards' ? '' : 'max-w-3xl mx-auto';
   const gridPostCount = homeLayout === 'cards' ? CARD_POST_COUNT : ROW_POST_COUNT;
 
