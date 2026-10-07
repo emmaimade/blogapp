@@ -2,21 +2,24 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 
+// `min-w-0` lets the card shrink to its grid column on narrow phones — grid
+// items otherwise refuse to get narrower than their content and spill past
+// the screen. The content is sized down on phones so it fits that width.
 export const StatCard = ({
-  title, value, sub, icon, accent = false,
+  title, value, sub, icon, accent = false, className = '',
 }: {
   title: string; value: number; sub: string;
-  icon: React.ReactNode; accent?: boolean;
+  icon: React.ReactNode; accent?: boolean; className?: string;
 }) => (
-  <div className={`admin-card flex flex-col gap-4 p-5 ${accent ? 'ring-1 ring-violet-200 dark:ring-violet-800/50' : ''}`}>
-    <div className="flex items-center justify-between">
-      <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{title}</span>
-      <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${accent ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+  <div className={`admin-card flex min-w-0 flex-col gap-3 p-4 sm:gap-4 sm:p-5 ${accent ? 'ring-1 ring-violet-200 dark:ring-violet-800/50' : ''} ${className}`}>
+    <div className="flex items-center justify-between gap-2">
+      <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400" title={title}>{title}</span>
+      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl sm:h-8 sm:w-8 ${accent ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}>
         {icon}
       </div>
     </div>
-    <div>
-      <div className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
+    <div className="min-w-0">
+      <div className="text-2xl font-black tracking-tight tabular-nums text-zinc-900 [overflow-wrap:anywhere] dark:text-white sm:text-3xl">
         {value.toLocaleString()}
       </div>
       <div className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{sub}</div>
@@ -86,16 +89,18 @@ export const DashboardSkeleton = () => (
         <div className="h-9 w-28 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="admin-card flex flex-col gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <div className="h-4 w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-8 w-8 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+    {/* Same arrangement as the loaded stat cards: the first spans the full
+        width on phones, then 2×2, then one row of five from lg. */}
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className={`admin-card flex min-w-0 flex-col gap-3 p-4 sm:gap-4 sm:p-5 ${i === 0 ? 'col-span-2 lg:col-span-1' : ''}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="h-4 w-full max-w-24 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+            <div className="h-7 w-7 shrink-0 rounded-xl bg-zinc-200 sm:h-8 sm:w-8 dark:bg-zinc-800" />
           </div>
           <div>
             <div className="h-8 w-16 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-            <div className="mt-2 h-3 w-32 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
+            <div className="mt-2 h-3 w-full max-w-32 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
           </div>
         </div>
       ))}

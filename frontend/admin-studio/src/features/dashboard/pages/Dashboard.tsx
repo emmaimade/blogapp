@@ -95,6 +95,7 @@ export const Dashboard = () => {
           sub={`${data.published_posts} live · ${data.draft_posts} drafts · ${data.scheduled_posts} scheduled`}
           icon={<FileText size={16} />}
           accent
+          className="col-span-2 lg:col-span-1"
         />
         <StatCard
           title="Live Posts"
@@ -128,16 +129,20 @@ export const Dashboard = () => {
         total={data.posts}
       />
 
-      {/* Main Structural Columns Blocks Layout Grid */}
-      <div className="grid gap-6 lg:grid-cols-5">
+      {/* Main Structural Columns Blocks Layout Grid. `grid-cols-1` matters: with
+          no columns defined below lg, the browser sizes one automatic column to
+          its widest content — and a long one-line (truncated) post title in
+          Recent activity counts at full length, pushing every card off-screen.
+          An explicit column can shrink to the screen, so truncation works. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Left Column Section: Shortcuts & Audit Feeds */}
-        <div className="space-y-6 lg:col-span-3">
+        <div className="min-w-0 space-y-6 lg:col-span-3">
           {(permissions.canManagePosts || permissions.canManageSettings) && (
             <div className="admin-card p-5">
               <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 Quick actions
               </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {permissions.canManagePosts && (
                   <QuickAction
                     to="/admin/posts/new"
@@ -262,7 +267,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Right Column Section: Global Configuration & Context Tables */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           {isOwner && activeBlog && (
             <SiteCard
               subdomain={activeBlog.subdomain}
