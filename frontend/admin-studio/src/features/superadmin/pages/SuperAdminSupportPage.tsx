@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MessageSquare, Send, Clock } from 'lucide-react';
 import { useSupportTickets, type TicketStatus } from '../hooks/useSupportTickets';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
@@ -39,6 +40,17 @@ export const SuperAdminSupportPage = () => {
   } = useSupportTickets();
 
   const [replyBody, setReplyBody] = useState('');
+
+  // Notification links point here as ?ticket=<id>. Clear the status filter
+  // too, otherwise the linked ticket could be hidden by the active tab.
+  const [searchParams] = useSearchParams();
+  const linkedTicketId = Number(searchParams.get('ticket')) || null;
+  useEffect(() => {
+    if (linkedTicketId) {
+      setStatusFilter('all');
+      setSelectedTicketId(linkedTicketId);
+    }
+  }, [linkedTicketId, setStatusFilter, setSelectedTicketId]);
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();

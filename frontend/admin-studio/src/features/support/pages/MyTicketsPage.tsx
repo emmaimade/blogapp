@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
@@ -41,6 +42,13 @@ export const MyTicketsPage = () => {
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [replyBody, setReplyBody] = useState('');
+
+  // Notification links point here as ?ticket=<id>.
+  const [searchParams] = useSearchParams();
+  const linkedTicketId = Number(searchParams.get('ticket')) || null;
+  useEffect(() => {
+    if (linkedTicketId) setSelectedTicketId(linkedTicketId);
+  }, [linkedTicketId]);
 
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
     queryKey: ['my-support-tickets'],
