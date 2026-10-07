@@ -2,13 +2,14 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, MoreHorizontal, CheckCircle2, XCircle, Trash2, Layers, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/context/AuthContext';
 import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { Modal } from '../../../shared/components/Modal';
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import api from '../../../shared/api/client';
+import { LoadError } from '../../../shared/ui/LoadError';
 
 const SuperAdminUsersSkeleton = () => (
   <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
@@ -44,7 +45,9 @@ const SuperAdminUsersSkeleton = () => (
   </div>
 );
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Requests go through the shared `api` client: it uses the same-origin /api
+// route in production, sends the session cookies, adds the CSRF header to
+// writes, and refreshes an expired session.
 
 export const SuperAdminUsersPage = () => {
   useDocumentTitle('Platform users');
@@ -72,21 +75,17 @@ export const SuperAdminUsersPage = () => {
   
   const activeMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['superadmin-users'],
     queryFn: async () => {
-      const res = await axios.get(`${API_URL}/superadmin/users?include_deleted=true`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      const res = await api.get('/superadmin/users', { params: { include_deleted: true } });
       return res.data;
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      axios.delete(`${API_URL}/superadmin/users/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      }),
+      api.delete(`/superadmin/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
       toast.success('User account permanently deleted');
@@ -99,11 +98,7 @@ export const SuperAdminUsersPage = () => {
 
   const toggleSuspendMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
-      axios.patch(
-        `${API_URL}/superadmin/users/${id}`,
-        { is_active },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      ),
+      api.patch(`/superadmin/users/${id}`, { is_active }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
       toast.success(variables.is_active ? 'User reactivated successfully' : 'User suspended successfully');
@@ -225,6 +220,15 @@ export const SuperAdminUsersPage = () => {
 
   if (isLoading) {
     return <SuperAdminUsersSkeleton />;
+  }
+
+  // A failed request must not fall through to "no users found".
+  if (isError) {
+    return (
+      <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto">
+        <LoadError title="Couldn't load users" onRetry={() => refetch()} isRetrying={isFetching} />
+      </div>
+    );
   }
 
   return (

@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import { ArrowRight, CheckCircle2, Clock, CreditCard, Search, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatLocalDate } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import api from '../../../shared/api/client';
+import { LoadError } from '../../../shared/ui/LoadError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
+// Requests go through the shared `api` client: it uses the same-origin /api
+// route in production, sends the session cookies, adds the CSRF header to
+// writes, and refreshes an expired session.
 const fetchSubscriptions = async () => {
-  const res = await axios.get(`${API_URL}/superadmin/subscriptions`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  });
+  const res = await api.get('/superadmin/subscriptions');
   return res.data;
 };
 
@@ -33,7 +33,7 @@ export const SuperAdminSubscriptionsPage = () => {
   useDocumentTitle('Subscriptions');
   const [search, setSearch] = useState('');
 
-  const { data: subscriptions, isLoading } = useQuery({
+  const { data: subscriptions, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['superadmin-subscriptions'],
     queryFn: fetchSubscriptions,
   });
@@ -71,7 +71,7 @@ export const SuperAdminSubscriptionsPage = () => {
             <div className="text-xs text-zinc-500 mt-1">workspaces</div>
           </div>
         ))}
-        {Object.keys(planCounts).length === 0 && !isLoading && (
+        {Object.keys(planCounts).length === 0 && !isLoading && !isError && (
           <div className="col-span-4 bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-5 text-center text-zinc-500 text-sm">
             No subscription data yet.
           </div>
@@ -156,6 +156,12 @@ export const SuperAdminSubscriptionsPage = () => {
                     ))}
                   </tr>
                 ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6}>
+                    <LoadError variant="inline" title="Couldn't load subscriptions" onRetry={() => refetch()} isRetrying={isFetching} />
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-zinc-500">

@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useBlocker } from 'react-router-dom';
 import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
-import axios from 'axios';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import api from '../../../shared/api/client';
+import { LoadError } from '../../../shared/ui/LoadError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Requests go through the shared `api` client: it uses the same-origin /api
+// route in production, sends the session cookies, adds the CSRF header to
+// writes, and refreshes an expired session.
 
 interface PlatformSettingsForm {
   platform_name: string;
@@ -57,16 +60,12 @@ const defaultPlatformSettings: PlatformSettingsForm = {
 };
 
 const fetchPlatformSettings = async () => {
-  const res = await axios.get(`${API_URL}/superadmin/platform-settings`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  });
+  const res = await api.get('/superadmin/platform-settings');
   return res.data;
 };
 
 const savePlatformSettings = async (data: any) => {
-  const res = await axios.patch(`${API_URL}/superadmin/platform-settings`, data, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  });
+  const res = await api.patch('/superadmin/platform-settings', data);
   return res.data;
 };
 
@@ -90,7 +89,7 @@ export const SuperAdminPlatformSettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saved, setSaved] = useState(false);
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['platform-settings'],
     queryFn: fetchPlatformSettings,
   });
@@ -167,6 +166,16 @@ export const SuperAdminPlatformSettingsPage = () => {
     return (
       <div className="p-4 sm:p-8 max-w-full sm:max-w-4xl mx-auto">
         <SettingsSkeleton cardsCount={1} fieldsPerCard={4} />
+      </div>
+    );
+  }
+
+  // Never show the form when loading failed: it would be filled with defaults,
+  // and saving it would overwrite the real platform settings.
+  if (isError) {
+    return (
+      <div className="p-4 sm:p-8 max-w-full sm:max-w-4xl mx-auto">
+        <LoadError title="Couldn't load platform settings" onRetry={() => refetch()} isRetrying={isFetching} />
       </div>
     );
   }

@@ -1,17 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { AlertTriangle, CheckCircle2, Eye, MessageSquare, MoreHorizontal, Search, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import api from '../../../shared/api/client';
+import { LoadError } from '../../../shared/ui/LoadError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
+// Requests go through the shared `api` client: it uses the same-origin /api
+// route in production, sends the session cookies, adds the CSRF header to
+// writes, and refreshes an expired session.
 const fetchModerationQueue = async () => {
-  const res = await axios.get(`${API_URL}/superadmin/moderation`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  });
+  const res = await api.get('/superadmin/moderation');
   return res.data;
 };
 
@@ -132,16 +132,14 @@ export const SuperAdminModerationPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const { data: items, isLoading } = useQuery({
+  const { data: items, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['superadmin-moderation'],
     queryFn: fetchModerationQueue,
   });
 
   const moderate = useMutation({
     mutationFn: ({ id, action }: { id: number; action: 'approve' | 'reject' | 'remove' }) =>
-      axios.post(`${API_URL}/superadmin/moderation/${id}/actions`, { action }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      }),
+      api.post(`/superadmin/moderation/${id}/actions`, { action }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['superadmin-moderation'] }),
   });
 
@@ -149,9 +147,7 @@ export const SuperAdminModerationPage = () => {
     mutationFn: async (action: 'approve' | 'reject' | 'remove') => {
       await Promise.all(
         Array.from(selectedIds).map((id) =>
-          axios.post(`${API_URL}/superadmin/moderation/${id}/actions`, { action }, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          })
+          api.post(`/superadmin/moderation/${id}/actions`, { action })
         )
       );
     },
@@ -292,6 +288,8 @@ export const SuperAdminModerationPage = () => {
               </div>
             ))}
           </div>
+        ) : isError ? (
+          <LoadError variant="inline" title="Couldn't load the moderation queue" onRetry={() => refetch()} isRetrying={isFetching} />
         ) : filtered.length === 0 ? (
           <div className="px-6 py-14 text-center">
             <MessageSquare size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
