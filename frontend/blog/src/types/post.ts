@@ -21,6 +21,8 @@ export interface Post {
   created_at: string;
   /** When the post went live — kept across edits and republishing. */
   published_at?: string | null;
+  /** Last content revision made after the post went live, if any. */
+  edited_at?: string | null;
   views?: number;
   is_project?: boolean;
   is_featured?: boolean;

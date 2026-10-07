@@ -471,7 +471,8 @@ def get_page_meta(host: str, path: str, session: Session) -> PageMeta:
                 # as_utc: the nested model's UTC serializer doesn't run inside
                 # PageMeta, and naive values would be read as local time in JS.
                 published_at=as_utc(post.published_at or post.created_at),
-                updated_at=as_utc(post.updated_at),
+                # Last content revision, not updated_at (which every view bumps).
+                updated_at=as_utc(post.edited_at or post.published_at or post.created_at),
             )
 
     return PageMeta(
@@ -1029,11 +1030,16 @@ def get_blog_dashboard_summary(blog: Blog, session: Session, current_user: User)
         .limit(5)
     ).all()
 
+    # created_at and updated_at get separate utcnow() calls on insert, so a
+    # never-changed post's two stamps differ by microseconds, not zero.
+    def _was_changed(post: Post) -> bool:
+        return bool(post.updated_at) and post.updated_at - post.created_at > timedelta(seconds=1)
+
     post_activity = [
         DashboardRecentActivity(
             type="post",
             title=post.title,
-            description="Updated post" if post.updated_at and post.updated_at != post.created_at else "Created post",
+            description="Updated post" if _was_changed(post) else "Created post",
             time=post.updated_at or post.created_at,
         )
         for post in recent_posts

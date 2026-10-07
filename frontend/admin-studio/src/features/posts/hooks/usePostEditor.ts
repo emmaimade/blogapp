@@ -164,6 +164,7 @@ export const usePostEditor = () => {
         : api.post(`/blogs/${activeBlog!.id}/posts/`, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] });
+      if (isEditMode) queryClient.invalidateQueries({ queryKey: ['post', id, activeBlog?.id] });
       const msg = variables.status === 'scheduled'
         ? 'Post scheduled!'
         : variables.status === 'published'
@@ -192,5 +193,6 @@ export const usePostEditor = () => {
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
     isDirty, savedTitle: existingPost?.title as string | undefined,
+    editedAt: existingPost?.edited_at as string | null | undefined,
   };
 };

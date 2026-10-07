@@ -9,7 +9,7 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import Request, UploadFile
-from sqlalchemy import case, func, or_
+from sqlalchemy import case, func, or_, update
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -457,6 +457,10 @@ def get_related_posts(blog_id: int, slug: str, session: Session, limit: int = 3)
     return session.exec(statement).all()
 
 
+# Fields whose change is a revision of the article itself (see Post.edited_at).
+_CONTENT_FIELDS = ("title", "content", "thumbnail_url", "is_project")
+
+
 def update_post(
     blog_id: int,
     post_id: int,
@@ -481,6 +485,24 @@ def update_post(
     if "slug" in update_dict and update_dict["slug"] != db_post.slug:
         update_dict["slug"] = Post.generate_unique_slug(update_dict["slug"], blog_id, session)
 
+    # Readers see "Updated" only for revisions to an article that has already
+    # gone live — not for drafting, status changes or featuring. The editor
+    # resends every field, so compare values rather than which fields were sent.
+    now = datetime.now(timezone.utc)
+    new_tags = (
+        _get_tags_by_ids(session, blog_id, post_data.tag_ids)
+        if post_data.tag_ids is not None else None
+    )
+    content_changed = any(
+        (update_dict[field] or None) != (getattr(db_post, field) or None)
+        for field in _CONTENT_FIELDS if field in update_dict
+    ) or (
+        new_tags is not None
+        and {tag.id for tag in new_tags} != {tag.id for tag in db_post.tags}
+    )
+    if content_changed and _went_live_at(db_post.published_at, now):
+        db_post.edited_at = now
+
     # Apply scalar fields
     for key, value in update_dict.items():
         setattr(db_post, key, value)
@@ -498,8 +520,8 @@ def update_post(
         db_post.published    = resolved_published
         db_post.published_at = resolved_published_at
 
-    if post_data.tag_ids is not None:
-        db_post.tags = _get_tags_by_ids(session, blog_id, post_data.tag_ids)
+    if new_tags is not None:
+        db_post.tags = new_tags
 
     session.add(db_post)
     add_audit_log(
@@ -576,10 +598,15 @@ def read_post_by_slug(
     if not post:
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
-    # Increment views only for published posts
+    # Increment views only for published posts. A single UPDATE so concurrent
+    # reads don't lose counts, and it pins updated_at — a read isn't a change,
+    # and the column's onupdate would otherwise bump it on every view.
     if post.status == PostStatus.PUBLISHED:
-        post.views = (post.views or 0) + 1
-        session.add(post)
+        session.execute(
+            update(Post)
+            .where(Post.id == post.id)
+            .values(views=Post.views + 1, updated_at=Post.updated_at)
+        )
         session.commit()
         session.refresh(post)
 

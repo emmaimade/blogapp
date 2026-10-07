@@ -57,6 +57,11 @@ class Post(SQLModel, table=True):
         sa_column=Column(SQLDateTime(timezone=True), index=True),
         description="UTC datetime when post goes/went live.",
     )
+    edited_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(SQLDateTime(timezone=True)),
+        description="UTC datetime of the last content edit made after the post first went live.",
+    )
 
     blog_id: int = Field(foreign_key="blog.id", ondelete="CASCADE")
 

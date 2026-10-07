@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { type Post } from '../../../shared/types';
-import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
+import { formatLocalDate, formatScheduled, formatShortDate } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
@@ -31,6 +31,20 @@ interface PostCounts {
   scheduled: number;
   draft: number;
 }
+
+// ── Date line ─────────────────────────────────────────────────────────────────
+// Published posts show what readers see on the blog: the go-live date, plus
+// "Updated" when the content was revised on a later day. Drafts show creation.
+const describePostDate = (post: Post): string => {
+  const isPublished = (post.status ?? (post.published ? 'published' : 'draft')) === 'published';
+  if (!isPublished || !post.published_at) return `Created ${formatLocalDate(post.created_at)}`;
+
+  const published = formatLocalDate(post.published_at);
+  const edited = post.edited_at ? formatLocalDate(post.edited_at) : null;
+  return edited && edited !== published
+    ? `Published ${published} · Updated ${formatShortDate(post.edited_at)}`
+    : `Published ${published}`;
+};
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({
@@ -334,7 +348,7 @@ export const PostList = () => {
             <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50 text-xs text-zinc-500">
               {post.status === 'scheduled' && post.published_at
                 ? <span className="text-yellow-700 dark:text-yellow-400 font-semibold flex items-center gap-1"><Clock size={11} /> Publishes {formatScheduled(post.published_at)}</span>
-                : <span>Created {formatLocalDate(post.created_at)}</span>
+                : <span>{describePostDate(post)}</span>
               }
             </div>
           </article>
@@ -399,7 +413,7 @@ export const PostList = () => {
                             <span className="text-xs text-zinc-500">
                               {postStatus === 'scheduled' && post.published_at
                                 ? <span className="flex items-center gap-1 text-yellow-700 dark:text-yellow-500"><Clock size={10} /> {formatScheduled(post.published_at)}</span>
-                                : formatLocalDate(post.created_at)
+                                : describePostDate(post)
                               }
                             </span>
                           </div>

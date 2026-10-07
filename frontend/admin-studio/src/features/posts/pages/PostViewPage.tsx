@@ -261,8 +261,8 @@ export const PostView = () => {
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-5 py-4 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="space-y-1">
           <p>Created {formatLocalDate(post.created_at)}</p>
-          {post.updated_at !== post.created_at && (
-            <p>Updated {formatLocalDate(post.updated_at)}</p>
+          {post.edited_at && (
+            <p>Updated {formatLocalDate(post.edited_at)}</p>
           )}
         </div>
         <button

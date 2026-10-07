@@ -131,6 +131,65 @@ def test_explicit_publish_date_is_respected(client):
     assert _as_utc(post.published_at) == backdated
 
 
+def test_editing_a_live_post_records_the_edit_time(client):
+    blog_id, user_id = _register_owner(client)
+    post_id = _published_post(blog_id, user_id, datetime.now(timezone.utc) - timedelta(days=30))
+
+    before = datetime.now(timezone.utc)
+    post = _update(blog_id, post_id, user_id, PostUpdate(content="Revised body.", status="published"))
+
+    assert post.edited_at is not None
+    assert _as_utc(post.edited_at) >= before - timedelta(seconds=1)
+
+
+def test_resave_without_content_changes_is_not_an_edit(client):
+    """The editor resends every field; identical values, status changes and
+    featuring aren't revisions readers should be told about."""
+    blog_id, user_id = _register_owner(client)
+    post_id = _published_post(blog_id, user_id, datetime.now(timezone.utc) - timedelta(days=30))
+    with Session(engine) as session:
+        original = session.get(Post, post_id)
+        title, content = original.title, original.content
+
+    post = _update(blog_id, post_id, user_id, PostUpdate(
+        title=title, content=content, thumbnail_url=None, is_project=False,
+        is_featured=True, tag_ids=[], status="published",
+    ))
+    assert post.edited_at is None
+
+    post = _update(blog_id, post_id, user_id, PostUpdate(status="draft"))
+    assert post.edited_at is None
+
+
+def test_editing_a_post_that_never_went_live_is_not_an_edit(client):
+    blog_id, user_id = _register_owner(client)
+    post_id = _create_post(blog_id, user_id, status=PostStatus.DRAFT, published=False)
+
+    post = _update(blog_id, post_id, user_id, PostUpdate(content="Still drafting."))
+    assert post.edited_at is None
+
+    post = _update(blog_id, post_id, user_id, PostUpdate(content="Ready.", status="published"))
+    assert post.edited_at is None
+
+
+def test_views_do_not_count_as_edits(client):
+    blog_id, user_id = _register_owner(client)
+    post_id = _published_post(blog_id, user_id, datetime.now(timezone.utc) - timedelta(days=30))
+    with Session(engine) as session:
+        before = session.get(Post, post_id)
+        slug, updated_at = before.slug, before.updated_at
+
+    for _ in range(2):
+        res = client.get(f"/blogs/{blog_id}/posts/slug/{slug}")
+        assert res.status_code == 200, res.text
+
+    body = res.json()
+    assert body["views"] == 2
+    assert body["edited_at"] is None
+    with Session(engine) as session:
+        assert session.get(Post, post_id).updated_at == updated_at
+
+
 def test_public_list_sorts_by_publish_date_not_creation(client):
     """A post written long ago but published today is the newest post."""
     blog_id, user_id = _register_owner(client)

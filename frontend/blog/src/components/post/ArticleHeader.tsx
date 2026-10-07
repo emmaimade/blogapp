@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Eye } from 'lucide-react';
+import { Calendar, Eye, RefreshCw } from 'lucide-react';
 import { formatLocalDate } from '../../utils/dates';
-import { getPostDate, shouldShowViews, tagUrl } from '../../utils/posts';
+import { getEditedDate, getPostDate, shouldShowViews, tagUrl } from '../../utils/posts';
 import type { PostDetail } from '../../types/post';
 import { ShareButtons } from './ShareButtons';
 
@@ -11,6 +11,7 @@ const getAuthorName = (author: PostDetail['author']) =>
 
 export const ArticleHeader: React.FC<{ post: PostDetail }> = ({ post }) => {
   const authorName = getAuthorName(post.author);
+  const editedAt = getEditedDate(post, formatLocalDate);
 
   return (
     <header className="mb-10">
@@ -50,6 +51,11 @@ export const ArticleHeader: React.FC<{ post: PostDetail }> = ({ post }) => {
         <span className="flex items-center gap-1 text-sm">
           <Calendar size={14} /> {formatLocalDate(getPostDate(post))}
         </span>
+        {editedAt && (
+          <span className="flex items-center gap-1 text-sm">
+            <RefreshCw size={14} /> Updated {formatLocalDate(editedAt)}
+          </span>
+        )}
         {shouldShowViews(post.views) && (
           <span className="flex items-center gap-1 text-sm">
             <Eye size={14} /> {post.views.toLocaleString()} views

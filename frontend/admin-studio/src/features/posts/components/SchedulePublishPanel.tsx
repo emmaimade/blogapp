@@ -10,11 +10,13 @@ export type PostStatus = 'draft' | 'scheduled' | 'published';
 interface SchedulePublishPanelProps {
   status: PostStatus;
   publishedAt?: string | null;
+  editedAt?: string | null;
   isSaving?: boolean;
   onSaveDraft:    () => void;
   onPublishNow:   () => void;
   onSchedule:     (publishAt: Date) => void;
   onUnpublish:    () => void;
+  onUpdate:       () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -53,11 +55,13 @@ const StatusPill = ({ status }: { status: PostStatus }) => {
 export const SchedulePublishPanel = ({
   status,
   publishedAt,
+  editedAt,
   isSaving = false,
   onSaveDraft,
   onPublishNow,
   onSchedule,
   onUnpublish,
+  onUpdate,
 }: SchedulePublishPanelProps) => {
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduleValue, setScheduleValue] = useState(defaultScheduleTime);
@@ -117,10 +121,28 @@ export const SchedulePublishPanel = ({
                   <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-0.5">
                     {format(parsedPublishedAt, 'MMM d, yyyy · h:mm a')}
                   </p>
+                  {editedAt && (
+                    <p className="text-xs text-green-700/70 dark:text-green-400/70 mt-0.5">
+                      Last updated {formatDistanceToNow(parseISO(editedAt), { addSuffix: true })}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
+            {/* Update — saves edits while keeping the post live and its original publish date */}
             <button
+              type="button"
+              onClick={onUpdate}
+              disabled={isSaving}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet/20"
+            >
+              {isSaving
+                ? <><Loader2 size={15} className="animate-spin" /> Updating…</>
+                : <><Send size={15} /> Update</>
+              }
+            </button>
+            <button
+              type="button"
               onClick={onUnpublish}
               disabled={isSaving}
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"

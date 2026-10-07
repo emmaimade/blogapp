@@ -63,6 +63,7 @@ class PostRead(UTCDatetimeMixin, BaseModel):
     published: bool
     status: PostStatus
     published_at: Optional[datetime] = None
+    edited_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     tags: List[TagRead] = Field(default_factory=list)

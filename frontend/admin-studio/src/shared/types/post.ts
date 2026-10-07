@@ -13,6 +13,7 @@ export interface Post {
   published: boolean;          // kept for backward compat — prefer `status`
   status: PostStatus;          // draft | scheduled | published
   published_at: string | null; // ISO datetime — set when scheduled or published
+  edited_at: string | null;    // last content edit after going live — what readers see as "Updated"
   thumbnail_url?: string | null;
   views: number;
   created_at: string;

@@ -39,6 +39,16 @@ export const countMarkdownHeadings = (content: string): number => {
 export const getPostDate = (post: { published_at?: string | null; created_at: string }): string =>
   post.published_at || post.created_at;
 
+/**
+ * When to tell readers the post was revised: only for an edit on a later day
+ * than the date shown, so a same-day typo fix doesn't add a second identical date.
+ */
+export const getEditedDate = (
+  post: { published_at?: string | null; edited_at?: string | null; created_at: string },
+  format: (iso: string) => string,
+): string | null =>
+  post.edited_at && format(post.edited_at) !== format(getPostDate(post)) ? post.edited_at : null;
+
 /** The one place a tag is browsed: the blog list filtered by it (`/tag/:tag` redirects here). */
 export const tagUrl = (tag: string): string => `/blog?tag=${encodeURIComponent(tag)}`;
 

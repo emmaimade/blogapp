@@ -23,7 +23,7 @@ export const PostEditor: React.FC = () => {
     currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
-    isDirty, savedTitle
+    isDirty, savedTitle, editedAt
   } = usePostEditor();
 
   // Saved title rather than the live input, so the tab doesn't churn while typing.
@@ -178,11 +178,13 @@ export const PostEditor: React.FC = () => {
           <SchedulePublishPanel
             status={currentStatus}
             publishedAt={currentPubAt}
+            editedAt={editedAt}
             isSaving={mutation.isPending}
             onSaveDraft={() => saveWithStatus('draft')}
             onPublishNow={() => saveWithStatus('published')}
             onSchedule={(at) => saveWithStatus('scheduled', at)}
             onUnpublish={() => saveWithStatus('draft', null)}
+            onUpdate={() => saveWithStatus('published')}
           />
 
           <TagSelector
