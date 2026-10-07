@@ -23,7 +23,12 @@ export const useNotifications = () => {
 
   const { data: notifications, refetch } = useQuery<AppNotification[]>({
     queryKey: ['notifications-list'],
-    queryFn: async () => (await api.get('/notifications/')).data,
+    // Guarded because a misrouted request can come back as HTML with a 200
+    // (the SPA fallback) - a string here made the dropdown's .map() throw.
+    queryFn: async () => {
+      const { data } = await api.get('/notifications/');
+      return Array.isArray(data) ? data : [];
+    },
     // Fetched proactively so the list is already warm by the time someone
     // opens the bell - opening it then just reveals cached data instantly,
     // with refetch() below still called on open to refresh it in the
