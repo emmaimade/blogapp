@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -46,8 +46,13 @@ export const MyTicketsPage = () => {
   // Notification links point here as ?ticket=<id>.
   const [searchParams] = useSearchParams();
   const linkedTicketId = Number(searchParams.get('ticket')) || null;
+  const threadRef = useRef<HTMLDivElement>(null);
+  const scrollToThreadRef = useRef(false);
   useEffect(() => {
-    if (linkedTicketId) setSelectedTicketId(linkedTicketId);
+    if (linkedTicketId) {
+      setSelectedTicketId(linkedTicketId);
+      scrollToThreadRef.current = true;
+    }
   }, [linkedTicketId]);
 
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
@@ -69,6 +74,16 @@ export const MyTicketsPage = () => {
 
   const selectedTicket = tickets?.find((t) => t.id === selectedTicketId) ?? null;
 
+  // On phones the thread sits below the list, so a linked ticket would be
+  // selected off-screen. Scroll to it once, as soon as the ticket has loaded.
+  useEffect(() => {
+    if (!selectedTicket || !scrollToThreadRef.current) return;
+    scrollToThreadRef.current = false;
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedTicket]);
+
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket || !replyBody.trim()) return;
@@ -77,7 +92,7 @@ export const MyTicketsPage = () => {
   };
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-180px)]">
+    <div className="flex flex-col md:flex-row gap-6 h-auto md:h-[calc(100vh-180px)]">
       <div className="w-full md:w-80 flex-shrink-0 flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -120,7 +135,7 @@ export const MyTicketsPage = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div ref={threadRef} className="flex-1 flex flex-col scroll-mt-16 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 gap-2">
             <MessageSquare size={28} />

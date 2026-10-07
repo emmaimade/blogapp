@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MessageSquare, Send, Clock } from 'lucide-react';
 import { useSupportTickets, type TicketStatus } from '../hooks/useSupportTickets';
@@ -45,12 +45,25 @@ export const SuperAdminSupportPage = () => {
   // too, otherwise the linked ticket could be hidden by the active tab.
   const [searchParams] = useSearchParams();
   const linkedTicketId = Number(searchParams.get('ticket')) || null;
+  const threadRef = useRef<HTMLDivElement>(null);
+  const scrollToThreadRef = useRef(false);
   useEffect(() => {
     if (linkedTicketId) {
       setStatusFilter('all');
       setSelectedTicketId(linkedTicketId);
+      scrollToThreadRef.current = true;
     }
   }, [linkedTicketId, setStatusFilter, setSelectedTicketId]);
+
+  // On phones the thread stacks below the list, so a linked ticket would be
+  // selected off-screen. Scroll to it once, as soon as the ticket has loaded.
+  useEffect(() => {
+    if (!selectedTicket || !scrollToThreadRef.current) return;
+    scrollToThreadRef.current = false;
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedTicket]);
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +125,7 @@ export const SuperAdminSupportPage = () => {
       </div>
 
       {/* Thread view */}
-      <div className="flex-1 flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div ref={threadRef} className="flex-1 flex flex-col scroll-mt-16 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 gap-2">
             <MessageSquare size={28} />
