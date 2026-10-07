@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { canAccess, getAccessSummary, type AdminCapability } from '../lib/accessControl';
+import { AdminShellSkeleton } from '../../../shared/ui/AdminShellSkeleton';
 
 interface ProtectedRouteProps {
   requiredCapability?: AdminCapability;
@@ -11,14 +12,11 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
   const { user, isLoading, logout } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
 
+  // Only the startup session check gets here (a refresh or an admin link) —
+  // signing in settles the session immediately. Until it's known whether
+  // anyone's signed in, show the layout's outline rather than a spinner.
   if (isLoading || isBlogLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--admin-bg)] px-4">
-        <div className="w-full max-w-md p-8 text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
-        </div>
-      </div>
-    );
+    return <AdminShellSkeleton />;
   }
 
   // 1. Ensure the user is authenticated first

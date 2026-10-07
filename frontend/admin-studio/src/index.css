@@ -688,3 +688,10 @@ h1, h2, h3, h4, h5, h6 {
   mask-composite: exclude;
   z-index: -1;
 }
+
+/* Delayed fade-in for loading placeholders (see AdminShellSkeleton): they
+   stay invisible on fast loads and only appear when the wait is noticeable. */
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
