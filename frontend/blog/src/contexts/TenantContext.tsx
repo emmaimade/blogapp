@@ -79,7 +79,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   }, [fetchTenant]);
 
   if (state === 'loading') {
-    return <PageLoader label="Loading blog" minHeight="100vh" />;
+    return <PageLoader minHeight="100vh" />;
   }
 
   if (state === 'not-found' || state === 'network-error') {

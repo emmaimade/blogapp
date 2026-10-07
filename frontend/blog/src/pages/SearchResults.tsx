@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, ChevronDown, ArrowLeft, X } from 'lucide-react';
 import api from '../api/blogApi';
 import { PostCard } from '../components/PostCard';
-import { PageLoader } from '../components/PageLoader';
+import { PostListSkeleton } from '../components/PostList';
 import { Pagination } from '../components/Pagination';
 import { usePagedPosts, usePageParam } from '../hooks/usePagedPosts';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -167,7 +167,7 @@ export const SearchResults: React.FC = () => {
           </div>
 
           {isLoading ? (
-            <PageLoader label="Searching posts" minHeight="18rem" />
+            <div role="status" aria-label="Searching posts"><PostListSkeleton layout="feed" count={4} /></div>
           ) : results.length > 0 ? (
             <>
               <div className={`divide-y divide-zinc-200 dark:divide-zinc-800 transition-opacity ${isFetching ? 'opacity-50' : 'opacity-100'}`}>

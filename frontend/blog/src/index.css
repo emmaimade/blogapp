@@ -38,6 +38,16 @@
 
 html {
   scroll-behavior: smooth;
+  /* The theme class is set on <html> before first paint (index.html), but the
+     app's own background only arrives with the app — so the page itself
+     carries the theme background, or a dark-mode visitor sees a white flash
+     (and a near-invisible loader) first. */
+  background-color: var(--color-white);
+}
+
+html.dark {
+  background-color: var(--color-zinc-950);
+  color-scheme: dark;
 }
 
 /* Visible keyboard-focus ring for interactive chrome (links, buttons, menu
