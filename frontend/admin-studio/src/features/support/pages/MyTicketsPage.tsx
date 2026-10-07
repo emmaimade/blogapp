@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
 import api from '../../../shared/api/client';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -40,20 +40,24 @@ export const MyTicketsPage = () => {
   useDocumentTitle('Support tickets');
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  // Notification links point here as ?ticket=<id>. Re-select whenever that
+  // param changes (adjusted during render rather than in an effect).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedTicketId = Number(searchParams.get('ticket')) || null;
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(linkedTicketId);
+  const [prevLinkedTicketId, setPrevLinkedTicketId] = useState(linkedTicketId);
+  if (linkedTicketId !== prevLinkedTicketId) {
+    setPrevLinkedTicketId(linkedTicketId);
+    if (linkedTicketId) setSelectedTicketId(linkedTicketId);
+  }
   const [replyBody, setReplyBody] = useState('');
 
-  // Notification links point here as ?ticket=<id>.
-  const [searchParams] = useSearchParams();
-  const linkedTicketId = Number(searchParams.get('ticket')) || null;
-  const threadRef = useRef<HTMLDivElement>(null);
-  const scrollToThreadRef = useRef(false);
-  useEffect(() => {
-    if (linkedTicketId) {
-      setSelectedTicketId(linkedTicketId);
-      scrollToThreadRef.current = true;
-    }
-  }, [linkedTicketId]);
+  // Phones show either the list or the open thread, never both. Going back
+  // also drops ?ticket, so tapping the same notification again reopens it.
+  const closeThread = () => {
+    setSelectedTicketId(null);
+    if (linkedTicketId) setSearchParams({}, { replace: true });
+  };
 
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
     queryKey: ['my-support-tickets'],
@@ -74,16 +78,6 @@ export const MyTicketsPage = () => {
 
   const selectedTicket = tickets?.find((t) => t.id === selectedTicketId) ?? null;
 
-  // On phones the thread sits below the list, so a linked ticket would be
-  // selected off-screen. Scroll to it once, as soon as the ticket has loaded.
-  useEffect(() => {
-    if (!selectedTicket || !scrollToThreadRef.current) return;
-    scrollToThreadRef.current = false;
-    if (window.matchMedia('(max-width: 767px)').matches) {
-      threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [selectedTicket]);
-
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket || !replyBody.trim()) return;
@@ -93,7 +87,7 @@ export const MyTicketsPage = () => {
 
   return (
     <div className="flex flex-col md:flex-row gap-6 h-auto md:h-[calc(100vh-180px)]">
-      <div className="w-full md:w-80 flex-shrink-0 flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className={`${selectedTicket ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-shrink-0 flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
         <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <LifeBuoy size={16} className="text-violet-600" />
@@ -135,7 +129,7 @@ export const MyTicketsPage = () => {
         </div>
       </div>
 
-      <div ref={threadRef} className="flex-1 flex flex-col scroll-mt-16 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className={`${selectedTicket ? 'flex' : 'hidden md:flex'} flex-1 flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 gap-2">
             <MessageSquare size={28} />
@@ -143,6 +137,12 @@ export const MyTicketsPage = () => {
           </div>
         ) : (
           <>
+            <button
+              onClick={closeThread}
+              className="md:hidden flex items-center gap-1.5 px-5 pt-3 text-xs font-medium text-violet-600"
+            >
+              <ArrowLeft size={14} /> Back to tickets
+            </button>
             <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
               <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{selectedTicket.subject}</h3>
               <p className="text-xs text-zinc-400 mt-0.5">Opened {formatDate(selectedTicket.created_at)}</p>

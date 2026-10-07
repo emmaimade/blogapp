@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MessageSquare, Send, Clock } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, Clock } from 'lucide-react';
 import { useSupportTickets, type TicketStatus } from '../hooks/useSupportTickets';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -43,27 +43,21 @@ export const SuperAdminSupportPage = () => {
 
   // Notification links point here as ?ticket=<id>. Clear the status filter
   // too, otherwise the linked ticket could be hidden by the active tab.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const linkedTicketId = Number(searchParams.get('ticket')) || null;
-  const threadRef = useRef<HTMLDivElement>(null);
-  const scrollToThreadRef = useRef(false);
   useEffect(() => {
     if (linkedTicketId) {
       setStatusFilter('all');
       setSelectedTicketId(linkedTicketId);
-      scrollToThreadRef.current = true;
     }
   }, [linkedTicketId, setStatusFilter, setSelectedTicketId]);
 
-  // On phones the thread stacks below the list, so a linked ticket would be
-  // selected off-screen. Scroll to it once, as soon as the ticket has loaded.
-  useEffect(() => {
-    if (!selectedTicket || !scrollToThreadRef.current) return;
-    scrollToThreadRef.current = false;
-    if (window.matchMedia('(max-width: 767px)').matches) {
-      threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [selectedTicket]);
+  // Phones show either the list or the open thread, never both. Going back
+  // also drops ?ticket, so tapping the same notification again reopens it.
+  const closeThread = () => {
+    setSelectedTicketId(null);
+    if (linkedTicketId) setSearchParams({}, { replace: true });
+  };
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +69,7 @@ export const SuperAdminSupportPage = () => {
   return (
     <div className="flex flex-col md:flex-row gap-6 h-auto md:h-[calc(100vh-180px)]">
       {/* Ticket list */}
-      <div className="w-full md:w-80 shrink-0 flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className={`${selectedTicket ? 'hidden md:flex' : 'flex'} w-full md:w-80 shrink-0 flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
         <div className="flex gap-1 p-2 border-b border-zinc-100 dark:border-zinc-800 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {STATUS_TABS.map((tab) => (
             <button
@@ -125,7 +119,7 @@ export const SuperAdminSupportPage = () => {
       </div>
 
       {/* Thread view */}
-      <div ref={threadRef} className="flex-1 flex flex-col scroll-mt-16 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className={`${selectedTicket ? 'flex' : 'hidden md:flex'} flex-1 flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 gap-2">
             <MessageSquare size={28} />
@@ -133,6 +127,12 @@ export const SuperAdminSupportPage = () => {
           </div>
         ) : (
           <>
+            <button
+              onClick={closeThread}
+              className="md:hidden flex items-center gap-1.5 px-5 pt-3 text-xs font-medium text-violet-600"
+            >
+              <ArrowLeft size={14} /> Back to tickets
+            </button>
             <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{selectedTicket.subject}</h3>
