@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowLeft, MessageSquare, Send, Clock, LifeBuoy } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Clock, LifeBuoy } from 'lucide-react';
 import api from '../../../shared/api/client';
+import { ReplyComposer } from '../components/ReplyComposer';
 import { TicketListSkeleton } from '../../../shared/ui/Skeleton';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -35,6 +36,11 @@ const STATUS_STYLES: Record<TicketStatus, string> = {
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+// Below md an open thread fills the screen under the 56px (top-14) mobile
+// topbar, covering the breadcrumbs, so only its messages scroll and the
+// reply box stays pinned. From md up it's the usual side-by-side panel.
+const CHAT_SCREEN_OPEN = 'fixed inset-x-0 top-14 bottom-0 z-40 flex md:static md:z-auto';
 
 export const MyTicketsPage = () => {
   useDocumentTitle('Support tickets');
@@ -77,6 +83,14 @@ export const MyTicketsPage = () => {
   });
 
   const selectedTicket = tickets?.find((t) => t.id === selectedTicketId) ?? null;
+
+  // Open on the newest message, and follow new replies as they arrive.
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const messageCount = selectedTicket?.messages.length;
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [selectedTicketId, messageCount]);
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +143,7 @@ export const MyTicketsPage = () => {
         </div>
       </div>
 
-      <div className={`${selectedTicket ? 'flex' : 'hidden md:flex'} flex-1 flex-col border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
+      <div className={`${selectedTicket ? CHAT_SCREEN_OPEN : 'hidden md:flex'} flex-1 flex-col md:border border-zinc-200 dark:border-zinc-800 md:rounded-2xl bg-white dark:bg-zinc-950 overflow-hidden`}>
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 gap-2">
             <MessageSquare size={28} />
@@ -148,7 +162,7 @@ export const MyTicketsPage = () => {
               <p className="text-xs text-zinc-400 mt-0.5">Opened {formatDate(selectedTicket.created_at)}</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div ref={messagesRef} className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar]:w-[5px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-300/60 dark:[&::-webkit-scrollbar-thumb]:bg-[#444444] [&::-webkit-scrollbar-thumb]:rounded-full">
               {selectedTicket.messages.map((message) => {
                 const isMine = message.sender_id === user?.id;
                 return (
@@ -172,22 +186,12 @@ export const MyTicketsPage = () => {
             </div>
 
             {selectedTicket.status !== 'closed' ? (
-              <form onSubmit={handleReply} className="flex items-end gap-2 p-4 border-t border-zinc-100 dark:border-zinc-800">
-                <textarea
-                  value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
-                  rows={2}
-                  placeholder="Write a reply…"
-                  className="flex-1 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none text-zinc-900 dark:text-zinc-100"
-                />
-                <button
-                  type="submit"
-                  disabled={replyMutation.isPending || !replyBody.trim()}
-                  className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white p-2.5 disabled:opacity-50"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
+              <ReplyComposer
+                value={replyBody}
+                onChange={setReplyBody}
+                onSubmit={handleReply}
+                isSending={replyMutation.isPending}
+              />
             ) : (
               <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 text-center text-xs text-zinc-400">
                 This ticket is closed.
