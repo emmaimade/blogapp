@@ -26,12 +26,14 @@ const values = [
   },
 ];
 
+// Only things that have actually shipped, dated from the project's history.
+// Add a milestone when it's live, not when it's planned.
 const milestones = [
-  { year: '2022', event: 'INKO founded after frustration managing multiple Ghost instances for agency clients.' },
-  { year: '2023', event: 'Launched multi-tenant workspace system. First 50 teams onboarded.' },
-  { year: '2024', event: 'Reached 200+ teams. Launched role-based permissions and advanced analytics.' },
-  { year: '2025', event: 'REST API and custom domain support shipped. Enterprise tier launched.' },
-  { year: '2026', event: 'Serving 500+ teams across 30+ countries. SSO, SAML, and deeper integrations.' },
+  { date: 'Feb 2026', event: 'Work on INKO begins: a writing studio and API for publishing a blog.' },
+  { date: 'May 2026', event: 'Workspaces arrive. Each blog gets its own team, branding and public site.' },
+  { date: 'Jul 2026', event: 'Built for teams: owner, editor and author roles, scheduled publishing and guided onboarding.' },
+  { date: 'Aug 2026', event: 'In-app notifications and a support desk, so teams stay in the loop and get help fast.' },
+  { date: 'Oct 2026', event: 'Free, Pro and Team plans launch, billed in naira through Paystack.' },
 ];
 
 const team = [
@@ -189,13 +191,13 @@ export const AboutPage = () => {
 
           <div className="relative">
             {/* Vertical line */}
-            <div className="absolute left-16 top-0 bottom-0 w-px bg-zinc-200" />
+            <div className="absolute left-[5.75rem] top-0 bottom-0 w-px bg-zinc-200" />
 
             <div className="space-y-8">
-              {milestones.map(({ year, event }, i) => (
-                <div key={year} className="flex gap-8 items-start">
-                  <div className="w-16 flex-shrink-0 text-right">
-                    <span className="text-sm font-black text-primary">{year}</span>
+              {milestones.map(({ date, event }, i) => (
+                <div key={date} className="flex gap-8 items-start">
+                  <div className="w-20 flex-shrink-0 text-right">
+                    <span className="text-sm font-black text-primary whitespace-nowrap">{date}</span>
                   </div>
                   <div className="relative flex-1 pb-2">
                     {/* Dot */}
