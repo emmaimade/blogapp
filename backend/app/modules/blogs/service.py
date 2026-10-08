@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks, Request, Response
 from jinja2 import Template
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
+from slugify import slugify
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
@@ -28,7 +29,7 @@ from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
 from app.modules.settings.router import blog_general_defaults, get_settings
-from app.modules.users.router import _generate_random_handle
+from app.modules.users.router import _generate_random_handle, _generate_unique_workspace_slug
 from app.core.email import dispatch_email
 from app.core.email_templates import (
     get_password_reset_template,
@@ -313,11 +314,36 @@ def _create_welcome_post_on_onboarding_complete(
 
 # ── Blog CRUD ────────────────────────────────────────────────────────────────
 
+def _resolve_new_blog_address(session: Session, name: str, requested: Optional[str]) -> str:
+    """
+    One address serves as both slug and subdomain, matching signup. A
+    requested address is slugified and must be free (it's what the user
+    typed, so we don't silently rename it); with none, one is derived from
+    the name and de-duplicated.
+    """
+    if not requested or not requested.strip():
+        return _generate_unique_workspace_slug(name, session)
+    address = slugify(requested)
+    if not address:
+        raise BadRequestError(ErrorCode.INVALID_INPUT, "Choose an address with letters or numbers.")
+    taken = session.exec(
+        select(Blog).where((Blog.slug == address) | (Blog.subdomain == address))
+    ).first()
+    if taken:
+        raise ConflictError(ErrorCode.SLUG_ALREADY_EXISTS)
+    return address
+
+
 def create_blog(blog_data: BlogCreate, session: Session, current_user: User, request: Request | None = None) -> Blog:
+    name = blog_data.name.strip()
+    if not name:
+        raise BadRequestError(ErrorCode.INVALID_INPUT, "Give your workspace a name.")
+    address = _resolve_new_blog_address(session, name, blog_data.slug or blog_data.subdomain)
+
     new_blog = Blog(
-        name=blog_data.name,
-        slug=blog_data.slug,
-        subdomain=blog_data.subdomain,
+        name=name,
+        slug=address,
+        subdomain=address,
         description=blog_data.description,
         owner_id=current_user.id,
         onboarding_status=OnboardingStatus.IN_PROGRESS,
