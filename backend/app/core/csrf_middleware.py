@@ -22,6 +22,9 @@ EXEMPT_EXACT = {
     ("POST", "/auth/send-verification"),
     ("POST", "/users/login"),
     ("POST", "/users/register"),
+    # Called server-to-server by Paystack with no cookies; authenticated by
+    # its HMAC signature instead (see modules/billing/service.py).
+    ("POST", "/billing/webhook"),
 }
 
 # /invitations/{token}/register-and-accept takes a dynamic path segment, so

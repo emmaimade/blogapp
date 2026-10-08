@@ -45,7 +45,6 @@ from app.schemas import (
     PlatformSettingsResponse,
     PlatformSettingsUpdate,
     PlatformStats,
-    SubscriptionRead,
     UserRead,
     SuperadminUserQueryParams,
 )
@@ -710,55 +709,7 @@ def update_platform_settings(
 # SUBSCRIPTIONS ENDPOINTS
 # ============================================================================
 
-@router.get("/subscriptions", response_model=List[SubscriptionRead])
-def get_all_subscriptions(
-    _: None = Depends(require_super_admin),
-    session: Session = Depends(get_session),
-):
-    """Get all blog subscriptions."""
-    from app.models.blog import BlogSubscription
-    rows = session.exec(
-        select(BlogSubscription, Blog.name).join(Blog, Blog.id == BlogSubscription.blog_id)
-    ).all()
-    return [
-        SubscriptionRead(
-            blog_id=sub.blog_id,
-            blog_name=blog_name,
-            plan=sub.plan,
-            status=sub.status,
-            trial_ends_at=sub.trial_ends_at,
-            current_period_ends_at=sub.current_period_ends_at,
-        )
-        for sub, blog_name in rows
-    ]
-
-
-@router.get("/subscriptions/{blog_id}", response_model=SubscriptionRead)
-def get_blog_subscription(
-    blog_id: int,
-    _: None = Depends(require_super_admin),
-    session: Session = Depends(get_session),
-):
-    """Get subscription for a specific blog."""
-    from app.models.blog import BlogSubscription
-    row = session.exec(
-        select(BlogSubscription, Blog.name)
-        .join(Blog, Blog.id == BlogSubscription.blog_id)
-        .where(BlogSubscription.blog_id == blog_id)
-    ).first()
-
-    if not row:
-        raise NotFoundError(ErrorCode.SUBSCRIPTION_NOT_FOUND)
-
-    subscription, blog_name = row
-    return SubscriptionRead(
-        blog_id=subscription.blog_id,
-        blog_name=blog_name,
-        plan=subscription.plan,
-        status=subscription.status,
-        trial_ends_at=subscription.trial_ends_at,
-        current_period_ends_at=subscription.current_period_ends_at,
-    )
+# Served by app/modules/billing/router.py (list, detail, extend trial, grant plan).
 
 
 # ============================================================================

@@ -90,6 +90,18 @@ class ErrorCode(str, Enum):
     # ── Business rules ────────────────────────────────────────────────────────
     OPERATION_NOT_ALLOWED = "OPERATION_NOT_ALLOWED"
 
+    # ── Billing ───────────────────────────────────────────────────────────────
+    BILLING_NOT_CONFIGURED = "BILLING_NOT_CONFIGURED"
+    PAYMENT_PROVIDER_ERROR = "PAYMENT_PROVIDER_ERROR"
+    PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND"
+    PAYMENT_NOT_SUCCESSFUL = "PAYMENT_NOT_SUCCESSFUL"
+    ALREADY_SUBSCRIBED = "ALREADY_SUBSCRIBED"
+    NO_ACTIVE_SUBSCRIPTION = "NO_ACTIVE_SUBSCRIPTION"
+    INVALID_WEBHOOK_SIGNATURE = "INVALID_WEBHOOK_SIGNATURE"
+    WORKSPACE_FULL = "WORKSPACE_FULL"
+    PAYMENT_METHOD_REQUIRED = "PAYMENT_METHOD_REQUIRED"
+    NO_PENDING_CHANGE = "NO_PENDING_CHANGE"
+
     # ── Throttling ────────────────────────────────────────────────────────────
     RATE_LIMITED = "RATE_LIMITED"
 
@@ -293,6 +305,51 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.OPERATION_NOT_ALLOWED: ErrorSpec(
         status.HTTP_400_BAD_REQUEST,
         "This action can't be completed right now.",
+    ),
+
+    # ── Billing ───────────────────────────────────────────────────────────────
+    ErrorCode.BILLING_NOT_CONFIGURED: ErrorSpec(
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        "Billing isn't available right now. Please try again later.",
+    ),
+    ErrorCode.PAYMENT_PROVIDER_ERROR: ErrorSpec(
+        status.HTTP_502_BAD_GATEWAY,
+        "We couldn't reach our payment provider. Please try again.",
+    ),
+    ErrorCode.PAYMENT_NOT_FOUND: ErrorSpec(
+        status.HTTP_404_NOT_FOUND,
+        "We couldn't find that payment for this workspace.",
+    ),
+    ErrorCode.PAYMENT_NOT_SUCCESSFUL: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "Your payment wasn't completed. You haven't been charged.",
+    ),
+    ErrorCode.ALREADY_SUBSCRIBED: ErrorSpec(
+        status.HTTP_409_CONFLICT,
+        "This workspace is already on that plan.",
+    ),
+    ErrorCode.NO_ACTIVE_SUBSCRIPTION: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "This workspace doesn't have a paid subscription.",
+    ),
+    ErrorCode.INVALID_WEBHOOK_SIGNATURE: ErrorSpec(
+        status.HTTP_401_UNAUTHORIZED,
+        "The request signature is invalid.",
+    ),
+    # Shown to someone joining by invitation — deliberately says nothing
+    # about the workspace's plan, which is the owner's business.
+    ErrorCode.PAYMENT_METHOD_REQUIRED: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "We don't have a saved card for this workspace. Please go through checkout instead.",
+    ),
+    ErrorCode.NO_PENDING_CHANGE: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "There's no scheduled plan change to undo.",
+    ),
+    ErrorCode.WORKSPACE_FULL: ErrorSpec(
+        status.HTTP_403_FORBIDDEN,
+        "This workspace can't take new members right now, so the invitation "
+        "can't be accepted yet. Let the person who invited you know.",
     ),
 
     # ── Throttling ────────────────────────────────────────────────────────────
