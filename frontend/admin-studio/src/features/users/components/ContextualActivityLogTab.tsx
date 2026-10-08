@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { Edit3, FileText, LogIn, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import api from '../../../shared/api/client';
 import { formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { useAuth } from '../../auth/context/AuthContext';
 import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
+import { getActionStyle } from '../../audit-log/lib/actionStyle';
 
 interface AuditLogEntry {
   id: number;
@@ -30,7 +31,7 @@ interface ContextualActivityLogTabProps {
 
 const PAGE_SIZE = 15;
 
-export default function ContextualActivityLogTab({ targetUserId, targetUserEmail }: ContextualActivityLogTabProps) {
+export default function ContextualActivityLogTab({ targetUserId }: ContextualActivityLogTabProps) {
   const { user: currentUser } = useAuth();
   const { activeBlog, activeRole } = useBlog();
   const [page, setPage] = useState(0);
@@ -61,7 +62,7 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
         params.actor_user_id = targetUserId;
       } else if (accessTier === 'owner') {
         url = `/blogs/${activeBlog?.id}/audit-logs`;
-        params.actor_email = targetUserEmail || undefined;
+        params.actor_user_id = targetUserId;
       }
 
       const res = await api.get(url, { params });
@@ -70,15 +71,6 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
     // Don't wait for activeBlog.id if we are just pulling our own /users/me logs
     enabled: accessTier !== 'denied' && (accessTier === 'self' || accessTier === 'superadmin' || !!activeBlog?.id),
   });
-
-  const getActionIcon = (action: string) => {
-    const act = action.toLowerCase();
-    if (act.includes('login') || act.includes('auth')) return <LogIn size={14} className="text-blue-500" />;
-    if (act.includes('create') || act.includes('publish')) return <FileText size={14} className="text-emerald-500" />;
-    if (act.includes('update') || act.includes('patch') || act.includes('edit')) return <Edit3 size={14} className="text-amber-500" />;
-    if (act.includes('delete') || act.includes('remove')) return <Trash2 size={14} className="text-rose-500" />;
-    return <Settings size={14} className="text-zinc-400" />;
-  };
 
   // Humanizes backend audit action names for a cleaner profile interface
   const humanizeAction = (action: string) => {
@@ -132,9 +124,7 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
           <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
             {logs.map((log) => (
               <div key={log.id} className="flex items-start gap-4 p-4 hover:bg-zinc-50/40 dark:hover:bg-zinc-900/10 text-xs transition-colors">
-                <div className="mt-0.5 h-7 w-7 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 flex items-center justify-center flex-shrink-0">
-                  {getActionIcon(log.action)}
-                </div>
+                <ActionBadge action={log.action} />
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-zinc-900 dark:text-zinc-200 capitalize">
@@ -188,3 +178,12 @@ export default function ContextualActivityLogTab({ targetUserId, targetUserEmail
     </div>
   );
 }
+
+const ActionBadge = ({ action }: { action: string }) => {
+  const { Icon, tone } = getActionStyle(action);
+  return (
+    <span aria-hidden="true" className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+      <Icon size={14} />
+    </span>
+  );
+};
