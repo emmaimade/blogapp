@@ -128,7 +128,8 @@ export const SignupPage = () => {
       });
 
       login(res.data.user);
-      navigate("/admin/onboarding");
+      // /admin lands on the new workspace's onboarding.
+      navigate("/admin");
     } catch (err: any) {
       const backendDetail = err.response?.data?.detail;
       if (Array.isArray(backendDetail)) {

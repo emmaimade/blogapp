@@ -13,14 +13,15 @@ interface SettingsSection {
   roles?: readonly SettingsRole[];
 }
 
+// Relative to this route (/admin/w/:workspaceSlug/settings).
 const settingsSections: readonly SettingsSection[] = [
-  { to: '/admin/settings/general', label: 'General', description: 'Site identity and defaults', icon: Globe, roles: ['owner'] },
-  { to: '/admin/settings/about', label: 'About', description: 'Bio and contact details', icon: UserSquare2, roles: ['owner'] },
-  { to: '/admin/settings/footer', label: 'Footer', description: 'Footer content and links', icon: PanelBottom, roles: ['owner'] },
-  { to: '/admin/settings/branding', label: 'Appearance', description: 'Colors, logo, fonts and layout', icon: Palette, roles: ['owner'] },
-  { to: '/admin/settings/seo', label: 'SEO', description: 'Metadata and analytics', icon: Search, roles: ['owner'] },
-  { to: '/admin/settings/contact', label: 'Contact', description: 'Email, location & FAQ', icon: Mail, roles: ['owner'] },
-  { to: '/admin/settings/billing', label: 'Billing', description: 'Plan, payments and invoices', icon: CreditCard, roles: ['owner'] },
+  { to: 'general', label: 'General', description: 'Site identity and defaults', icon: Globe, roles: ['owner'] },
+  { to: 'about', label: 'About', description: 'Bio and contact details', icon: UserSquare2, roles: ['owner'] },
+  { to: 'footer', label: 'Footer', description: 'Footer content and links', icon: PanelBottom, roles: ['owner'] },
+  { to: 'branding', label: 'Appearance', description: 'Colors, logo, fonts and layout', icon: Palette, roles: ['owner'] },
+  { to: 'seo', label: 'SEO', description: 'Metadata and analytics', icon: Search, roles: ['owner'] },
+  { to: 'contact', label: 'Contact', description: 'Email, location & FAQ', icon: Mail, roles: ['owner'] },
+  { to: 'billing', label: 'Billing', description: 'Plan, payments and invoices', icon: CreditCard, roles: ['owner'] },
 ];
 
 export const SettingsLayout = () => {

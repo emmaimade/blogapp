@@ -7,7 +7,7 @@ import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { BILLING_PATH, toastApiError } from '../../../shared/lib/apiErrors';
+import { billingPath, toastApiError } from '../../../shared/lib/apiErrors';
 import { useBillingOverview } from '../../billing/hooks/useBilling';
 
 interface FooterSettingsData {
@@ -187,7 +187,7 @@ export const FooterSettings: React.FC = () => {
                   </span>
                 )}
                 {isFreePlan && (
-                  <Link to={BILLING_PATH} className="ml-2 text-xs font-semibold text-violet-600 underline underline-offset-2">
+                  <Link to={billingPath()} className="ml-2 text-xs font-semibold text-violet-600 underline underline-offset-2">
                     Upgrade
                   </Link>
                 )}

@@ -14,7 +14,7 @@ export const AuthCallbackPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const next = searchParams.get('next') || '/admin/dashboard';
+    const next = searchParams.get('next') || '/admin';
 
     const inviteToken = searchParams.get('invite') || sessionStorage.getItem('pending_invite_token');
     if (inviteToken) {

@@ -3,14 +3,18 @@ import { useAuth } from '../context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { canAccess, getAccessSummary, type AdminCapability } from '../lib/accessControl';
 import { AdminShellSkeleton } from '../../../shared/ui/AdminShellSkeleton';
+import { useStoredTheme } from '../../../shared/lib/theme';
 
 interface ProtectedRouteProps {
-  requiredCapability?: AdminCapability;
+  /** `null` checks sign-in only, for routes that explain missing access themselves. */
+  requiredCapability?: AdminCapability | null;
 }
 
 export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: ProtectedRouteProps) => {
   const { user, isLoading, logout } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
+  // The access-denied screen below renders outside AdminLayout, which owns the theme.
+  useStoredTheme();
 
   // Only the startup session check gets here (a refresh or an admin link) —
   // signing in settles the session immediately. Until it's known whether
@@ -25,7 +29,8 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
   }
 
   // 2. Standard capability and access controls proceed normally
-  const isAllowed = canAccess(user, activeMembership, requiredCapability);
+  const isAllowed =
+    requiredCapability === null || canAccess(user, activeMembership, requiredCapability);
   const accessSummary = getAccessSummary(user, memberships, activeMembership);
 
   if (!isAllowed) {

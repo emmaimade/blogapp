@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useAuth } from '../../auth/context/AuthContext';
 import { InkoLogo } from '../../../assets/inko';
 import { EmailVerificationBanner } from '../../auth/components/EmailVerificationBanner';
@@ -112,6 +113,7 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 );
 
 export const OnboardingPage = () => {
+  const toWorkspace = useWorkspacePath();
   useDocumentTitle('Set up your blog');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -172,8 +174,8 @@ export const OnboardingPage = () => {
   }, [onboardingQuery.data]);
 
   useEffect(() => {
-    if (activeBlog && !requiresOnboarding) navigate('/admin/dashboard', { replace: true });
-  }, [activeBlog, navigate, requiresOnboarding]);
+    if (activeBlog && !requiresOnboarding) navigate(toWorkspace('/dashboard'), { replace: true });
+  }, [activeBlog, navigate, requiresOnboarding, toWorkspace]);
 
   const syncAfterSave = async () => {
     await Promise.all([
@@ -312,7 +314,7 @@ export const OnboardingPage = () => {
             Your workspace is fully unlocked. Start publishing, invite your team, and grow your audience.
           </p>
           <button
-            onClick={() => navigate('/admin/dashboard', { replace: true })}
+            onClick={() => navigate(toWorkspace('/dashboard'), { replace: true })}
             className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white hover:bg-primary-hover transition-all shadow-md shadow-primary/20 cursor-pointer"
           >
             Go to dashboard <ArrowRight size={16} />

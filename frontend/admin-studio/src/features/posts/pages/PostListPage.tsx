@@ -11,6 +11,7 @@ import { Modal } from '../../../shared/components/Modal';
 import { type Post } from '../../../shared/types';
 import { formatLocalDate, formatScheduled, formatShortDate } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 type FilterTab = 'all' | 'published' | 'scheduled' | 'draft';
@@ -107,6 +108,7 @@ const StatusBadge = ({
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const PostList = () => {
+  const toWorkspace = useWorkspacePath();
   useDocumentTitle('Posts');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -280,7 +282,7 @@ export const PostList = () => {
             />
           </div>
           <button
-            onClick={() => navigate('/admin/posts/new')}
+            onClick={() => navigate(toWorkspace('/posts/new'))}
             className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 active:scale-95 transition-all"
           >
             <Plus size={16} /> New post
@@ -306,7 +308,7 @@ export const PostList = () => {
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1 min-w-0">
                 <button
-                  onClick={() => navigate(`/admin/posts/view/${post.id}`)}
+                  onClick={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
                   className="min-w-0 text-left font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-2"
                 >
                   {post.title}
@@ -318,7 +320,7 @@ export const PostList = () => {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => navigate(`/admin/posts/edit/${post.id}`)} className="admin-icon-btn admin-icon-btn-edit"><Edit size={16} /></button>
+                <button onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))} className="admin-icon-btn admin-icon-btn-edit"><Edit size={16} /></button>
                 <button onClick={() => setDeleteId(post.id)} className="admin-icon-btn admin-icon-btn-delete"><Trash2 size={16} /></button>
               </div>
             </div>
@@ -364,7 +366,7 @@ export const PostList = () => {
               <p className="mt-1 text-sm text-zinc-500">{searchTerm ? 'Try adjusting your search.' : 'Get started by writing your first post.'}</p>
             </div>
             {!searchTerm && (
-              <button onClick={() => navigate('/admin/posts/new')} className="mt-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
+              <button onClick={() => navigate(toWorkspace('/posts/new'))} className="mt-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
                 Write new post
               </button>
             )}
@@ -396,7 +398,7 @@ export const PostList = () => {
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => navigate(`/admin/posts/view/${post.id}`)}
+                              onClick={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
                               className="text-left text-base font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-1"
                             >
                               {post.title}
@@ -463,7 +465,7 @@ export const PostList = () => {
                       <td className="p-4 text-right align-top">
                         <div className="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                           <button
-                            onClick={() => navigate(`/admin/posts/edit/${post.id}`)}
+                            onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
                             aria-label={`Edit ${post.title}`}
                           >
@@ -497,7 +499,7 @@ export const PostList = () => {
                 </p>
               </div>
               {!searchTerm && (
-                <button onClick={() => navigate('/admin/posts/new')} className="mt-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700">
+                <button onClick={() => navigate(toWorkspace('/posts/new'))} className="mt-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700">
                   Write new post
                 </button>
               )}

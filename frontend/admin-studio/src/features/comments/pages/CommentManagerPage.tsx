@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
@@ -27,6 +28,7 @@ interface Comment {
 }
 
 export const CommentManager = () => {
+  const toWorkspace = useWorkspacePath();
   useDocumentTitle('Comments');
   const { activeMembership } = useBlog();
   const queryClient = useQueryClient();
@@ -143,7 +145,7 @@ export const CommentManager = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/admin/posts/view/${postComments[0].post.id}`);
+                    navigate(toWorkspace(`/posts/view/${postComments[0].post.id}`));
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-violet-600 hover:shadow-sm dark:hover:bg-zinc-800 dark:hover:text-violet-400"
                   title="View post"

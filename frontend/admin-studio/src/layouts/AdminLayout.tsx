@@ -18,6 +18,8 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useBlog } from "../app/providers/BlogProvider";
+import { useWorkspacePath } from "../app/providers/useWorkspacePath";
+import { getStoredDarkMode, storeDarkMode } from "../shared/lib/theme";
 import { useAuth } from "../features/auth/context/AuthContext";
 import {
     isSuperAdmin
@@ -55,6 +57,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const toWorkspace = useWorkspacePath();
   const userDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -128,7 +131,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
               </Link>
               {showSettingsLink && (
                 <Link
-                  to="/admin/settings/general"
+                  to={toWorkspace("/settings/general")}
                   className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
                   onClick={() => setShowUserDropdown(false)}
                 >
@@ -159,7 +162,8 @@ const UserMenu: React.FC<UserMenuProps> = ({
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { blogs, activeBlog, activeRole, requiresOnboarding, setActiveBlogId } = useBlog();
+  const { blogs, activeBlog, activeRole, requiresOnboarding, routeSlug, switchWorkspace } = useBlog();
+  const toWorkspace = useWorkspacePath();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -175,12 +179,7 @@ export const AdminLayout: React.FC = () => {
   const userIsSuperAdmin = isSuperAdmin(user);
 
   // Sync state with HTML class list for theme customization
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem("darkMode");
-    return saved !== null
-      ? saved === "true"
-      : window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-  });
+  const [darkMode, setDarkMode] = useState<boolean>(getStoredDarkMode);
 
   useEffect(() => {
     if (darkMode) {
@@ -193,7 +192,7 @@ export const AdminLayout: React.FC = () => {
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
-    localStorage.setItem("darkMode", String(newMode));
+    storeDarkMode(newMode);
   };
 
 useEffect(() => {
@@ -201,12 +200,13 @@ useEffect(() => {
     navigate("/admin/force-password-change", { replace: true });
     return;
   }
+  // Onboarding lives outside this layout, so being here means it isn't open.
   const needsGate =
-    (requiresOnboarding || !user?.email_verified) && !userIsSuperAdmin;
-  if (needsGate && location.pathname !== "/admin/onboarding") {
-    navigate("/admin/onboarding", { replace: true });
+    (requiresOnboarding || !user?.email_verified) && !userIsSuperAdmin && !!activeBlog;
+  if (needsGate) {
+    navigate(toWorkspace("/onboarding"), { replace: true });
   }
-}, [requiresOnboarding, user, location.pathname, navigate, userIsSuperAdmin]);
+}, [requiresOnboarding, user, activeBlog, location.pathname, navigate, userIsSuperAdmin, toWorkspace]);
 
   // Close menus on page navigation changes
   useEffect(() => {
@@ -278,12 +278,20 @@ useEffect(() => {
         ? user.platform_role.charAt(0).toUpperCase() + user.platform_role.slice(1).toLowerCase()
         : "User";
 
-  const getPageTitle = () => {
-    if (location.pathname === "/admin/users") return "Team";
-    if (location.pathname === "/admin/platform-users") return "Users";
-    if (location.pathname === "/admin/platform-settings") return "Platform Settings";
+  // Titles and breadcrumbs read the path as if the workspace weren't in it:
+  // /admin/w/acme/posts/new → /admin/posts/new.
+  const sectionPath = routeSlug
+    ? location.pathname.replace(`/admin/w/${routeSlug}`, "/admin")
+    : location.pathname;
+  const sectionHref = (path: string) =>
+    routeSlug ? toWorkspace(path.replace(/^\/admin/, "")) : path;
 
-    const pathSegments = location.pathname.split("/").filter(Boolean);
+  const getPageTitle = () => {
+    if (sectionPath === "/admin/users") return "Team";
+    if (sectionPath === "/admin/platform-users") return "Users";
+    if (sectionPath === "/admin/platform-settings") return "Platform Settings";
+
+    const pathSegments = sectionPath.split("/").filter(Boolean);
     const titleSegments = pathSegments.filter((segment) =>
       isNaN(Number(segment)),
     );
@@ -333,21 +341,20 @@ useEffect(() => {
     profile: "Profile",
   };
 
-  const pathSegments = location.pathname.split("/").filter(Boolean);
+  const pathSegments = sectionPath.split("/").filter(Boolean);
   const adminSegments = pathSegments.slice(1).filter((segment) => isNaN(Number(segment)));
   const rootLabel = "Dashboard";
   const sectionKey = adminSegments[0];
   const sectionLabel = sectionKey ? routeLabels[sectionKey] ?? pageTitle : rootLabel;
   const pageBreadcrumbs: { label: string; href: string }[] = [
-    { label: rootLabel, href: "/admin/dashboard" },
+    { label: rootLabel, href: userIsSuperAdmin ? "/admin/superadmin" : toWorkspace() },
   ];
   const isDashboardRoot =
-    location.pathname === "/admin/dashboard" ||
-    location.pathname === "/admin/superadmin";
+    sectionPath === "/admin/dashboard" ||
+    sectionPath === "/admin/superadmin";
   const showOnboardingLock =
     (requiresOnboarding || !user?.email_verified) &&
-    !userIsSuperAdmin &&
-    location.pathname !== "/admin/onboarding";
+    !userIsSuperAdmin;
   const onboardingStepOrder = ["about", "profile", "publication", "team", "plan"];
   const onboardingStepsTotal = 5;
   const onboardingCompleted =
@@ -356,7 +363,7 @@ useEffect(() => {
       : Math.max(0, onboardingStepOrder.indexOf(activeBlog?.onboarding_step ?? "about"));
 
   if (!isDashboardRoot && sectionLabel && sectionLabel !== rootLabel) {
-    pageBreadcrumbs.push({ label: sectionLabel, href: `/admin/${sectionKey}` });
+    pageBreadcrumbs.push({ label: sectionLabel, href: sectionHref(`/admin/${sectionKey}`) });
   }
 
   if (!isDashboardRoot && pageTitle !== sectionLabel && pageTitle !== rootLabel) {
@@ -442,7 +449,7 @@ useEffect(() => {
                       <button
                         key={blog.id}
                         onClick={() => { 
-                          setActiveBlogId(blog.id); 
+                          switchWorkspace(blog.slug);
                           setShowMobileWorkspaceMenu(false); 
                         }}
                         className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors active:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -566,7 +573,7 @@ useEffect(() => {
                   </div>
                 </div>
                 <Link
-                  to="/admin/onboarding"
+                  to={toWorkspace("/onboarding")}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-950 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
                 >
                   <CheckCircle2 size={16} />
@@ -639,7 +646,7 @@ useEffect(() => {
                     interactive.
                   </p>
                   <Link
-                    to="/admin/onboarding"
+                    to={toWorkspace("/onboarding")}
                     className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
                   >
                     <Rocket size={16} />

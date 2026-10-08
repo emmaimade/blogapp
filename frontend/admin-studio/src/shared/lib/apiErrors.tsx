@@ -1,6 +1,15 @@
 import toast from 'react-hot-toast';
+import { slugFromLocation, workspacePath } from './workspacePaths';
 
-export const BILLING_PATH = '/admin/settings/billing';
+/**
+ * The billing page of the workspace in the current URL. Read at call time
+ * since toasts render outside the router; off a workspace page the legacy
+ * path redirects to the last-used workspace.
+ */
+export const billingPath = () => {
+  const slug = slugFromLocation();
+  return slug ? workspacePath(slug, '/settings/billing') : '/admin/settings/billing';
+};
 
 /** The backend's error envelope, as axios exposes it. */
 type ApiErrorLike = { response?: { data?: { code?: string; detail?: string } } } | null | undefined;
@@ -30,7 +39,7 @@ export const toastApiError = (error: unknown, fallback: string): void => {
     () => (
       <span className="text-sm">
         {message}{' '}
-        <a href={BILLING_PATH} className="font-semibold text-violet-600 underline underline-offset-2 dark:text-violet-400">
+        <a href={billingPath()} className="font-semibold text-violet-600 underline underline-offset-2 dark:text-violet-400">
           See plans
         </a>
       </span>

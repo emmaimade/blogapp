@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useBlog } from '../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../app/providers/useWorkspacePath';
 import { InkoLogo } from '../../assets/inko';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { isSuperAdmin } from '../../features/auth/lib/accessControl';
@@ -20,7 +21,8 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: SidebarProps) => {
   const { user } = useAuth();
-  const { blogs, activeBlog, activeRole, setActiveBlogId } = useBlog();
+  const { blogs, activeBlog, activeRole, switchWorkspace } = useBlog();
+  const toWorkspace = useWorkspacePath();
   const location = useLocation();
   const [showSupportModal, setShowSupportModal] = useState(false);
   
@@ -74,8 +76,8 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
   }, [showWorkspaceMenu]);
 
   const isActive = (path: string) => {
-    if (path.startsWith('/admin/settings')) {
-      return location.pathname.startsWith('/admin/settings');
+    if (path.endsWith('/settings')) {
+      return location.pathname.startsWith(path);
     }
     return location.pathname === path;
   };
@@ -186,7 +188,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
           className={`hidden lg:flex shrink-0 items-center px-3 pt-6 transition-all duration-300 ${isExpanded ? "mb-6" : "mb-4 justify-center"}`}
         >
           <Link
-            to={userIsSuperAdmin ? "/admin/superadmin" : "/admin/dashboard"}
+            to={userIsSuperAdmin ? "/admin/superadmin" : toWorkspace()}
             className={`flex items-center gap-3 ${!isExpanded && "justify-center w-10"}`}
           >
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center">
@@ -253,7 +255,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                     <button
                       key={blog.id}
                       onClick={() => {
-                        setActiveBlogId(blog.id);
+                        switchWorkspace(blog.slug);
                         setShowWorkspaceMenu(false);
                       }}
                       className="flex w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -357,7 +359,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                 )}
                 <div className="space-y-1">
                   <NavLink
-                    to="/admin/dashboard"
+                    to={toWorkspace("/dashboard")}
                     icon={LayoutDashboard}
                     label="Dashboard"
                   />
@@ -368,12 +370,12 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   <div className={sectionHeaderClass}>Content</div>
                 )}
                 <div className="space-y-1">
-                  <NavLink to="/admin/posts" icon={FileText} label="Posts" />
+                  <NavLink to={toWorkspace("/posts")} icon={FileText} label="Posts" />
                   {(activeRole === "owner" || activeRole === "editor") && (
                     <>
-                      <NavLink to="/admin/tags" icon={Tag} label="Tags" />
+                      <NavLink to={toWorkspace("/tags")} icon={Tag} label="Tags" />
                       <NavLink
-                        to="/admin/comments"
+                        to={toWorkspace("/comments")}
                         icon={MessageSquare}
                         label="Comments"
                       />
@@ -388,16 +390,16 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                   )}
                   <div className="space-y-1">
                     {activeRole === "owner" && (
-                      <NavLink to="/admin/users" icon={Users} label="Team" />
+                      <NavLink to={toWorkspace("/users")} icon={Users} label="Team" />
                     )}
                     <NavLink
-                      to="/admin/activity"
+                      to={toWorkspace("/activity")}
                       icon={ScrollText}
                       label="Activity Log"
                     />
                     {activeRole === "owner" && (
                       <NavLink
-                        to="/admin/settings"
+                        to={toWorkspace("/settings")}
                         icon={Settings}
                         label="Settings"
                       />

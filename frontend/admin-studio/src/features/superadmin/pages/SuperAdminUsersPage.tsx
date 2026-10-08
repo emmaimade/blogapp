@@ -343,7 +343,7 @@ export const SuperAdminUsersPage = () => {
                             {openMenuKey === targetMobileKey && (
                               <div className="absolute right-0 mt-1 w-44 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-xs text-left animate-in fade-in slide-in-from-top-1 duration-100">
                                 <Link
-                                  to={isSelf ? "/admin/profile" : `/admin/users/${accountRow.id}`}
+                                  to={isSelf ? "/admin/profile" : `/admin/platform-users/${accountRow.id}`}
                                   onClick={() => setOpenMenuKey(null)}
                                   className="flex w-full items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 font-medium text-zinc-700 dark:text-zinc-100"
                                 >
@@ -563,7 +563,7 @@ export const SuperAdminUsersPage = () => {
                                 {openMenuKey === currentUniqueRowKey && (
                                   <div className="absolute right-0 mt-1 w-48 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-sm text-left animate-in fade-in slide-in-from-top-1 duration-100">
                                     <Link
-                                      to={isSelf ? "/admin/profile" : `/admin/users/${accountRow.id}`}
+                                      to={isSelf ? "/admin/profile" : `/admin/platform-users/${accountRow.id}`}
                                       onClick={() => setOpenMenuKey(null)}
                                       className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 font-medium text-zinc-700 dark:text-zinc-100"
                                     >

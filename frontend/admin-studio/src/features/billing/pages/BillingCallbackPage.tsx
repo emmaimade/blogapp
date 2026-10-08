@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import api from '../../../shared/api/client';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { BILLING_PATH, apiErrorMessage } from '../../../shared/lib/apiErrors';
+import { billingPath, apiErrorMessage } from '../../../shared/lib/apiErrors';
 import { formatLocalDate } from '../../../shared/utils/dates';
 import { planName } from '../../../shared/lib/plans';
 import { billingQueryKey, type BillingOverview } from '../hooks/useBilling';
@@ -83,7 +83,7 @@ export const BillingCallbackPage = () => {
 
       {(failed || data) && (
         <Link
-          to={BILLING_PATH}
+          to={billingPath()}
           className="mt-6 inline-flex items-center justify-center rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
         >
           Back to billing

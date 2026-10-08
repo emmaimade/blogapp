@@ -6,6 +6,7 @@ import api from '../../../shared/api/client';
 import { type Post, type Tag } from '../../../shared/types';
 import { formatLocalDate } from '../../../shared/utils/dates';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useAuth } from '../../auth/context/AuthContext';
 import { canAccess } from '../../auth/lib/accessControl';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -43,6 +44,7 @@ const SectionSkeleton = () => (
 );
 
 export const SearchResultsPage = () => {
+  const toWorkspace = useWorkspacePath();
   const navigate = useNavigate();
   const { activeBlog, activeMembership } = useBlog();
   const { user } = useAuth();
@@ -137,7 +139,7 @@ export const SearchResultsPage = () => {
             {postsQuery.data!.map((post) => (
               <button
                 key={post.id}
-                onClick={() => navigate(`/admin/posts/view/${post.id}`)}
+                onClick={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
                 className="flex w-full flex-col gap-1.5 p-4 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
               >
                 <div className="flex items-center gap-2">
@@ -173,7 +175,7 @@ export const SearchResultsPage = () => {
             {commentResults.map((comment) => (
               <button
                 key={comment.id}
-                onClick={() => navigate(`/admin/posts/view/${comment.post.id}`)}
+                onClick={() => navigate(toWorkspace(`/posts/view/${comment.post.id}`))}
                 className="flex w-full flex-col gap-1.5 p-4 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
               >
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
@@ -201,7 +203,7 @@ export const SearchResultsPage = () => {
             {tagResults.map((tag) => (
               <button
                 key={tag.id}
-                onClick={() => navigate('/admin/tags')}
+                onClick={() => navigate(toWorkspace('/tags'))}
                 className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-violet-100 hover:text-violet-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-violet-900/40 dark:hover:text-violet-300"
               >
                 <Hash size={12} /> {tag.name}

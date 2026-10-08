@@ -8,6 +8,7 @@ import { Avatar, RoleBadge, RoleDropdown, MemberActionsMenu } from "../component
 import { Modal } from "../../../shared/components/Modal";
 import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from "../../../shared/ui/Skeleton";
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
 const UserManagerSkeleton = () => (
   <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6">
@@ -45,6 +46,7 @@ const UserManagerSkeleton = () => (
 );
 
 export const UserManager = () => {
+  const toWorkspace = useWorkspacePath();
   useDocumentTitle('Users');
   const {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
@@ -157,7 +159,7 @@ export const UserManager = () => {
                       )}
 
                       <MemberActionsMenu
-                        profileHref={`/admin/users/${member.user.id}`}
+                        profileHref={toWorkspace(`/users/${member.user.id}`)}
                         canRemove={canRemove}
                         onRemoveClick={() =>
                           setModalConfig({
@@ -217,7 +219,7 @@ export const UserManager = () => {
                             <Avatar firstName={member.user.first_name} lastName={member.user.last_name} />
                             <div className="flex flex-col min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <Link to={`/admin/users/${member.user.id}`} className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 hover:underline hover:text-zinc-600 dark:hover:text-zinc-300 block truncate">
+                                <Link to={toWorkspace(`/users/${member.user.id}`)} className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 hover:underline hover:text-zinc-600 dark:hover:text-zinc-300 block truncate">
                                   {member.user.first_name} {member.user.last_name}
                                 </Link>
                                 {isCurrentUser && <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 tracking-wider select-none">you</span>}
@@ -255,7 +257,7 @@ export const UserManager = () => {
                         <td className="px-6 py-4 text-right whitespace-nowrap relative z-10">
                           <div className="inline-block text-left">
                             <MemberActionsMenu
-                              profileHref={`/admin/users/${member.user.id}`}
+                              profileHref={toWorkspace(`/users/${member.user.id}`)}
                               canRemove={canRemove}
                               direction={isFirstRow ? "down" : "up"}
                               onRemoveClick={() =>

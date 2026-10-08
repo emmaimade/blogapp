@@ -1,5 +1,6 @@
 import type { AuthUser } from '../types';
 import type { BlogMembership } from '../../../app/providers/BlogProvider';
+import { pickLandingMembership, workspacePath } from '../../../shared/lib/workspacePaths';
 
 export type AdminCapability =
   | 'access_admin_studio'
@@ -126,12 +127,17 @@ export const getPostLoginPath = (user: AuthUser): string => {
     return '/admin/superadmin';
   }
 
-  const requiresOnboarding = user.blog_memberships?.some(
+  const memberships = user.blog_memberships ?? [];
+  // A workspace the user owns but hasn't finished setting up comes first.
+  const needsSetup = memberships.find(
     (membership) =>
       membership.blog.is_active &&
       membership.role === 'owner' &&
       membership.blog.onboarding_status !== 'completed',
   );
+  if (needsSetup) return workspacePath(needsSetup.blog.slug, '/onboarding');
 
-  return requiresOnboarding ? '/admin/onboarding' : '/admin/dashboard';
+  const landing = pickLandingMembership(memberships);
+  // No workspace at all: /admin explains that state.
+  return landing ? workspacePath(landing.blog.slug) : '/admin';
 };

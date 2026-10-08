@@ -10,6 +10,7 @@ import {
 import 'highlight.js/styles/atom-one-dark.css';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { type Post } from '../../../shared/types';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -85,6 +86,7 @@ const markdownComponents: Components = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const PostView = () => {
+  const toWorkspace = useWorkspacePath();
   const { id } = useParams();
   const navigate = useNavigate();
   const { activeBlog } = useBlog();
@@ -131,7 +133,7 @@ export const PostView = () => {
         <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Post not found</h2>
         <p className="text-sm text-zinc-500">This post may have been deleted or you don't have access.</p>
         <button
-          onClick={() => navigate('/admin/posts')}
+          onClick={() => navigate(toWorkspace('/posts'))}
           className="mt-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover transition-all"
         >
           Back to posts
@@ -148,13 +150,13 @@ export const PostView = () => {
       {/* ─── Top bar ─── */}
       <div className="mb-8 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
         <button
-          onClick={() => navigate('/admin/posts')}
+          onClick={() => navigate(toWorkspace('/posts'))}
           className="flex items-center gap-2 text-zinc-500 transition hover:text-primary dark:text-zinc-400 dark:hover:text-violet-400"
         >
           <ArrowLeft size={18} /> Back to posts
         </button>
         <button
-          onClick={() => navigate(`/admin/posts/edit/${post.id}`)}
+          onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))}
           className="flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
         >
           <Edit size={16} /> Edit post
@@ -266,7 +268,7 @@ export const PostView = () => {
           )}
         </div>
         <button
-          onClick={() => navigate(`/admin/posts/edit/${post.id}`)}
+          onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))}
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-hover transition-all"
         >
           <Edit size={13} /> Edit this post

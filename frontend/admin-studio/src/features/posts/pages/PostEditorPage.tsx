@@ -15,8 +15,10 @@ import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 import 'easymde/dist/easymde.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
 export const PostEditor: React.FC = () => {
+  const toWorkspace = useWorkspacePath();
   const {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
@@ -44,7 +46,7 @@ export const PostEditor: React.FC = () => {
       {/* Top action bar */}
       <div className="mb-8 flex items-center justify-between gap-4">
         <button
-          onClick={() => navigate("/admin/posts")}
+          onClick={() => navigate(toWorkspace("/posts"))}
           className="inline-flex items-center gap-2 text-zinc-500 transition hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
         >
           <ArrowLeft size={18} /> Back to Library

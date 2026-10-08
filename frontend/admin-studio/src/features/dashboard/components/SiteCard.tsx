@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, CheckCircle2, Copy, ExternalLink, Zap, Lock } from 'lucide-react';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
 interface SiteCardProps {
   subdomain: string;
@@ -10,6 +11,7 @@ interface SiteCardProps {
 }
 
 export const SiteCard = ({ subdomain, customDomain, plan, canManageSettings }: SiteCardProps) => {
+  const toWorkspace = useWorkspacePath();
   const [copied, setCopied] = useState(false);
   const isPro = plan === 'pro' || plan === 'team';
   const BLOG_BASE_URL = import.meta.env.VITE_BLOG_URL || 'http://localhost:5174';
@@ -62,7 +64,7 @@ export const SiteCard = ({ subdomain, customDomain, plan, canManageSettings }: S
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{isPro ? 'Replace your .inko.blog address with your own domain.' : 'Upgrade to use your own domain like blog.yoursite.com.'}</p>
             </div>
             {canManageSettings && (
-              <Link to="/admin/settings/general" className="flex-shrink-0 text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline whitespace-nowrap">
+              <Link to={toWorkspace("/settings/general")} className="flex-shrink-0 text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline whitespace-nowrap">
                 {isPro ? 'Set up →' : 'Upgrade →'}
               </Link>
             )}
@@ -72,7 +74,7 @@ export const SiteCard = ({ subdomain, customDomain, plan, canManageSettings }: S
         {customDomain && (
           <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <CheckCircle2 size={13} className="text-green-500" /> Custom domain active
-            {canManageSettings && <Link to="/admin/settings/general" className="ml-auto text-violet-600 dark:text-violet-400 font-semibold hover:underline">Manage →</Link>}
+            {canManageSettings && <Link to={toWorkspace("/settings/general")} className="ml-auto text-violet-600 dark:text-violet-400 font-semibold hover:underline">Manage →</Link>}
           </div>
         )}
       </div>

@@ -34,7 +34,7 @@ export const ComingSoon: React.FC = () => {
 
       <div className="flex flex-col sm:flex-row gap-4">
         <Link
-          to={location.pathname.includes('superadmin') ? '/admin/superadmin' : '/admin/dashboard'}
+          to={location.pathname.includes('superadmin') ? '/admin/superadmin' : '/admin'}
           className="back-to-dashboard-btn flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3.5 text-sm font-semibold text-white hover:bg-primary-hover dark:bg-white dark:hover:bg-zinc-100 transition"
         >
           <ArrowLeft size={18} />

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { toastApiError } from '../../../shared/lib/apiErrors';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 
@@ -21,6 +22,7 @@ export interface PostForm {
 }
 
 export const usePostEditor = () => {
+  const toWorkspace = useWorkspacePath();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -172,7 +174,7 @@ export const usePostEditor = () => {
         ? (isEditMode ? 'Changes published!' : 'Post published!')
         : 'Draft saved!';
       toast.success(msg);
-      navigate('/admin/posts');
+      navigate(toWorkspace('/posts'));
     },
     onError: (error: any) => toastApiError(error, 'Failed to save post'),
   });

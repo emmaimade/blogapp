@@ -9,8 +9,10 @@ import { useDashboard } from '../hooks/useDashboard';
 import { StatCard, PublishProgress, QuickAction, DashboardSkeleton } from '../components/DashboardComponents';
 import { SiteCard } from '../components/SiteCard';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
 export const Dashboard = () => {
+  const toWorkspace = useWorkspacePath();
   useDocumentTitle('Dashboard');
   const {
     user, activeBlog, permissions, data, isLoading, error, refetch, subscription, greeting, today, isOwner
@@ -49,7 +51,7 @@ export const Dashboard = () => {
           </span>
           {permissions.canManagePosts && (
             <Link
-              to="/admin/posts/new"
+              to={toWorkspace("/posts/new")}
               className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-violet-700 active:scale-95"
             >
               <Plus size={16} /> New post
@@ -145,7 +147,7 @@ export const Dashboard = () => {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {permissions.canManagePosts && (
                   <QuickAction
-                    to="/admin/posts/new"
+                    to={toWorkspace("/posts/new")}
                     icon={<Feather size={18} />}
                     label="Write new post"
                     desc="Start from blank slate"
@@ -154,7 +156,7 @@ export const Dashboard = () => {
                 )}
                 {permissions.canManagePosts && (
                   <QuickAction
-                    to="/admin/posts"
+                    to={toWorkspace("/posts")}
                     icon={<Edit3 size={18} />}
                     label="Manage posts"
                     desc="Edit and publish content"
@@ -162,7 +164,7 @@ export const Dashboard = () => {
                 )}
                 {permissions.canManageTags && (
                   <QuickAction
-                    to="/admin/tags"
+                    to={toWorkspace("/tags")}
                     icon={<Tag size={18} />}
                     label="Manage tags"
                     desc={`${data.tags} tags in workspace`}
@@ -170,7 +172,7 @@ export const Dashboard = () => {
                 )}
                 {permissions.canManageComments && (
                   <QuickAction
-                    to="/admin/comments"
+                    to={toWorkspace("/comments")}
                     icon={<MessageSquare size={18} />}
                     label="Moderate comments"
                     desc={`${data.comments} total comments`}
@@ -178,7 +180,7 @@ export const Dashboard = () => {
                 )}
                 {permissions.canManageUsers && (
                   <QuickAction
-                    to="/admin/users"
+                    to={toWorkspace("/users")}
                     icon={<Users size={18} />}
                     label="Team"
                     desc={`${data.team_members} member${data.team_members !== 1 ? "s" : ""}`}
@@ -186,7 +188,7 @@ export const Dashboard = () => {
                 )}
                 {permissions.canManageSettings && (
                   <QuickAction
-                    to="/admin/settings/general"
+                    to={toWorkspace("/settings/general")}
                     icon={<Settings size={18} />}
                     label="Settings"
                     desc="Configure your workspace"
@@ -204,7 +206,7 @@ export const Dashboard = () => {
               </h3>
               {permissions.canManagePosts && (
                 <Link
-                  to="/admin/posts"
+                  to={toWorkspace("/posts")}
                   className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400"
                 >
                   View all <ArrowUpRight size={12} />
@@ -255,7 +257,7 @@ export const Dashboard = () => {
                 </p>
                 {permissions.canManagePosts && (
                   <Link
-                    to="/admin/posts/new"
+                    to={toWorkspace("/posts/new")}
                     className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-400"
                   >
                     Write your first post →

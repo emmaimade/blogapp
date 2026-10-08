@@ -1,7 +1,5 @@
 import { Navigate, Route, createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { ProtectedRoute } from '../../features/auth/components/ProtectedRoute';
-import { useAuth } from '../../features/auth/context/AuthContext';
-import { getPostLoginPath } from '../../features/auth/lib/accessControl';
 import { LoginView } from '../../features/auth/pages/LoginPage';
 import { SignupPage } from '../../features/auth/pages/SignupPage';
 import { ForgotPasswordPage } from '../../features/auth/pages/ForgotPasswordPage';
@@ -42,17 +40,30 @@ import { SuperAdminSupportPage } from '../../features/superadmin/pages/SuperAdmi
 import { SuperAdminBlogDetailPage } from '../../features/superadmin/pages/SuperAdminBlogDetailPage';
 import { JoinInvitationPage } from '../../features/users/pages/JoinInvitationPage';
 import { SearchResultsPage } from '../../features/search/pages/SearchResultsPage';
+import { BlogProviderOutlet } from '../providers/BlogProvider';
+import {
+  DefaultAdminRedirect,
+  LegacyWorkspaceRedirect,
+  WorkspaceRoute,
+} from '../../features/workspaces/routes/WorkspaceRoutes';
 
-const DefaultAdminRedirect = () => {
-  const { user } = useAuth();
-  if (!user) return null;
-  return <Navigate to={getPostLoginPath(user)} replace />;
-};
+// Paths that lived directly under /admin before the workspace moved into the
+// URL. They now redirect into /admin/w/:workspaceSlug (see LegacyWorkspaceRedirect).
+const LEGACY_WORKSPACE_PATHS = [
+  '/admin/onboarding',
+  '/admin/dashboard',
+  '/admin/users/*',
+  '/admin/posts/*',
+  '/admin/tags',
+  '/admin/comments',
+  '/admin/activity',
+  '/admin/settings/*',
+];
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <>
-    {/* ── Public routes ── */}
+    <Route element={<BlogProviderOutlet />}>
+      {/* ── Public routes ── */}
       <Route path="/admin/login" element={<LoginView />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route element={<AuthLayout />}>
@@ -65,28 +76,94 @@ const router = createBrowserRouter(
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/join/:token" element={<JoinInvitationPage />} />
 
+      {/* Signed in is enough here: each route explains a missing or unknown
+          workspace itself instead of showing "access denied". */}
+      <Route element={<ProtectedRoute requiredCapability={null} />}>
+        <Route path="/admin" element={<DefaultAdminRedirect />} />
+        {LEGACY_WORKSPACE_PATHS.map((path) => (
+          <Route key={path} path={path} element={<LegacyWorkspaceRedirect />} />
+        ))}
+
+        {/* ── One workspace: everything here is scoped by the slug ── */}
+        <Route path="/admin/w/:workspaceSlug" element={<WorkspaceRoute />}>
+          <Route path="onboarding" element={<OnboardingPage />} />
+
+          <Route element={<AdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+
+            <Route
+              element={<ProtectedRoute requiredCapability="view_dashboard" />}
+            >
+              <Route path="dashboard" element={<Dashboard />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="manage_users" />}
+            >
+              <Route path="users" element={<UserManager />} />
+              <Route path="users/:id" element={<UserInfoPage />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="manage_posts" />}
+            >
+              <Route path="posts" element={<PostList />} />
+              <Route path="posts/new" element={<PostEditor />} />
+              <Route path="posts/edit/:id" element={<PostEditor />} />
+              <Route path="posts/view/:id" element={<PostView />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="manage_tags" />}
+            >
+              <Route path="tags" element={<TagManager />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="manage_comments" />}
+            >
+              <Route path="comments" element={<CommentManager />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="view_audit_logs" />}
+            >
+              <Route path="activity" element={<ActivityLogPage />} />
+            </Route>
+
+            <Route path="settings" element={<SettingsLayout />}>
+              <Route
+                element={
+                  <ProtectedRoute requiredCapability="manage_settings" />
+                }
+              >
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="about" element={<AboutPageSettings />} />
+                <Route path="footer" element={<FooterSettings />} />
+                <Route path="branding" element={<BrandingSettings />} />
+                <Route path="seo" element={<SEOSettings />} />
+                <Route path="contact" element={<ContactSettings />} />
+                <Route path="billing" element={<BillingPage />} />
+                <Route path="billing/callback" element={<BillingCallbackPage />} />
+              </Route>
+              <Route index element={<Navigate to="general" replace />} />
+            </Route>
+          </Route>
+        </Route>
+
+      </Route>
+
       <Route element={<ProtectedRoute />}>
         <Route
           path="/admin/force-password-change"
           element={<ForcePasswordChangePage />}
         />
-        <Route path="/admin/onboarding" element={<OnboardingPage />} />
 
-        {/* ── All other admin routes — inside AdminLayout ── */}
+        {/* ── Account-level and platform pages: no workspace in the URL ── */}
         <Route element={<AdminLayout />}>
-          <Route path="/admin" element={<DefaultAdminRedirect />} />
-
-          <Route
-            element={<ProtectedRoute requiredCapability="view_dashboard" />}
-          >
-            <Route path="/admin/dashboard" element={<Dashboard />} />
-          </Route>
-
           <Route path="/admin/profile" element={<UserInfoPage />} />
-
           <Route path="/admin/search" element={<SearchResultsPage />} />
-
-          {/* ======================== */}
+          <Route path="/admin/support-tickets" element={<MyTicketsPage />} />
 
           <Route
             element={
@@ -106,6 +183,10 @@ const router = createBrowserRouter(
             <Route
               path="/admin/platform-users"
               element={<SuperAdminUsersPage />}
+            />
+            <Route
+              path="/admin/platform-users/:id"
+              element={<UserInfoPage />}
             />
             <Route
               path="/admin/subscriptions"
@@ -128,70 +209,11 @@ const router = createBrowserRouter(
               element={<SuperAdminSupportPage />}
             />
           </Route>
-
-          <Route
-            element={<ProtectedRoute requiredCapability="manage_users" />}
-          >
-            <Route path="/admin/users" element={<UserManager />} />
-            <Route path="/admin/users/:id" element={<UserInfoPage />} />
-          </Route>
-
-          <Route
-            element={<ProtectedRoute requiredCapability="manage_posts" />}
-          >
-            <Route path="/admin/posts" element={<PostList />} />
-            <Route path="/admin/posts/new" element={<PostEditor />} />
-            <Route path="/admin/posts/edit/:id" element={<PostEditor />} />
-            <Route path="/admin/posts/view/:id" element={<PostView />} />
-          </Route>
-
-          <Route
-            element={<ProtectedRoute requiredCapability="manage_tags" />}
-          >
-            <Route path="/admin/tags" element={<TagManager />} />
-          </Route>
-
-          <Route
-            element={<ProtectedRoute requiredCapability="manage_comments" />}
-          >
-            <Route path="/admin/comments" element={<CommentManager />} />
-          </Route>
-
-          <Route
-            element={<ProtectedRoute requiredCapability="view_audit_logs" />}
-          >
-            <Route path="/admin/activity" element={<ActivityLogPage />} />
-          </Route>
-
-          <Route
-            element={
-              <ProtectedRoute requiredCapability="access_admin_studio" />
-            }
-          >
-            <Route path="/admin/support-tickets" element={<MyTicketsPage />} />
-            <Route path="/admin/settings" element={<SettingsLayout />}>
-              <Route
-                element={
-                  <ProtectedRoute requiredCapability="manage_settings" />
-                }
-              >
-                <Route path="general" element={<GeneralSettings />} />
-                <Route path="about" element={<AboutPageSettings />} />
-                <Route path="footer" element={<FooterSettings />} />
-                <Route path="branding" element={<BrandingSettings />} />
-                <Route path="seo" element={<SEOSettings />} />
-                <Route path="contact" element={<ContactSettings />} />
-                <Route path="billing" element={<BillingPage />} />
-                <Route path="billing/callback" element={<BillingCallbackPage />} />
-              </Route>
-              <Route index element={<Navigate to="general" replace />} />
-            </Route>
-          </Route>
         </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/admin/login" replace />} />
-    </>
+    </Route>
   )
 );
 

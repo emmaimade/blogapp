@@ -6,6 +6,7 @@ import api from "../../../shared/api/client";
 import { useAuth } from "../../auth/context/AuthContext";
 import { RoleBadge } from "../components/UserComponents";
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { workspacePath } from '../../../shared/lib/workspacePaths';
 
 interface InvitationInfo {
   blog_name: string;
@@ -76,7 +77,7 @@ export const JoinInvitationPage = () => {
       // happened. The reload itself (rather than client-side routing) is
       // still needed so auth/blog membership state is freshly fetched
       // everywhere (sidebar, blog switcher, dashboard).
-      setTimeout(() => window.location.assign("/admin/dashboard"), 1400);
+      setTimeout(() => window.location.assign(invite ? workspacePath(invite.blog_slug) : "/admin"), 1400);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to accept invitation.");
       setIsAccepting(false);
@@ -99,7 +100,7 @@ export const JoinInvitationPage = () => {
       });
       login(res.data.user);
       setJustJoined(true);
-      setTimeout(() => window.location.assign("/admin/dashboard"), 1400);
+      setTimeout(() => window.location.assign(invite ? workspacePath(invite.blog_slug) : "/admin"), 1400);
     } catch (err: any) {
       const detail = err.response?.data?.detail || "";
       // These two specific 400s mean the account/membership already exists —
