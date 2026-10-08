@@ -144,14 +144,49 @@ class SubscriptionPlan(str, Enum):
     PRO = "pro"
     TEAM = "team"
 
+
+class BillingInterval(str, Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    TRIALING = "trialing"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    EXPIRED = "expired"
+
+
 class BlogSubscription(SQLModel, table=True):
     __tablename__ = "blog_subscriptions"
     id: Optional[int] = Field(default=None, primary_key=True)
     blog_id: int = Field(foreign_key="blog.id", unique=True, ondelete="CASCADE")
     plan: SubscriptionPlan = Field(default=SubscriptionPlan.FREE)
-    status: str = Field(default="active")
-    stripe_customer_id: Optional[str] = None
-    stripe_subscription_id: Optional[str] = None
+    # Stored as plain strings (values of SubscriptionStatus / BillingInterval)
+    # so new states don't need a Postgres enum migration.
+    status: str = Field(default=SubscriptionStatus.ACTIVE.value)
+    billing_interval: Optional[str] = None
+    paystack_customer_code: Optional[str] = None
+    paystack_subscription_code: Optional[str] = None
+    # Paystack needs this alongside the subscription code to disable a
+    # subscription; it only arrives on the subscription.create event.
+    paystack_email_token: Optional[str] = None
+    last_payment_reference: Optional[str] = None
+    # The card Paystack can charge again without the owner present, and the
+    # email it belongs to — needed for prorated upgrades and for creating the
+    # replacement subscription on a plan change.
+    paystack_authorization_code: Optional[str] = None
+    paystack_customer_email: Optional[str] = None
+    # A downgrade waits for the end of the paid period: the plan stays as it
+    # is until pending_change_at, then becomes pending_plan.
+    pending_plan: Optional[str] = None
+    pending_interval: Optional[str] = None
+    pending_change_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    # When the current paid period began — the basis for prorating an upgrade.
+    current_period_started_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    # One trial per workspace — stays true after the trial ends.
+    trial_used: bool = Field(default=False)
     trial_ends_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     current_period_ends_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
     cancelled_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
@@ -163,6 +198,44 @@ class BlogSubscription(SQLModel, table=True):
         default_factory=utcnow,
         sa_column=Column(SQLDateTime(timezone=True), nullable=False, onupdate=utcnow),
     )
+
+
+class PaymentTransaction(SQLModel, table=True):
+    """One Paystack charge against a workspace — the billing history."""
+    __tablename__ = "payment_transactions"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    blog_id: int = Field(foreign_key="blog.id", index=True, ondelete="CASCADE")
+    reference: str = Field(unique=True, index=True)
+    # Paystack amounts are in the currency's subunit (kobo for NGN).
+    amount_kobo: int
+    currency: str = Field(default="NGN")
+    plan: str
+    billing_interval: Optional[str] = None
+    status: str
+    paid_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))
+    created_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False),
+    )
+
+
+class PaymentEvent(SQLModel, table=True):
+    """
+    Every Paystack webhook we've acted on. Paystack retries deliveries, so
+    `event_key` (event type + the payload's own identifier) being unique is
+    what stops one payment from being applied twice.
+    """
+    __tablename__ = "payment_events"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_key: str = Field(unique=True, index=True)
+    event_type: str = Field(index=True)
+    blog_id: Optional[int] = Field(default=None, index=True, foreign_key="blog.id", ondelete="SET NULL")
+    payload: str
+    processed_at: datetime = Field(
+        default_factory=utcnow,
+        sa_column=Column(SQLDateTime(timezone=True), nullable=False),
+    )
+
 
 class BlogInvitation(SQLModel, table=True):
     __tablename__ = "blog_invitations"

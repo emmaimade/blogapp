@@ -76,6 +76,20 @@ class Settings(BaseSettings):
     # tenant-owned custom domain.
     PUBLIC_BLOG_BASE_DOMAIN: str = "inko.blog"
 
+    # ── Billing (Paystack) ──
+    # All optional so the app boots without them; billing endpoints refuse
+    # to run until the secret key and plan codes are set. Plan codes come
+    # from the plans created in the Paystack dashboard (PLN_...).
+    PAYSTACK_SECRET_KEY: Optional[str] = None
+    PAYSTACK_PUBLIC_KEY: Optional[str] = None
+    PAYSTACK_PLAN_PRO_MONTHLY: Optional[str] = None
+    PAYSTACK_PLAN_PRO_YEARLY: Optional[str] = None
+    PAYSTACK_PLAN_TEAM_MONTHLY: Optional[str] = None
+    PAYSTACK_PLAN_TEAM_YEARLY: Optional[str] = None
+    TRIAL_DAYS: int = Field(14, ge=0)
+    # How long a failed renewal keeps paid features before dropping to Free.
+    PAST_DUE_GRACE_DAYS: int = Field(3, ge=0)
+
     # ── Observability ──
     LOG_LEVEL: str = "INFO"
     # SQLAlchemy statement echo. Off by default: it writes every statement and
