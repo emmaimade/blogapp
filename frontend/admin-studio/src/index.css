@@ -140,8 +140,9 @@ h1, h2, h3, h4, h5, h6 {
 
 
 
-/* White text should stay white */
-.dark .text-white { color: #ffffff !important; }
+/* White text should stay white — except where the element picks its own
+   dark-mode text colour (e.g. a button that turns white with dark:text-zinc-900). */
+.dark .text-white:not([class*="dark:text-"]) { color: #ffffff !important; }
 
 /* Background overrides */
 .dark .bg-white { background-color: var(--admin-panel-solid) !important; }
