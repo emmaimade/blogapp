@@ -1,14 +1,16 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, or_
 
+from app.core.datetimes import utc_now
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, NotFoundError
 from app.core.permissions import Permissions
+from app.core.plans import get_blog_limits
 from app.core.security import get_current_user
 from app.models import AuditLog, Blog
 from app.models.blog import BlogRole
@@ -235,6 +237,12 @@ def get_workspace_audit_logs(
         AuditLog.blog_id == blog_id,
         ~AuditLog.action.startswith("http."),
     )
+
+    # How far back a workspace can see depends on its plan. Older rows are
+    # kept, so upgrading brings them back into view.
+    if not Permissions.is_super_admin(current_user):
+        history_days = get_blog_limits(session, blog_id).activity_log_days
+        statement = statement.where(AuditLog.created_at >= utc_now() - timedelta(days=history_days))
 
     if params.action:
         statement = statement.where(AuditLog.action == params.action)

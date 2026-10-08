@@ -9,11 +9,11 @@ automated coverage despite gating a real security boundary.
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.db import engine
 from app.core.security import ACCESS_TOKEN_COOKIE_NAME
-from app.models import BlogInvitation, BlogRole
+from app.models import BlogInvitation, BlogRole, BlogSubscription, SubscriptionPlan
 
 
 def _unique_email() -> str:
@@ -46,6 +46,13 @@ def _create_invitation(
 ) -> str:
     token = uuid.uuid4().hex
     with Session(engine) as session:
+        # These tests cover the accept flow, not plan limits — a Free
+        # workspace has no seat beyond the owner's, so put it on Team.
+        subscription = session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
+        subscription = subscription or BlogSubscription(blog_id=blog_id)
+        subscription.plan = SubscriptionPlan.TEAM
+        subscription.status = "active"
+        session.add(subscription)
         session.add(
             BlogInvitation(
                 blog_id=blog_id,

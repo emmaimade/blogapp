@@ -24,6 +24,7 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.core.logging_config import get_logger
+from app.core.plans import ensure_can_publish, ensure_can_schedule
 from app.models import Comment, Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
@@ -168,6 +169,25 @@ def _resolve_status(
     return PostStatus.DRAFT, False, original_go_live
 
 
+def _ensure_plan_allows_status(
+    session: Session,
+    blog_id: int,
+    status: PostStatus,
+    previous_status: PostStatus | None,
+) -> None:
+    """
+    Plan limits apply only when a post *moves into* published or scheduled.
+    Re-saving a post that's already live, or editing one already scheduled,
+    is always allowed — even after the workspace drops to a smaller plan.
+    """
+    if status == previous_status:
+        return
+    if status == PostStatus.PUBLISHED:
+        ensure_can_publish(session, blog_id)
+    elif status == PostStatus.SCHEDULED:
+        ensure_can_schedule(session, blog_id)
+
+
 # ── Image upload ──────────────────────────────────────────────────────────────
 
 def upload_post_image(file: UploadFile) -> dict[str, str]:
@@ -206,6 +226,7 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
     resolved_status, resolved_published, resolved_published_at = _resolve_status(
         post_data.status, post_data.published, post_data.published_at
     )
+    _ensure_plan_allows_status(session, blog_id, resolved_status, previous_status=None)
 
     new_post = Post(
         **post_data.model_dump(
@@ -516,6 +537,7 @@ def update_post(
             post_data.status, post_data.published, post_data.published_at,
             previous_published_at=db_post.published_at,
         )
+        _ensure_plan_allows_status(session, blog_id, resolved_status, previous_status=db_post.status)
         db_post.status       = resolved_status
         db_post.published    = resolved_published
         db_post.published_at = resolved_published_at

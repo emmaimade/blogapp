@@ -23,6 +23,7 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.permissions import Permissions
+from app.core.plans import ensure_member_capacity, get_effective_plan
 from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
@@ -50,6 +51,7 @@ from app.models import (
     Post,
     SiteSettings,
     SubscriptionPlan,
+    SubscriptionStatus,
     Tag,
     User,
 )
@@ -727,18 +729,43 @@ def complete_onboarding_team_step(blog_id: int, payload: OnboardingTeamComplete,
     )
 
 
+def _apply_onboarding_plan_choice(subscription: BlogSubscription, choice: SubscriptionPlan) -> None:
+    """
+    Picking Pro or Team during onboarding starts the free trial — paying
+    happens later, from Settings → Billing. A workspace that's already on a
+    paid plan it's entitled to keeps it whatever is picked here.
+    """
+    if subscription.plan != SubscriptionPlan.FREE and get_effective_plan(subscription) == subscription.plan:
+        return
+
+    if choice == SubscriptionPlan.FREE:
+        subscription.plan = SubscriptionPlan.FREE
+        subscription.status = SubscriptionStatus.ACTIVE.value
+        return
+
+    if subscription.trial_used:
+        raise AuthorizationError(
+            ErrorCode.PLAN_UPGRADE_REQUIRED,
+            "This workspace has already used its free trial. Choose Free for now "
+            "and upgrade any time from Settings → Billing.",
+        )
+
+    subscription.plan = choice
+    subscription.status = SubscriptionStatus.TRIALING.value
+    subscription.trial_used = True
+    subscription.trial_ends_at = utc_now() + timedelta(days=settings.TRIAL_DAYS)
+
+
 def update_onboarding_plan(blog_id: int, payload: OnboardingPlanUpdate, session: Session, current_user: User, request: Request | None = None) -> OnboardingState:
     blog = session.get(Blog, blog_id)
     if not blog:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
 
     subscription = _load_subscription(session, blog_id)
-    if subscription:
-        subscription.plan = payload.plan
-        session.add(subscription)
-    else:
-        subscription = BlogSubscription(blog_id=blog_id, plan=payload.plan)
-        session.add(subscription)
+    if subscription is None:
+        subscription = BlogSubscription(blog_id=blog_id, plan=SubscriptionPlan.FREE)
+    _apply_onboarding_plan_choice(subscription, payload.plan)
+    session.add(subscription)
 
     blog.onboarding_status = OnboardingStatus.COMPLETED
     blog.onboarding_step = OnboardingStep.PLAN
@@ -832,6 +859,8 @@ def invite_blog_member(blog_id: int, payload: BlogMemberCreate, session: Session
             ErrorCode.OPERATION_NOT_ALLOWED,
             "You are already part of this workspace.",
         )
+
+    ensure_member_capacity(session, blog_id)
 
     membership = BlogMember(
         user_id=user_to_invite.id,
@@ -1150,6 +1179,7 @@ def create_invitation(
         invitation = pending
         session.add(invitation)
     else:
+        ensure_member_capacity(session, blog_id, include_pending_invites=True)
         invitation = BlogInvitation(
             blog_id=blog_id,
             email=normalized_email,
@@ -1238,6 +1268,9 @@ def accept_invitation(token: str, session: Session, current_user: User) -> BlogM
             "You are already a member of this workspace.",
         )
 
+    # The workspace may have moved to a smaller plan since the invite was sent.
+    ensure_member_capacity(session, invite.blog_id, for_invitee=True)
+
     membership = BlogMember(
         user_id=current_user.id,
         blog_id=invite.blog_id,
@@ -1294,6 +1327,10 @@ def register_and_accept_invitation(token: str, payload: InvitationRegisterCreate
             ErrorCode.EMAIL_ALREADY_EXISTS,
             "An account with this email already exists. Please log in instead.",
         )
+
+    # Checked before the account is created, so a full workspace doesn't
+    # leave behind an account that belongs to nothing.
+    ensure_member_capacity(session, invite.blog_id, for_invitee=True)
 
     # Uses the shared policy in app.core.security rather than a local length
     # check, so this signup path cannot drift away from /auth/reset-password

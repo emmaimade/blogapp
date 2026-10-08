@@ -317,20 +317,15 @@ def update_footer_settings(
     _: None = Depends(require_blog_owner),
     __: None = Depends(require_completed_onboarding),
 ):
-    from app.models import BlogSubscription, SubscriptionPlan
-    
+    from app.core.plans import get_blog_limits
+
     # Check if user is trying to modify the copyright text
     existing_settings = get_setting(session, blog_id, "footer", FooterSettings)
-    
+
     if settings.copyright_text != existing_settings.get("copyright_text"):
-        # Check subscription plan - only pro/team can edit copyright
-        subscription = session.exec(
-            select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)
-        ).first()
-        
-        plan = subscription.plan if subscription else SubscriptionPlan.FREE
-        
-        if plan == SubscriptionPlan.FREE:
+        # Follows the plan the workspace is entitled to right now, so an
+        # expired trial or lapsed subscription counts as Free.
+        if not get_blog_limits(session, blog_id).can_remove_branding:
             raise AuthorizationError(
                 ErrorCode.PLAN_UPGRADE_REQUIRED,
                 "Editing the copyright text is available on the Pro and Team plans. "
