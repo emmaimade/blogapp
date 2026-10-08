@@ -16,6 +16,8 @@ import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import 'easymde/dist/easymde.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
+import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
 
 export const PostEditor: React.FC = () => {
   const toWorkspace = useWorkspacePath();
@@ -31,6 +33,9 @@ export const PostEditor: React.FC = () => {
   // Saved title rather than the live input, so the tab doesn't churn while typing.
   useDocumentTitle(isEditMode ? (savedTitle ? `Edit: ${savedTitle}` : 'Edit post') : 'New post', isDirty);
 
+  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
+  const unsavedChangesBlocker = useUnsavedChangesGuard(isDirty);
+
   const editorOptions = useMemo(() => getEditorOptions(handleImageUpload), [handleImageUpload]);
 
   if (isEditMode && isLoading) {
@@ -43,6 +48,7 @@ export const PostEditor: React.FC = () => {
 
   return (
     <div className="admin-page mx-auto max-w-6xl px-4 py-4 sm:p-6">
+      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
       {/* Top action bar */}
       <div className="mb-8 flex items-center justify-between gap-4">
         <button

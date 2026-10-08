@@ -1,3 +1,5 @@
+import type { PlanKey } from '../../shared/lib/plans';
+
 export type PlatformRole = 'super_admin' | 'user';
 
 export type BlogRole = 'owner' | 'editor' | 'author';
@@ -33,6 +35,8 @@ export interface UserBlogMembership {
   role: BlogRole;
   invited_at: string;
   blog: MembershipBlog;
+  /** The workspace's effective plan; the backend sends it only on memberships the user owns. */
+  plan?: PlanKey | null;
 }
 
 export interface AuthUser {

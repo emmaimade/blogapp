@@ -7,6 +7,8 @@ import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
 
 const inputClass =
   'w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-medium text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-violet-500/10 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-violet-500';
@@ -149,12 +151,16 @@ export const GeneralSettings: React.FC = () => {
     formData.posts_per_page !== settings.posts_per_page
   );
 
+  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
+  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
+
   if (isLoading) {
     return <SettingsSkeleton cardsCount={3} fieldsPerCard={2} />;
   }
 
   return (
     <div className="space-y-6 max-w-4xl pb-24 lg:pb-12 relative">
+      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
       {/* Floating Save Button - Adjusted for mobile bottom tabs */}
       <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">

@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect } from 'react';
-import { Outlet, useMatch } from 'react-router-dom';
+import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { lastWorkspace } from '../../shared/lib/blogSession';
 import { pickLandingMembership, workspacePath, WORKSPACE_ROUTE_PATTERN } from '../../shared/lib/workspacePaths';
 import { useAuth } from '../../features/auth/context/AuthContext';
+import { switchTargetPath } from '../../features/workspaces/lib/switchTarget';
 import type { MembershipBlog, UserBlogMembership } from '../../features/auth/types';
 
 export type Blog = MembershipBlog;
@@ -32,6 +33,8 @@ const BlogContext = createContext<BlogContextType | undefined>(undefined);
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const routeSlug = useMatch(WORKSPACE_ROUTE_PATTERN)?.params.workspaceSlug ?? null;
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const memberships = user?.blog_memberships ?? [];
   const blogs = memberships.map((membership) => membership.blog);
@@ -48,11 +51,18 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     if (resolvedRouteSlug) lastWorkspace.setSlug(resolvedRouteSlug);
   }, [resolvedRouteSlug]);
 
-  const switchWorkspace = useCallback((slug: string) => {
-    // A full load for now so every cached query starts fresh; switching
-    // without a reload comes with the shared switcher.
-    window.location.assign(workspacePath(slug));
-  }, []);
+  // Client-side: cached queries are keyed by blog id, and WorkspaceRoute
+  // remounts its pages when the slug changes, so nothing from the previous
+  // workspace carries over. An unsaved-changes guard on the page can still
+  // stop the navigation.
+  const switchWorkspace = useCallback(
+    (slug: string) => {
+      const target = memberships.find((membership) => membership.blog.slug === slug);
+      if (!target || slug === routeSlug) return;
+      navigate(workspacePath(slug, switchTargetPath(location.pathname, routeSlug, target, user)));
+    },
+    [memberships, routeSlug, location.pathname, navigate, user],
+  );
 
   return (
     <BlogContext.Provider

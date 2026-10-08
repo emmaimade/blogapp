@@ -1,7 +1,5 @@
 import {
-    Check,
     CheckCircle2,
-    ChevronDown,
     ChevronRight,
     HelpCircle,
     Lock,
@@ -28,6 +26,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SupportModal } from "../features/support/components/SupportModal";
 import { NotificationBell } from "../features/notifications/components/NotificationBell";
 import { QuickJumpPalette } from "../features/superadmin/components/QuickJumpPalette";
+import { WorkspaceSwitcher } from "../features/workspaces/components/WorkspaceSwitcher";
 
 interface UserMenuProps {
   user: ReturnType<typeof useAuth>["user"];
@@ -162,18 +161,16 @@ const UserMenu: React.FC<UserMenuProps> = ({
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { blogs, activeBlog, activeRole, requiresOnboarding, routeSlug, switchWorkspace } = useBlog();
+  const { activeBlog, activeRole, requiresOnboarding, routeSlug } = useBlog();
   const toWorkspace = useWorkspacePath();
   const location = useLocation();
   const navigate = useNavigate();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showMobileWorkspaceMenu, setShowMobileWorkspaceMenu] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showQuickJump, setShowQuickJump] = useState(false);
 
-  const mobileWorkspaceMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const userIsSuperAdmin = isSuperAdmin(user);
@@ -211,7 +208,6 @@ useEffect(() => {
   // Close menus on page navigation changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
-    setShowMobileWorkspaceMenu(false);
   }, [location.pathname]);
 
   // Global "/" shortcut — jumps into the topbar search for blog admins, or
@@ -253,22 +249,6 @@ useEffect(() => {
       mobileSearchInputRef.current?.focus();
     }
   }, [showMobileSearch]);
-
-  // Handle outside clicks for mobile dropdown overlay stacks
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        mobileWorkspaceMenuRef.current &&
-        !mobileWorkspaceMenuRef.current.contains(event.target as Node)
-      ) {
-        setShowMobileWorkspaceMenu(false);
-      }
-    };
-    if (showMobileWorkspaceMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showMobileWorkspaceMenu]);
 
   const roleLabel = userIsSuperAdmin
     ? "Super admin"
@@ -429,44 +409,7 @@ useEffect(() => {
 
           {/* Workspace contextual switcher display block */}
           {activeBlog?.name && !userIsSuperAdmin ? (
-            <div className="flex items-center min-w-0" ref={mobileWorkspaceMenuRef}>
-              <button
-                onClick={() => setShowMobileWorkspaceMenu(!showMobileWorkspaceMenu)}
-                className="flex items-center gap-1 text-[15px] font-bold tracking-tight text-zinc-900 dark:text-white px-1.5 py-1 rounded-lg active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors min-w-0"
-              >
-                <span className="truncate">{activeBlog.name}</span>
-                <ChevronDown size={14} className={`text-zinc-400 flex-shrink-0 transition-transform duration-200 ${showMobileWorkspaceMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Slide down Workspace Selector Dropdown List */}
-              {showMobileWorkspaceMenu && blogs.length > 0 && (
-                <div className="absolute top-full left-4 mt-1 w-56 rounded-xl border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <div className="border-b border-zinc-100 px-3.5 pb-2 pt-1.5 dark:border-zinc-800">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">Workspaces</div>
-                  </div>
-                  <div className="py-1 max-h-60 overflow-y-auto">
-                    {blogs.map((blog) => (
-                      <button
-                        key={blog.id}
-                        onClick={() => { 
-                          switchWorkspace(blog.slug);
-                          setShowMobileWorkspaceMenu(false); 
-                        }}
-                        className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors active:bg-zinc-50 dark:hover:bg-zinc-800"
-                      >
-                        <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-violet-600 text-[9px] font-bold text-white">
-                          {blog.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">{blog.name}</div>
-                        </div>
-                        {activeBlog?.id === blog.id && <Check size={14} className="flex-shrink-0 text-violet-600" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <WorkspaceSwitcher variant="header" className="flex min-w-0 items-center" />
           ) : (
             <div className="text-[15px] font-bold tracking-tight text-zinc-900 dark:text-white ml-1">Inko</div>
           )}

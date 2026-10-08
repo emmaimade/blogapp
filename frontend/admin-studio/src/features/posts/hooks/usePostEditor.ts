@@ -7,6 +7,7 @@ import api from '../../../shared/api/client';
 import { toastApiError } from '../../../shared/lib/apiErrors';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
+import { LEAVE_AFTER_SAVE } from '../../../shared/hooks/useUnsavedChangesGuard';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 
@@ -174,7 +175,8 @@ export const usePostEditor = () => {
         ? (isEditMode ? 'Changes published!' : 'Post published!')
         : 'Draft saved!';
       toast.success(msg);
-      navigate(toWorkspace('/posts'));
+      // The form still reads as dirty for this navigation; it's been saved.
+      navigate(toWorkspace('/posts'), { state: LEAVE_AFTER_SAVE });
     },
     onError: (error: any) => toastApiError(error, 'Failed to save post'),
   });

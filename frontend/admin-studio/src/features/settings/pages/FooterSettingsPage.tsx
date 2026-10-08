@@ -9,6 +9,8 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { billingPath, toastApiError } from '../../../shared/lib/apiErrors';
 import { useBillingOverview } from '../../billing/hooks/useBilling';
+import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
 
 interface FooterSettingsData {
   footer_text: string;
@@ -124,14 +126,19 @@ export const FooterSettings: React.FC = () => {
     }));
   };
 
+  const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
+
+  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
+  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
+
   if (isLoading) {
     return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
   }
 
-  const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
 
   return (
     <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
       {/* Floating Save Button - Mobile Optimized */}
       <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">

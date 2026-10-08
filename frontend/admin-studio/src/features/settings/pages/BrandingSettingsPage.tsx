@@ -8,6 +8,8 @@ import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton'; // Adjust path as needed
 
 type PostLayout = 'feed' | 'list' | 'cards' | 'compact';
+import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
 
 interface BrandingSettingsData {
   primary_color: string;
@@ -265,12 +267,16 @@ export const BrandingSettings: React.FC = () => {
   };
 
   // Render the skeleton loader if the settings query is still loading
+  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
+  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
+
   if (isLoading) {
     return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
   }
 
   return (
     <div className="max-w-4xl pb-24 lg:pb-12 relative">
+      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
       {/* Floating Save Button - Mobile Optimized */}
       {isDirty && (
         <div className="fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50">

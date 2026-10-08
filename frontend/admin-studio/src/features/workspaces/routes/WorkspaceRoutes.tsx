@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Navigate, Outlet, useLocation, useMatch } from 'react-router-dom';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -31,7 +32,9 @@ export const WorkspaceRoute = () => {
     return <Navigate to={workspacePath(activeMembership.blog.slug, '/onboarding')} replace />;
   }
 
-  return <Outlet />;
+  // Keyed by workspace: React Router keeps a page mounted when only the slug
+  // changes, which would carry one workspace's form state into another.
+  return <Fragment key={activeMembership.blog.slug}><Outlet /></Fragment>;
 };
 
 /**

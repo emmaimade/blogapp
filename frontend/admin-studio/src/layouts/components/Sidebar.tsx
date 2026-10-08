@@ -1,4 +1,4 @@
-import { BarChart3, Building2, Check, ChevronDown, CreditCard, FileText, HelpCircle, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users, LifeBuoy } from 'lucide-react';
+import { BarChart3, Building2, CreditCard, FileText, HelpCircle, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users, LifeBuoy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { InkoLogo } from '../../assets/inko';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { isSuperAdmin } from '../../features/auth/lib/accessControl';
 import { SupportModal } from '../../features/support/components/SupportModal';
+import { WorkspaceSwitcher } from '../../features/workspaces/components/WorkspaceSwitcher';
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
@@ -21,7 +22,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: SidebarProps) => {
   const { user } = useAuth();
-  const { blogs, activeBlog, activeRole, switchWorkspace } = useBlog();
+  const { blogs, activeRole } = useBlog();
   const toWorkspace = useWorkspacePath();
   const location = useLocation();
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -33,10 +34,8 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
   });
   const [isHovering, setIsHovering] = useState(false);
   const [showSidebarControl, setShowSidebarControl] = useState(false);
-  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
 
   const sidebarControlRef = useRef<HTMLDivElement>(null);
-  const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const isExpanded = sidebarMode === 'expanded' || (sidebarMode === 'hover' && isHovering);
 
   useEffect(() => {
@@ -62,18 +61,6 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showSidebarControl]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) {
-        setShowWorkspaceMenu(false);
-      }
-    };
-    if (showWorkspaceMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showWorkspaceMenu]);
 
   const isActive = (path: string) => {
     if (path.endsWith('/settings')) {
@@ -207,79 +194,13 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
           </Link>
         </div>
 
-        {/* Workspace Dropper Selector Menu - DESKTOP ONLY */}
+        {/* Workspace switcher - desktop only (the mobile one sits in AdminLayout's top bar) */}
         {blogs.length > 0 && !userIsSuperAdmin && (
-          <div
-            ref={workspaceMenuRef}
-            className="hidden lg:block relative mx-2 mb-4 transition-all duration-300"
-          >
-            <button
-              onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-              className={`flex w-full items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 transition-all hover:bg-white hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${isExpanded ? "px-3 py-2.5" : "h-10 w-10 justify-center p-0"}`}
-              aria-label="Switch workspace"
-            >
-              <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
-                {activeBlog?.name?.charAt(0).toUpperCase() ?? "W"}
-              </div>
-              {isExpanded && (
-                <>
-                  <div className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-[13px] font-semibold text-zinc-900 dark:text-white">
-                      {activeBlog?.name ?? "Select workspace"}
-                    </div>
-                    {activeRole && (
-                      <div className="text-[10px] font-medium capitalize text-zinc-500 dark:text-zinc-400">
-                        {activeRole}
-                      </div>
-                    )}
-                  </div>
-                  <ChevronDown
-                    size={14}
-                    className={`flex-shrink-0 text-zinc-400 transition-transform duration-200 ${showWorkspaceMenu ? "rotate-180" : ""}`}
-                  />
-                </>
-              )}
-            </button>
-
-            {showWorkspaceMenu && (
-              <div
-                className={`absolute z-50 mt-1.5 rounded-xl border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${isExpanded ? "left-0 right-0" : "left-full ml-2 w-52"}`}
-              >
-                <div className="border-b border-zinc-100 px-3.5 pb-2 pt-1.5 dark:border-zinc-800">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                    Workspaces
-                  </div>
-                </div>
-                <div className="py-1 max-h-60 overflow-y-auto scrollbar-thin">
-                  {blogs.map((blog) => (
-                    <button
-                      key={blog.id}
-                      onClick={() => {
-                        switchWorkspace(blog.slug);
-                        setShowWorkspaceMenu(false);
-                      }}
-                      className="flex w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    >
-                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
-                        {blog.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-zinc-900 dark:text-white">
-                          {blog.name}
-                        </div>
-                      </div>
-                      {activeBlog?.id === blog.id && (
-                        <Check
-                          size={14}
-                          className="flex-shrink-0 text-violet-600"
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <WorkspaceSwitcher
+            variant="sidebar"
+            expanded={isExpanded}
+            className="hidden lg:block mx-2 mb-4 transition-all duration-300"
+          />
         )}
 
         {/* Scrollable Navigation Area Links list */}

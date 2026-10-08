@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useBlocker } from 'react-router-dom';
-import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { Save, Globe, Mail, Shield, Zap, Loader2, CheckCircle2 } from 'lucide-react';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import api from '../../../shared/api/client';
@@ -114,23 +115,8 @@ export const SuperAdminPlatformSettingsPage = () => {
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(savedForm);
 
-  // Browser-level guard: refresh, close tab, or navigate to another site.
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isDirty) return;
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isDirty]);
-
-  // In-app guard: navigating to another route within the app.
-  // NOTE: useBlocker only works with a data router (createBrowserRouter /
-  // createRoutesFromElements). It throws if the app still uses <BrowserRouter>.
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) => isDirty && currentLocation.pathname !== nextLocation.pathname
-  );
+  // Asks before leaving with unsaved changes (reload, close, or in-app navigation).
+  const unsavedChangesBlocker = useUnsavedChangesGuard(isDirty);
 
   const set = <K extends keyof PlatformSettingsForm>(key: K, value: PlatformSettingsForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -366,36 +352,7 @@ export const SuperAdminPlatformSettingsPage = () => {
       </div>
     )}
 
-    {/* In-app navigation guard modal */}
-    {blocker.state === 'blocked' && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-full bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0">
-              <AlertTriangle size={16} className="text-yellow-700 dark:text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white">Leave without saving?</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">You have unsaved changes to platform settings. They'll be lost if you leave this page.</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => blocker.reset?.()}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-            >
-              Stay on page
-            </button>
-            <button
-              onClick={() => blocker.proceed?.()}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
-            >
-              Leave without saving
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
     </>
   );
 };
