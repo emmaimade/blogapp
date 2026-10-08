@@ -10,6 +10,8 @@ class AuditLogRead(UTCDatetimeMixin, BaseModel):
     actor_user_id: Optional[int] = None
     actor_email: Optional[str] = None
     actor: Optional[str] = None
+    # The actor's display name, when they still have an account.
+    actor_name: Optional[str] = None
     action: str
     resource_type: str
     target_type: Optional[str] = None
@@ -58,3 +60,21 @@ class AuditLogQueryParams(BaseModel):
         description="Free-text search across actor email, action name, and event details. "
         "Applied server-side before pagination so result counts and page totals stay consistent.",
     )
+    since: Optional[datetime] = Query(default=None, description="Only entries at or after this time")
+    until: Optional[datetime] = Query(default=None, description="Only entries before this time")
+
+
+class AuditLogActor(BaseModel):
+    user_id: int
+    email: Optional[str] = None
+    name: Optional[str] = None
+
+
+class AuditLogFilters(BaseModel):
+    """
+    What the workspace activity log can be filtered by: everyone who appears
+    in the visible history, and how far back that history goes on the
+    workspace's plan (None when there's no limit, e.g. for a superadmin).
+    """
+    history_days: Optional[int] = None
+    actors: list[AuditLogActor]
