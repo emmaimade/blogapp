@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
-from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep, PostVisibility
+from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep, PostVisibility, SubscriptionPlan
 from app.models.user import PlatformRole
 
 class UserCreate(BaseModel):
@@ -22,6 +22,7 @@ class MembershipBlogRead(UTCDatetimeMixin, BaseModel):
     slug: str
     subdomain: str
     custom_domain: Optional[str] = None
+    logo_url: Optional[str] = None
     is_active: bool
     owner_id: int
     onboarding_status: OnboardingStatus
@@ -53,6 +54,9 @@ class UserBlogMembershipRead(UTCDatetimeMixin, BaseModel):
     role: BlogRole
     invited_at: datetime
     blog: MembershipBlogRead
+    # The workspace's effective plan — filled in only on memberships the user
+    # owns (see build_user_payload); billing isn't an editor's or author's business.
+    plan: Optional[SubscriptionPlan] = None
 
     model_config = {"from_attributes": True}
 

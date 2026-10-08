@@ -13,7 +13,8 @@ from app.core.security import (
     create_access_token,
     verify_password,
 )
-from app.models import BlogMember, User
+from app.core.plans import get_effective_plan
+from app.models import BlogMember, BlogRole, BlogSubscription, User
 from app.schemas import UserRead
 from app.services.auth_tokens import create_refresh_token
 
@@ -45,7 +46,18 @@ def build_user_payload(user_id: int, session: Session) -> UserRead:
     hydrated_user = session.exec(statement).first()
     if not hydrated_user:
         raise ValueError(f"User with id={user_id} could not be loaded")
-    return UserRead.model_validate(hydrated_user)
+    payload = UserRead.model_validate(hydrated_user)
+
+    owned_blog_ids = [m.blog_id for m in payload.blog_memberships if m.role == BlogRole.OWNER]
+    if owned_blog_ids:
+        subscriptions = {
+            sub.blog_id: sub
+            for sub in session.exec(select(BlogSubscription).where(BlogSubscription.blog_id.in_(owned_blog_ids))).all()
+        }
+        for membership in payload.blog_memberships:
+            if membership.role == BlogRole.OWNER:
+                membership.plan = get_effective_plan(subscriptions.get(membership.blog_id))
+    return payload
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
