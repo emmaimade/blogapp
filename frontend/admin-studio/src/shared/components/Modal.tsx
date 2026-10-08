@@ -8,13 +8,15 @@ interface ModalProps {
   title: string;
   message: string;
   confirmText?: string;
+  /** Label for the dismiss button. */
+  cancelText?: string;
   isDanger?: boolean;
   validationMatch?: string;
   autoClose?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", isDanger = true, validationMatch, autoClose = true 
+  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", cancelText = "Cancel", isDanger = true, validationMatch, autoClose = true 
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   
@@ -76,7 +78,7 @@ export const Modal: React.FC<ModalProps> = ({
             onClick={onClose}
             className="admin-btn admin-btn-secondary px-4 py-2 text-sm"
           >
-            Cancel
+            {cancelText}
           </button>
           <button
             onClick={() => {

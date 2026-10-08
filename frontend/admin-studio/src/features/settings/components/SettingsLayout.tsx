@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail, type LucideIcon } from 'lucide-react';
+import { Globe, UserSquare2, PanelBottom, Palette, Search, Mail, CreditCard, type LucideIcon } from 'lucide-react';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import type { BlogMembership } from '../../../app/providers/BlogProvider';
 
@@ -20,6 +20,7 @@ const settingsSections: readonly SettingsSection[] = [
   { to: '/admin/settings/branding', label: 'Appearance', description: 'Colors, logo, fonts and layout', icon: Palette, roles: ['owner'] },
   { to: '/admin/settings/seo', label: 'SEO', description: 'Metadata and analytics', icon: Search, roles: ['owner'] },
   { to: '/admin/settings/contact', label: 'Contact', description: 'Email, location & FAQ', icon: Mail, roles: ['owner'] },
+  { to: '/admin/settings/billing', label: 'Billing', description: 'Plan, payments and invoices', icon: CreditCard, roles: ['owner'] },
 ];
 
 export const SettingsLayout = () => {
@@ -104,7 +105,7 @@ export const SettingsLayout = () => {
         </section>
       </div>
 
-      {/* Mobile Bottom Tab Navigator (All 6 tabs fit beautifully) */}
+      {/* Mobile Bottom Tab Navigator */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/95 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95 lg:hidden">
         <div className="flex items-center justify-around px-1 py-1">
           {visibleSections.map(({ to, label, icon: Icon }) => (

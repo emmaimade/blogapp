@@ -15,6 +15,10 @@ import { InkoLogo } from '../../../assets/inko';
 import { EmailVerificationBanner } from '../../auth/components/EmailVerificationBanner';
 import { SupportModal } from '../../support/components/SupportModal';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { toastApiError } from '../../../shared/lib/apiErrors';
+import { PLANS, TRIAL_DAYS, formatNaira, type PlanKey } from '../../../shared/lib/plans';
+
+const planPrice = (key: PlanKey) => PLANS.find((plan) => plan.key === key)?.price.monthly ?? 0;
 
 type SubscriptionPlan = 'free' | 'pro' | 'team';
 type OnboardingStepKey = 'about' | 'profile' | 'publication' | 'team' | 'plan';
@@ -215,6 +219,7 @@ export const OnboardingPage = () => {
 
   const savePlan = useMutation({
     mutationFn: async () => api.put(`/blogs/${activeBlog?.id}/onboarding/plan`, { plan: selectedPlan }),
+    onError: (err) => toastApiError(err, "Couldn't save your plan. Please try again."),
     onSuccess: async () => {
       setDone(true);
       await syncAfterSave();
@@ -224,7 +229,7 @@ export const OnboardingPage = () => {
   const inviteMutation = useMutation({
     mutationFn: async () => api.post(`/blogs/${activeBlog?.id}/invitations`, { email: inviteEmail, role: inviteRole }),
     onError: (err: any) => {
-      toast.error(err.response?.data?.detail || 'Failed to send invitation.');
+      toastApiError(err, 'Failed to send invitation.');
     },
     onSuccess: async () => {
       setInviteEmail('');
@@ -475,7 +480,7 @@ export const OnboardingPage = () => {
                 {currentStep === "team" &&
                   "Teammates added now will get an email invite instantly. You can always add more later."}
                 {currentStep === "plan" &&
-                  "Your trial is already active. Pick a plan now or stay on free and upgrade when ready."}
+                  `Try Pro or Team free for ${TRIAL_DAYS} days — no card needed — or start on Free and upgrade when you're ready.`}
               </p>
             </div>
 
@@ -926,12 +931,12 @@ export const OnboardingPage = () => {
                     className="text-violet-600 flex-shrink-0 mt-0.5"
                   />
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                    Your{" "}
+                    Pro and Team start with a{" "}
                     <strong className="text-zinc-900 dark:text-white">
-                      14-day free trial
-                    </strong>{" "}
-                    is already running. You won't be charged until you choose a
-                    paid plan and add a card.
+                      {TRIAL_DAYS}-day free trial
+                    </strong>
+                    . You won't be charged — when the trial ends you move to
+                    Free unless you add a payment in Settings → Billing.
                   </p>
                 </div>
 
@@ -939,25 +944,25 @@ export const OnboardingPage = () => {
                   {[
                     {
                       key: "free",
-                      title: "Free trial",
-                      price: "Free for 14 days",
-                      desc: "Full access during trial. Upgrade when you're ready.",
+                      title: "Free",
+                      price: "₦0 — free forever",
+                      desc: "1 member, up to 30 published posts. Upgrade any time.",
                       icon: ShieldCheck,
                       recommended: false,
                     },
                     {
                       key: "pro",
-                      title: "Professional",
-                      price: "$29 / month",
-                      desc: "Custom domain, API access, advanced analytics, priority support.",
+                      title: "Pro",
+                      price: `${TRIAL_DAYS} days free, then ${formatNaira(planPrice('pro'))} / month`,
+                      desc: "Up to 3 members, unlimited posts, scheduled publishing, no Inko branding.",
                       icon: Rocket,
                       recommended: true,
                     },
                     {
                       key: "team",
-                      title: "Enterprise",
-                      price: "Custom pricing",
-                      desc: "Unlimited workspaces, SSO, dedicated support, SLA guarantee.",
+                      title: "Team",
+                      price: `${TRIAL_DAYS} days free, then ${formatNaira(planPrice('team'))} / month`,
+                      desc: "Up to 15 members, a year of activity history, priority support.",
                       icon: Sparkles,
                       recommended: false,
                     },

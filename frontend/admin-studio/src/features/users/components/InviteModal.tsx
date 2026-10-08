@@ -3,6 +3,7 @@ import { X, Check, Mail, Loader2, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../../../shared/api/client";
 import { useBlog } from "../../../app/providers/BlogProvider";
+import { toastApiError } from "../../../shared/lib/apiErrors";
 import type { BlogRole } from "../hooks/useUserManager";
 import { RoleBadge, ROLE_META } from "./UserComponents";
 
@@ -36,7 +37,7 @@ export const InviteModal = ({ isOpen, onClose, onSuccess }: InviteModalProps) =>
       setSentTo(trimmedEmail);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to send invitation.");
+      toastApiError(err, "Failed to send invitation.");
     } finally {
       setIsLoading(false);
     }

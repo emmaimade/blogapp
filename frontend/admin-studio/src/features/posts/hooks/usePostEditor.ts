@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 import { useBlog } from '../../../app/providers/BlogProvider';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
@@ -173,7 +174,7 @@ export const usePostEditor = () => {
       toast.success(msg);
       navigate('/admin/posts');
     },
-    onError: (error: any) => toast.error(error.response?.data?.detail || 'Failed to save post'),
+    onError: (error: any) => toastApiError(error, 'Failed to save post'),
   });
 
   const saveWithStatus = (status: PostStatus, publishedAt?: Date | null) => {

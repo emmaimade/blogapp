@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { BILLING_PATH, toastApiError } from '../../../shared/lib/apiErrors';
+import { useBillingOverview } from '../../billing/hooks/useBilling';
 
 interface FooterSettingsData {
   footer_text: string;
@@ -48,18 +51,10 @@ export const FooterSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
 
-  const { data: subscription } = useQuery({
-    queryKey: ['blogSubscription', activeBlog?.id],
-    queryFn: async () => {
-      try {
-        const res = await api.get(`/blogs/${activeBlog!.id}/subscription`);
-        return res.data;
-      } catch {
-        return { plan: 'free' };
-      }
-    },
-    enabled: !!activeBlog?.id,
-  });
+  // The plan in effect right now — an expired trial or lapsed payment counts
+  // as Free, which is what the backend checks when saving.
+  const { data: billing } = useBillingOverview();
+  const isFreePlan = (billing?.effective_plan ?? 'free') === 'free';
 
   const { data: settings, isLoading } = useQuery<FooterSettingsData>({
     queryKey: ['footerSettings', activeBlog?.id],
@@ -105,9 +100,7 @@ export const FooterSettings: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['footerSettings', activeBlog?.id] });
       toast.success('Footer settings saved successfully!');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to save settings');
-    },
+    onError: (error: any) => toastApiError(error, 'Failed to save settings'),
   });
 
   const handleSave = () => {
@@ -187,11 +180,16 @@ export const FooterSettings: React.FC = () => {
             <div>
               <label className="block text-sm font-bold text-zinc-700 mb-2">
                 Copyright Text
-                {subscription?.plan === 'free' && (
+                {isFreePlan && (
                   <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
                     <Lock size={12} />
                     Pro Feature
                   </span>
+                )}
+                {isFreePlan && (
+                  <Link to={BILLING_PATH} className="ml-2 text-xs font-semibold text-violet-600 underline underline-offset-2">
+                    Upgrade
+                  </Link>
                 )}
               </label>
               <input
@@ -199,7 +197,7 @@ export const FooterSettings: React.FC = () => {
                 value={formData.copyright_text || ''}
                 onChange={(e) => handleChange('copyright_text', e.target.value)}
                 placeholder="Powered by INKO"
-                disabled={subscription?.plan === 'free'}
+                disabled={isFreePlan}
                 className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-500"
               />
             </div>
