@@ -40,7 +40,7 @@ export const useDashboard = () => {
 
   const { data, isLoading, error, refetch } = useQuery<DashboardSummary>({
     queryKey: ['blogDashboard', activeMembership?.blog_id],
-    queryFn: async () => (await api.get('/dashboard')).data,
+    queryFn: async () => (await api.get(`/blogs/${activeMembership!.blog_id}/dashboard`)).data,
     enabled: !!activeMembership,
     refetchInterval: 30000,
   });

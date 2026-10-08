@@ -51,7 +51,7 @@ export const AboutPageSettings: React.FC = () => {
     queryFn: async () => {
       let data: any = {};
       try {
-        const res = await api.get('/settings/about');
+        const res = await api.get(`/blogs/${activeBlog!.id}/settings/about`);
         data = res.data || {};
       } catch (error) {}
       return {
@@ -82,7 +82,7 @@ export const AboutPageSettings: React.FC = () => {
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: AboutSettingsData) => api.post('/settings/about', data),
+    mutationFn: (data: AboutSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/about`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aboutSettings'] });
       queryClient.invalidateQueries({ queryKey: ['siteSettings'] });

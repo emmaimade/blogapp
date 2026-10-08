@@ -52,7 +52,7 @@ export const GeneralSettings: React.FC = () => {
     queryFn: async () => {
       let data: any = {};
       try {
-        const res = await api.get('/settings/general');
+        const res = await api.get(`/blogs/${activeBlog!.id}/settings/general`);
         data = res.data || {};
       } catch {}
       
@@ -81,7 +81,7 @@ export const GeneralSettings: React.FC = () => {
   }, [activeBlog]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: GeneralSettingsData) => api.post('/settings/general', data),
+    mutationFn: (data: GeneralSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/general`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['generalSettings'] });
       queryClient.invalidateQueries({ queryKey: ['allSettings'] });

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { useBlog } from '../../../app/providers/BlogProvider';
 
 interface FAQItem {
   question: string;
@@ -58,10 +59,12 @@ const normalizeContactSettings = (
 export const ContactSettings = () => {
   useDocumentTitle('Contact settings');
   const queryClient = useQueryClient();
+  const { activeBlog } = useBlog();
 
   const { data: settings = defaultSettings, isLoading } = useQuery<ContactSettingsData>({
-    queryKey: ['settings', 'contact'],
-    queryFn: async () => normalizeContactSettings((await api.get('/settings/contact')).data),
+    queryKey: ['settings', 'contact', activeBlog?.id],
+    queryFn: async () => normalizeContactSettings((await api.get(`/blogs/${activeBlog!.id}/settings/contact`)).data),
+    enabled: !!activeBlog?.id,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -74,9 +77,9 @@ export const ContactSettings = () => {
   const mutation = useMutation({
     // A blank email is "not set" — the backend validates any non-null value as an address.
     mutationFn: async (payload: ContactSettingsData) =>
-      (await api.post('/settings/contact', { ...payload, contact_email: payload.contact_email.trim() || null })).data,
+      (await api.post(`/blogs/${activeBlog!.id}/settings/contact`, { ...payload, contact_email: payload.contact_email.trim() || null })).data,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings', 'contact'] });
+      queryClient.invalidateQueries({ queryKey: ['settings', 'contact', activeBlog?.id] });
       toast.success('Contact settings saved successfully!');
     },
     onError: () => toast.error('Failed to save contact settings'),

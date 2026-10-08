@@ -166,7 +166,7 @@ export const BrandingSettings: React.FC = () => {
     queryFn: async () => {
       let data: any = {};
       try {
-        const res = await api.get('/settings/branding');
+        const res = await api.get(`/blogs/${activeBlog!.id}/settings/branding`);
         data = res.data || {};
       } catch {}
       return {
@@ -191,7 +191,7 @@ export const BrandingSettings: React.FC = () => {
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: BrandingSettingsData) => api.post('/settings/branding', data),
+    mutationFn: (data: BrandingSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/branding`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brandingSettings'] });
       toast.success('Appearance settings saved');
@@ -207,8 +207,8 @@ export const BrandingSettings: React.FC = () => {
       formDataUpload.append('file', file);
 
       const endpoint = type === 'logo' 
-        ? '/settings/branding/upload-logo' 
-        : '/settings/branding/upload-favicon';
+        ? `/blogs/${activeBlog!.id}/settings/branding/upload-logo`
+        : `/blogs/${activeBlog!.id}/settings/branding/upload-favicon`;
 
       const res = await api.post(endpoint, formDataUpload, {
         headers: { 'Content-Type': 'multipart/form-data' },

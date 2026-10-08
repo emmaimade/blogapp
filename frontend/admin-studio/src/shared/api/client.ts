@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { blogSession } from '../lib/blogSession';
 import { getCsrfToken } from './csrf';
 
 // In production this points at this app's own /api/* path, which Vercel
@@ -23,21 +22,6 @@ api.interceptors.request.use((config) => {
     const csrfToken = getCsrfToken();
     if (csrfToken) {
       config.headers['X-CSRF-Token'] = csrfToken;
-    }
-  }
-
-  const blogId = blogSession.getBlogId();
-  if (blogId && config.url) {
-    const isMultitenantEndpoint =
-      config.url.startsWith('/dashboard') ||
-      config.url.startsWith('/posts') ||
-      config.url.startsWith('/comments') ||
-      config.url.startsWith('/tags') ||
-      config.url.startsWith('/settings') ||
-      config.url.startsWith('/members');
-
-    if (isMultitenantEndpoint) {
-      config.url = `/blogs/${blogId}${config.url}`;
     }
   }
 

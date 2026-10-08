@@ -50,7 +50,7 @@ export const SEOSettings: React.FC = () => {
     queryFn: async () => {
       let data: PartialSEOSettingsData = {};
       try {
-        const res = await api.get('/settings/seo');
+        const res = await api.get(`/blogs/${activeBlog!.id}/settings/seo`);
         data = res.data || {};
       } catch {
         // Fallback to defaults on error
@@ -75,7 +75,7 @@ export const SEOSettings: React.FC = () => {
   }, [settings]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: SEOSettingsData) => api.post('/settings/seo', data),
+    mutationFn: (data: SEOSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/seo`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seoSettings'] });
       queryClient.invalidateQueries({ queryKey: ['allSettings'] });
