@@ -273,6 +273,7 @@ useEffect(() => {
     if (sectionPath === "/admin/users") return "Team";
     if (sectionPath === "/admin/platform-users") return "Users";
     if (sectionPath === "/admin/platform-settings") return "Platform Settings";
+    if (sectionPath === NEW_WORKSPACE_PATH) return "New workspace";
 
     const pathSegments = sectionPath.split("/").filter(Boolean);
     const titleSegments = pathSegments.filter((segment) =>

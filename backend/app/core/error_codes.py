@@ -355,7 +355,7 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.WORKSPACE_LIMIT_REACHED: ErrorSpec(
         status.HTTP_403_FORBIDDEN,
         "You've reached the maximum number of workspaces you can own. "
-        "Delete one you no longer need, or contact support to raise the limit.",
+        "Contact support if you need more.",
     ),
 
     # ── Throttling ────────────────────────────────────────────────────────────

@@ -343,7 +343,12 @@ def _ensure_can_create_workspace(session: Session, current_user: User) -> None:
         select(func.count()).select_from(Blog).where(Blog.owner_id == current_user.id)
     ).one()
     if owned >= settings.MAX_OWNED_WORKSPACES:
-        raise AuthorizationError(ErrorCode.WORKSPACE_LIMIT_REACHED)
+        # Owners can't delete a workspace themselves, so support is the way out.
+        raise AuthorizationError(
+            ErrorCode.WORKSPACE_LIMIT_REACHED,
+            f"You've reached the maximum of {settings.MAX_OWNED_WORKSPACES} workspaces you can own. "
+            "Contact support if you need more.",
+        )
     recent = session.exec(
         select(func.count()).select_from(Blog).where(
             Blog.owner_id == current_user.id,

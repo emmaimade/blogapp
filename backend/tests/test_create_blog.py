@@ -99,6 +99,9 @@ def test_owner_cannot_exceed_the_workspace_cap(client, monkeypatch):
 
     assert res.status_code == 403, res.text
     assert res.json()["code"] == "WORKSPACE_LIMIT_REACHED"
+    assert res.json()["detail"] == (
+        "You've reached the maximum of 2 workspaces you can own. Contact support if you need more."
+    )
 
 
 def test_workspace_creation_is_rate_limited(client, monkeypatch):
