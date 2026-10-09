@@ -223,3 +223,42 @@ def test_related_posts_respect_limit_and_handle_untagged_or_unknown(client):
     assert len(client.get(f"/blogs/{blog_id}/posts/slug/{current}/related", params={"limit": 2}).json()) == 2
     assert client.get(f"/blogs/{blog_id}/posts/slug/{untagged}/related").json() == []
     assert client.get(f"/blogs/{blog_id}/posts/slug/does-not-exist/related").json() == []
+
+
+def _post_id(slug: str) -> int:
+    with Session(engine) as session:
+        return session.exec(select(Post.id).where(Post.slug == slug)).one()
+
+
+def test_reading_a_draft_by_id_404s_for_anonymous_and_outside_users(client):
+    """GET /posts/{id} used to return drafts to anyone; the slug route already didn't."""
+    blog_id, user_id = _register_owner(client)
+    for status in (PostStatus.DRAFT, PostStatus.SCHEDULED):
+        post_id = _post_id(_create_post(blog_id, user_id, status=status))
+
+        anonymous = client.get(f"/blogs/{blog_id}/posts/{post_id}")
+        assert anonymous.status_code == 404, anonymous.text
+
+        _, _, outsider_token = _register(client)
+        outsider = client.get(
+            f"/blogs/{blog_id}/posts/{post_id}", headers={"Authorization": f"Bearer {outsider_token}"}
+        )
+        assert outsider.status_code == 404, outsider.text
+
+
+def test_team_members_can_read_a_draft_by_id(client):
+    blog_id, user_id = _register_owner(client)
+    post_id = _post_id(_create_post(blog_id, user_id, status=PostStatus.DRAFT))
+
+    for role in (BlogRole.OWNER, BlogRole.EDITOR, BlogRole.AUTHOR):
+        _, headers = _add_member(client, blog_id, role)
+        res = client.get(f"/blogs/{blog_id}/posts/{post_id}", headers=headers)
+        assert res.status_code == 200, (role, res.text)
+
+
+def test_published_post_by_id_is_public(client):
+    blog_id, user_id = _register_owner(client)
+    post_id = _post_id(_create_post(blog_id, user_id))
+
+    res = client.get(f"/blogs/{blog_id}/posts/{post_id}")
+    assert res.status_code == 200, res.text

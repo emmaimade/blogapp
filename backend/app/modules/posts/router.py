@@ -184,8 +184,10 @@ def read_post(
     post_id: int,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    return _with_comment_count(post_service.read_post(blog_id, post_id, session), session)
+    post = post_service.read_post(blog_id, post_id, session, current_user)
+    return _with_comment_count(post, session)
 
 
 @router.get("/slug/{slug}/related", response_model=List[PostRead])
