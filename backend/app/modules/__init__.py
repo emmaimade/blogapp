@@ -11,6 +11,7 @@ from .blogs.invitations_router import router as blog_invitations_router
 from .blogs.invitations_router import invitations_router
 from .blogs.audit_router import router as audit_router
 from .superadmin.router import router as superadmin_router
+from .superadmin.audit_router import router as superadmin_audit_router
 from .support.router import router as support_router
 from .notifications.router import router as notifications_router
 from .billing.router import router as billing_router
@@ -29,6 +30,7 @@ __all__ = [
     "invitations_router",
     "audit_router",
     "superadmin_router",
+    "superadmin_audit_router",
     "support_router",
     "notifications_router",
     "billing_router",

@@ -13,6 +13,10 @@ class AuditLogRead(UTCDatetimeMixin, BaseModel):
     # The actor's display name, when they still have an account.
     actor_name: Optional[str] = None
     action: str
+    # From app.core.audit_catalog; filled on the superadmin log.
+    label: Optional[str] = None
+    category: Optional[str] = None
+    severity: Optional[str] = None
     resource_type: str
     target_type: Optional[str] = None
     resource_id: Optional[int] = None
@@ -78,3 +82,40 @@ class AuditLogFilters(BaseModel):
     """
     history_days: Optional[int] = None
     actors: list[AuditLogActor]
+
+
+class SuperadminAuditLogQueryParams(BaseModel):
+    skip: int = Query(default=0, ge=0)
+    limit: int = Query(default=50, ge=1, le=200)
+    blog_id: Optional[int] = Query(default=None, description="Only this workspace")
+    actor_user_id: Optional[int] = Query(default=None, description="Only this actor; also includes their sign-ins")
+    action: Optional[str] = Query(default=None, description="Exact action name")
+    category: Optional[str] = Query(default=None, description="A category from app.core.audit_catalog")
+    severity: Optional[str] = Query(default=None, description="critical, warning or info")
+    search: Optional[str] = Query(default=None, description="Actor email, action, IP address and event details")
+    since: Optional[datetime] = Query(default=None, description="Only entries at or after this time")
+    until: Optional[datetime] = Query(default=None, description="Only entries before this time")
+    include_logins: bool = Query(default=False, description="Include user.login rows, which are hidden by default")
+
+
+class AuditLogSummary(BaseModel):
+    """Counts for the whole filtered set, ignoring the severity filter."""
+    total: int
+    by_severity: dict[str, int]
+
+
+class AuditLogLookupWorkspace(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+
+class AuditLogLookupUser(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: str
+
+
+class AuditLogLookup(BaseModel):
+    workspaces: list[AuditLogLookupWorkspace]
+    users: list[AuditLogLookupUser]

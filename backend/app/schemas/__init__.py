@@ -1,4 +1,5 @@
-from .audit import AuditLogActor, AuditLogFilters, AuditLogRead, AuditLogQueryParams, MyAuditLogRead
+from .audit import (AuditLogActor, AuditLogFilters, AuditLogLookup, AuditLogLookupUser, AuditLogLookupWorkspace,
+    AuditLogQueryParams, AuditLogRead, AuditLogSummary, MyAuditLogRead, SuperadminAuditLogQueryParams)
 from .errors import ErrorResponse, ValidationErrorResponse
 from .pagination import PaginatedResponse
 from .comments import CommentAdminRead, CommentCreate, CommentRead
@@ -80,6 +81,11 @@ __all__ = [
     "AuditLogQueryParams",
     "AuditLogActor",
     "AuditLogFilters",
+    "AuditLogLookup",
+    "AuditLogLookupUser",
+    "AuditLogLookupWorkspace",
+    "AuditLogSummary",
+    "SuperadminAuditLogQueryParams",
     "MyAuditLogRead",
     "FlagContentCreate",
     "ModerationActionCreate",

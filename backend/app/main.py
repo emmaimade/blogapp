@@ -26,6 +26,7 @@ from app.modules import (
     blog_invitations_router,
     invitations_router,
     superadmin_router,
+    superadmin_audit_router,
     audit_router,
     support_router,
     notifications_router,
@@ -94,7 +95,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    # X-Total-Count and X-Export-Truncated: the superadmin audit log reads them.
+    expose_headers=["X-Request-ID", "X-Total-Count", "X-Export-Truncated", "Content-Disposition"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ app.include_router(blogs_router)
 app.include_router(blog_invitations_router)
 app.include_router(invitations_router)
 app.include_router(superadmin_router)
+app.include_router(superadmin_audit_router)
 app.include_router(audit_router)
 app.include_router(support_router)
 app.include_router(notifications_router)

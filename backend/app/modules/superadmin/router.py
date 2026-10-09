@@ -21,11 +21,9 @@ from app.core.email import dispatch_email
 from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
 from app.services.auth_tokens import create_password_reset_token
 from app.models import (
-    AuditLog,
     Blog,
     User,
     Post,
-    Tag,
     Comment,
     ModerationItem,
     BlogMember,
@@ -35,7 +33,6 @@ from app.models import (
     PlatformSettings as PlatformSettingsRecord)
 from app.modules.support.router import SupportTicketRead
 from app.schemas import (
-    AuditLogRead,
     BlogAnalytics,
     ModerationActionCreate,
     ModerationActionRead,
@@ -809,39 +806,6 @@ def moderate_flagged_content(
     return moderation_action
 
 
-# ============================================================================
-# AUDIT LOG ENDPOINTS
-# ============================================================================
-
-@router.get("/audit-logs", response_model=List[AuditLogRead])
-def get_audit_logs(
-    skip: int = 0,
-    limit: int = 50,
-    blog_id: Optional[int] = None,
-    actor_user_id: Optional[int] = None,
-    action: Optional[str] = None,
-    _: None = Depends(require_super_admin),
-    session: Session = Depends(get_session),
-):
-    """Get platform audit logs."""
-    safe_limit = max(1, min(limit, 200))
-    # Exclude the generic http.* rows the AuditLogMiddleware writes for every
-    # POST/PATCH/PUT/DELETE — they're noise duplicates of the semantic action
-    # already logged in the router (e.g. "user.login" already covers what
-    # "http.post" on /users/login would otherwise repeat).
-    statement = select(AuditLog).where(~AuditLog.action.startswith("http."))
-    if blog_id is not None:
-        statement = statement.where(AuditLog.blog_id == blog_id)
-    if actor_user_id is not None:
-        statement = statement.where(AuditLog.actor_user_id == actor_user_id)
-    if action is not None:
-        statement = statement.where(AuditLog.action == action)
-    statement = statement.order_by(AuditLog.created_at.desc()).offset(skip).limit(safe_limit)
-
-    logs = session.exec(statement).all()
-    return _to_audit_log_read_list(session, logs)
-
-
 def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
     if item.content_type == "comment":
         comment = session.get(Comment, item.content_id)
@@ -864,212 +828,6 @@ def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
         ErrorCode.OPERATION_NOT_ALLOWED,
         "This kind of content cannot be removed automatically.",
     )
-
-
-def _to_audit_log_read(
-    log: AuditLog,
-    blog_name: Optional[str] = None,
-    resource_label: Optional[str] = None,
-) -> AuditLogRead:
-    try:
-        details = json.loads(log.details) if log.details else {}
-    except (TypeError, json.JSONDecodeError):
-        details = {}
-
-    return AuditLogRead(
-        id=log.id,
-        actor_user_id=log.actor_user_id,
-        actor_email=log.actor_email,
-        actor=log.actor_email,
-        action=log.action,
-        resource_type=log.resource_type,
-        target_type=log.resource_type,
-        resource_id=log.resource_id,
-        blog_id=log.blog_id,
-        blog_name=blog_name,
-        resource_label=resource_label,
-        details=details,
-        description=_describe_audit_log(log, details),
-        ip_address=log.ip_address,
-        user_agent=log.user_agent,
-        created_at=log.created_at,
-    )
-
-
-# Resource types whose id points at a User row (member-management actions
-# record the target member's user id here, same as plain "user" actions).
-_USER_RESOURCE_TYPES = {"user", "blog_member"}
-
-
-def _to_audit_log_read_list(session: Session, logs: List[AuditLog]) -> List[AuditLogRead]:
-    """
-    Batch-resolves human-readable names for Tenant Scope and Resource so the
-    audit log doesn't force superadmins to cross-reference bare ids — one
-    query per referenced table instead of a per-row join for each of the
-    (possibly 200) rows on the page.
-    """
-    blog_ids = {log.blog_id for log in logs if log.blog_id is not None}
-    blog_ids |= {log.resource_id for log in logs if log.resource_type == "blog" and log.resource_id is not None}
-    blog_names: dict[int, str] = {}
-    if blog_ids:
-        rows = session.exec(select(Blog.id, Blog.name).where(Blog.id.in_(blog_ids))).all()
-        blog_names = {bid: name for bid, name in rows}
-
-    user_ids = {log.resource_id for log in logs if log.resource_type in _USER_RESOURCE_TYPES and log.resource_id is not None}
-    user_names: dict[int, str] = {}
-    if user_ids:
-        rows = session.exec(select(User.id, User.first_name, User.last_name).where(User.id.in_(user_ids))).all()
-        user_names = {uid: f"{fn} {ln}".strip() for uid, fn, ln in rows}
-
-    post_ids = {log.resource_id for log in logs if log.resource_type == "post" and log.resource_id is not None}
-    post_titles: dict[int, str] = {}
-    if post_ids:
-        rows = session.exec(select(Post.id, Post.title).where(Post.id.in_(post_ids))).all()
-        post_titles = {pid: title for pid, title in rows}
-
-    tag_ids = {log.resource_id for log in logs if log.resource_type == "tag" and log.resource_id is not None}
-    tag_names: dict[int, str] = {}
-    if tag_ids:
-        rows = session.exec(select(Tag.id, Tag.name).where(Tag.id.in_(tag_ids))).all()
-        tag_names = {tid: name for tid, name in rows}
-
-    ticket_ids = {log.resource_id for log in logs if log.resource_type == "support_ticket" and log.resource_id is not None}
-    ticket_subjects: dict[int, str] = {}
-    if ticket_ids:
-        rows = session.exec(select(SupportTicket.id, SupportTicket.subject).where(SupportTicket.id.in_(ticket_ids))).all()
-        ticket_subjects = {tid: subject for tid, subject in rows}
-
-    def resource_label(log: AuditLog) -> Optional[str]:
-        if log.resource_id is None:
-            return None
-        if log.resource_type in _USER_RESOURCE_TYPES:
-            return user_names.get(log.resource_id)
-        if log.resource_type == "blog":
-            return blog_names.get(log.resource_id)
-        if log.resource_type == "post":
-            return post_titles.get(log.resource_id)
-        if log.resource_type == "tag":
-            return tag_names.get(log.resource_id)
-        if log.resource_type == "support_ticket":
-            return ticket_subjects.get(log.resource_id)
-        return None
-
-    return [
-        _to_audit_log_read(
-            log,
-            blog_name=blog_names.get(log.blog_id) if log.blog_id is not None else None,
-            resource_label=resource_label(log),
-        )
-        for log in logs
-    ]
-
-
-def _format_datetime_label(value: Any) -> str | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value))
-        return parsed.strftime("%b %d, %Y at %I:%M %p UTC")
-    except (ValueError, TypeError):
-        return None
-
-
-ROLE_LABELS = {
-    "owner": "Owner",
-    "editor": "Editor",
-    "author": "Author",
-    "viewer": "Viewer",
-}
-
-
-def _role_label(role: Any) -> str:
-    if isinstance(role, str):
-        return ROLE_LABELS.get(role.lower(), role)
-    return str(role) if role is not None else "unknown"
-
-
-def _describe_audit_log(log: AuditLog, details: dict[str, Any]) -> str:
-    subject = log.resource_type.replace("_", " ")
-    if log.resource_id is not None:
-        subject = f"{subject} #{log.resource_id}"
-    action_label = log.action.replace(".", " ")
-
-    # Membership actions carry an email (and often a role) — say who, not just "blog member add"
-    if log.action == "blog.member_add" and details.get("email"):
-        role = details.get("role")
-        return f"Added {details['email']} to the workspace" + (f" as {role}" if role else "")
-
-    if log.action == "blog.member_remove" and details.get("email"):
-        role = details.get("role")
-        return f"Removed {details['email']} from the workspace" + (f" ({role})" if role else "")
-
-    # Posts encode status in the action name itself (post.published, post.draft,
-    # post.scheduled) rather than post.created — handle them explicitly before
-    # the generic create/update/delete-by-suffix check below.
-    if log.resource_type == "post" and details.get("title"):
-        title = details["title"]
-        if log.action == "post.deleted":
-            return f"Deleted post \u201c{title}\u201d"
-        if log.action == "post.updated":
-            return f"Updated post \u201c{title}\u201d"
-        if log.action == "post.published":
-            return f"Published post \u201c{title}\u201d"
-        if log.action == "post.scheduled":
-            when = _format_datetime_label(details.get("published_at"))
-            return f"Scheduled post \u201c{title}\u201d" + (f" for {when}" if when else "")
-        if log.action == "post.draft":
-            return f"Saved post \u201c{title}\u201d as a draft"
-
-    # --- Comment Actions ---
-    # Comments use "post_title" rather than "title" so they don't get swept
-    # into the post-specific branch above. Readers must register to comment
-    # on the public blog, so most comment.create rows are ordinary readers,
-    # not workspace team members — call that out when it's a team member,
-    # since that's the more notable case to a platform admin reviewing activity.
-    if log.resource_type == "comment":
-        post_title = details.get("post_title")
-        on_post = f' on "{post_title}"' if post_title else (f" on post #{details['post_id']}" if details.get("post_id") else "")
-
-        if log.action in ("comment.create", "comment.created"):
-            role = details.get("commenter_role")
-            if role and role != "reader":
-                return f"Commented{on_post} (as {_role_label(role)})"
-            return f"A reader commented{on_post}"
-
-        if log.action in ("comment.update", "comment.updated"):
-            return f"Edited a comment{on_post}"
-
-        if log.action in ("comment.delete", "comment.deleted", "comment.moderator_delete"):
-            deleted_by = details.get("deleted_by")
-            if log.action == "comment.moderator_delete" or deleted_by == "moderator":
-                return f"Removed a comment{on_post} (moderator)"
-            return f"Deleted a comment{on_post}"
-
-    # Named create/update/delete resources (posts, tags, comments, support tickets, etc.)
-    # — use the name/title/subject instead of a bare resource id.
-    name = details.get("name") or details.get("title") or details.get("subject")
-    if name:
-        if log.action.endswith((".create", ".created")):
-            return f"Created {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
-        if log.action.endswith((".update", ".updated")):
-            return f"Updated {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
-        if log.action.endswith((".delete", ".deleted")):
-            return f"Deleted {log.resource_type.replace('_', ' ')} \u201c{name}\u201d"
-
-    # Simple before/after toggle (e.g. status flips): {"from": ..., "to": ...}
-    if "from" in details and "to" in details:
-        return f"{action_label} on {subject}: {details['from']} \u2192 {details['to']}"
-
-    # Multi-field diffs (e.g. blog.update, settings.updated): {"changes": {field: {"from", "to"}}}
-    changes = details.get("changes")
-    if changes:
-        parts = [f"{field} {c.get('from')} \u2192 {c.get('to')}" for field, c in changes.items()]
-        return f"{action_label} on {subject}: {'; '.join(parts)}"
-
-    fields = details.get("fields")
-    if fields:
-        return f"{action_label} on {subject}: {', '.join(fields)}"
-    return f"{action_label} on {subject}"
 
 
 # ============================================================================
