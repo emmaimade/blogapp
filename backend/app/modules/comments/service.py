@@ -68,6 +68,9 @@ def create_comment(
             link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
         )
 
+    if parent_id is not None:
+        _notify_reply_recipient(session, post, parent_id, current_user)
+
     session.commit()
     return _load_comment(session, comment.id)
 
@@ -292,6 +295,32 @@ def _resolve_reply_parent(session: Session, parent_id: Optional[int], post_id: i
         raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "You can't reply to a deleted comment.")
 
     return parent.parent_id or parent.id
+
+
+def _notify_reply_recipient(session: Session, post: Post, parent_id: int, replier: User) -> None:
+    """
+    Tells the parent commenter about a reply. Notifications only surface in
+    the admin studio, so this is limited to workspace team members — a
+    plain reader has nowhere to see it. Skipped for self-replies, and for
+    the post author, who already got a comment notification above.
+    """
+    parent = session.get(Comment, parent_id)
+    if not parent or parent.user_id in (replier.id, post.author_id):
+        return
+
+    parent_author = session.get(User, parent.user_id)
+    if not parent_author or not _is_workspace_writer(parent_author, post.blog_id, session):
+        return
+
+    add_notification(
+        session,
+        user_id=parent_author.id,
+        blog_id=post.blog_id,
+        type="comment_reply",
+        title=f'New reply on "{post.title}"',
+        body=f"{replier.first_name} {replier.last_name} replied to your comment",
+        link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
+    )
 
 
 def _load_comment(session: Session, comment_id: int) -> Comment:
