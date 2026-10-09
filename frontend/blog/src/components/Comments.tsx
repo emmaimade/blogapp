@@ -70,9 +70,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
     }
 
     try {
-      await api.patch(`/comments/${commentId}`, null, {
-        params: { content: editText }
-      });
+      await api.patch(`/comments/${commentId}`, { content: editText });
       toast.success('Comment updated!');
       setEditingId(null);
       setEditText('');
