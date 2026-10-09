@@ -293,3 +293,23 @@ def test_role_edit_between_editor_and_author_still_works(client):
 
     assert res.status_code == 200, res.text
     assert _role(member_id, blog_id) == BlogRole.EDITOR
+
+
+# ── Removal ───────────────────────────────────────────────────────────────────
+
+def test_removed_member_is_notified(client):
+    owner_headers, _, blog_id = _register(client)
+    _, member_id, _ = _register(client)
+    membership_id = _join(member_id, blog_id, BlogRole.AUTHOR)
+
+    res = client.delete(f"/blogs/{blog_id}/members/{membership_id}", headers=owner_headers)
+
+    assert res.status_code == 204, res.text
+    with Session(engine) as session:
+        note = session.exec(
+            select(Notification).where(Notification.user_id == member_id, Notification.type == "member_removed")
+        ).first()
+        blog_name = session.get(Blog, blog_id).name
+    assert note is not None
+    assert note.title == f"You were removed from {blog_name}"
+    assert note.link == "/admin"

@@ -1091,6 +1091,18 @@ def remove_blog_member(blog_id: int, member_id: int, session: Session, current_u
         },
         request=request,
     )
+    # Tell them, rather than leave them to find a "workspace not found"
+    # screen. The link goes to /admin: they can no longer open the workspace.
+    blog = session.get(Blog, blog_id)
+    add_notification(
+        session,
+        user_id=membership.user_id,
+        blog_id=blog_id,
+        type="member_removed",
+        title=f"You were removed from {blog.name}",
+        body=f"{_person(current_user)} removed you from the team. Ask an owner if you need access again.",
+        link="/admin",
+    )
     session.delete(membership)
     session.commit()
 
