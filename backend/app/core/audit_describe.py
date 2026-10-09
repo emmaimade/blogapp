@@ -91,6 +91,14 @@ def describe_audit_log(log: AuditLog, details: dict[str, Any]) -> str:
         role = details.get("role")
         return f"Added {target_label} to workspace" + (f" as {_role_label(role)}" if role else "")
 
+    if action == "blog.member_leave":
+        role = details.get("role")
+        return "Left the workspace" + (f" (was {_role_label(role)})" if role else "")
+
+    if action == "blog.ownership_transfer":
+        new_owner = details.get("to_email") or target_label
+        return f"Transferred ownership to {new_owner}"
+
     if "member_remove" in action or "member.removed" in action:
         role = details.get("role")
         return f"Removed {target_label} from workspace" + (f" ({_role_label(role)})" if role else "")

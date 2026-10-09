@@ -19,6 +19,7 @@ from app.schemas import (
     BlogMemberCreate,
     BlogMemberRead,
     BlogMemberUpdate,
+    OwnershipTransfer,
     BlogRead,
     BlogUpdate,
     OnboardingAboutUpdate,
@@ -210,6 +211,30 @@ def invite_blog_member(
     _: None = Depends(require_blog_owner),
 ):
     return blog_service.invite_blog_member(blog_id, payload, session, current_user, request=request)
+
+
+# Before /members/{member_id}, or "me" would be parsed (and rejected) as an id.
+@router.delete("/{blog_id}/members/me", status_code=status.HTTP_204_NO_CONTENT)
+def leave_blog(
+    blog_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: Blog = Depends(get_current_blog),
+):
+    blog_service.leave_blog(blog_id, session, current_user, request=request)
+
+
+@router.post("/{blog_id}/transfer-ownership", response_model=BlogMemberRead)
+def transfer_ownership(
+    blog_id: int,
+    payload: OwnershipTransfer,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_blog_owner),
+):
+    return blog_service.transfer_ownership(blog_id, payload.member_id, session, current_user, request=request)
 
 
 @router.delete("/{blog_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)

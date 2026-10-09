@@ -60,6 +60,8 @@ ACTIONS: dict[str, ActionInfo] = {
     "blog.member_add": ActionInfo("Added a member", "team", "info"),
     "blog.member_remove": ActionInfo("Removed a member", "team", "warning"),
     "blog.member_permissions_update": ActionInfo("Changed a member's role", "team", "warning"),
+    "blog.member_leave": ActionInfo("Left a workspace", "team", "info"),
+    "blog.ownership_transfer": ActionInfo("Transferred workspace ownership", "team", "warning"),
     # ── Content ──────────────────────────────────────────────────────────
     "post.draft": ActionInfo("Saved a draft", "content", "info"),
     "post.scheduled": ActionInfo("Scheduled a post", "content", "info"),

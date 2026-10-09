@@ -3,7 +3,7 @@ Multi-Tenant Permission System
 ===============================
 """
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlmodel import Session, select
 from typing import Optional
 
@@ -11,7 +11,7 @@ from app.models import Blog, BlogMember, BlogRole, OnboardingStatus, PlatformRol
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, NotFoundError
-from app.core.security import get_current_user
+from app.core.security import extract_bearer_token, get_current_user, get_current_user_optional
 
 class Permissions:
     @staticmethod
@@ -80,15 +80,46 @@ class Permissions:
 
 async def get_public_blog(
     blog_id: int,
+    request: Request,
     session: Session = Depends(get_session)
 ) -> Blog:
+    """
+    Reads anyone may make (the public site uses these too). A suspended
+    workspace is hidden from the public but stays readable to its own
+    members and superadmins, who still use these reads in the admin. The
+    signed-in user is only looked up in that (rare) suspended case.
+    """
     blog = session.get(Blog, blog_id)
-    if not blog or not blog.is_active:
+    if not blog:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
-    return blog
+    if blog.is_active:
+        return blog
+    viewer = await get_current_user_optional(request, extract_bearer_token(request), session)
+    if viewer and (
+        Permissions.is_super_admin(viewer)
+        or session.exec(
+            select(BlogMember).where(BlogMember.user_id == viewer.id, BlogMember.blog_id == blog_id)
+        ).first()
+    ):
+        return blog
+    raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
+
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _allowed_while_suspended(request: Request, blog_id: int) -> bool:
+    """
+    Writes a suspended workspace still accepts: billing, so an owner can
+    always cancel and never keeps paying for a workspace they can't use;
+    and leaving it.
+    """
+    path = request.url.path.rstrip("/")
+    return f"/blogs/{blog_id}/billing" in path or path.endswith(f"/blogs/{blog_id}/members/me")
+
 
 async def get_current_blog(
     blog_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ) -> Blog:
@@ -105,6 +136,14 @@ async def get_current_blog(
     blog = session.get(Blog, blog_id)
     if not blog:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
+    # A workspace suspended by a superadmin stays readable to its members,
+    # but is read-only.
+    if (
+        not blog.is_active
+        and request.method not in _READ_METHODS
+        and not _allowed_while_suspended(request, blog_id)
+    ):
+        raise AuthorizationError(ErrorCode.WORKSPACE_DEACTIVATED)
     return blog
 
 async def require_blog_owner(

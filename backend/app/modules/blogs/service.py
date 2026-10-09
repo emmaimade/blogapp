@@ -944,6 +944,120 @@ def invite_blog_member(blog_id: int, payload: BlogMemberCreate, session: Session
     return membership
 
 
+def _role_name(role: BlogRole | str) -> str:
+    value = role.value if isinstance(role, BlogRole) else str(role)
+    return {"owner": "the owner", "editor": "an editor", "author": "an author"}.get(value, value)
+
+
+def _person(user: User) -> str:
+    return f"{user.first_name} {user.last_name}".strip() or user.email
+
+
+def leave_blog(blog_id: int, session: Session, current_user: User, request: Request | None = None) -> None:
+    """A member removes themselves. Owners transfer ownership first."""
+    membership = session.exec(
+        select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == current_user.id)
+    ).first()
+    if not membership:
+        raise NotFoundError(ErrorCode.MEMBER_NOT_FOUND)
+    if membership.role == BlogRole.OWNER:
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "You own this workspace. Make another member the owner before leaving.",
+        )
+    blog = session.get(Blog, blog_id)
+
+    add_audit_log(
+        session,
+        action="blog.member_leave",
+        resource_type="blog_member",
+        resource_id=current_user.id,
+        blog_id=blog_id,
+        actor=current_user,
+        details={"member_id": membership.id, "email": current_user.email, "role": membership.role},
+        request=request,
+    )
+    add_notification(
+        session,
+        user_id=blog.owner_id,
+        blog_id=blog_id,
+        type="member_left",
+        title=f"{_person(current_user)} left {blog.name}",
+        body=f"They were {_role_name(membership.role)}.",
+        link=f"/admin/w/{blog.slug}/users",
+    )
+    session.delete(membership)
+    session.commit()
+
+
+def transfer_ownership(
+    blog_id: int, member_id: int, session: Session, current_user: User, request: Request | None = None
+) -> BlogMember:
+    """
+    Makes an existing editor or author the owner; the previous owner stays
+    on as an editor. The subscription belongs to the workspace, so billing
+    moves with ownership without any change to it.
+    """
+    blog = session.get(Blog, blog_id)
+    if not blog:
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
+    target = session.exec(
+        select(BlogMember)
+        .where(BlogMember.id == member_id, BlogMember.blog_id == blog_id)
+        .options(selectinload(BlogMember.user))
+    ).first()
+    if not target:
+        raise NotFoundError(ErrorCode.MEMBER_NOT_FOUND)
+    if target.role == BlogRole.OWNER:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "That member already owns this workspace.")
+
+    new_owner = target.user
+    if not Permissions.is_super_admin(new_owner):
+        owned = session.exec(
+            select(func.count()).select_from(Blog).where(Blog.owner_id == new_owner.id)
+        ).one()
+        if owned >= settings.MAX_OWNED_WORKSPACES:
+            raise AuthorizationError(
+                ErrorCode.WORKSPACE_LIMIT_REACHED,
+                f"{_person(new_owner)} already owns the maximum of {settings.MAX_OWNED_WORKSPACES} workspaces.",
+            )
+
+    previous_owner_id = blog.owner_id
+    previous = session.exec(
+        select(BlogMember).where(BlogMember.blog_id == blog_id, BlogMember.user_id == previous_owner_id)
+    ).first()
+    if previous:
+        previous.role = BlogRole.EDITOR
+        session.add(previous)
+    target.role = BlogRole.OWNER
+    blog.owner_id = new_owner.id
+    session.add(target)
+    session.add(blog)
+
+    add_audit_log(
+        session,
+        action="blog.ownership_transfer",
+        resource_type="blog",
+        resource_id=blog_id,
+        blog_id=blog_id,
+        actor=current_user,
+        details={"from_user_id": previous_owner_id, "to_user_id": new_owner.id, "to_email": new_owner.email},
+        request=request,
+    )
+    add_notification(
+        session,
+        user_id=new_owner.id,
+        blog_id=blog_id,
+        type="ownership_transferred",
+        title=f"You now own {blog.name}",
+        body=f"{_person(current_user)} made you the owner, including its plan and billing.",
+        link=f"/admin/w/{blog.slug}/dashboard",
+    )
+    session.commit()
+    session.refresh(target)
+    return target
+
+
 def remove_blog_member(blog_id: int, member_id: int, session: Session, current_user: User, request: Request | None = None) -> None:
     membership = session.exec(
         select(BlogMember)
@@ -1012,17 +1126,14 @@ def update_blog_member_permissions(
 
     update_data = payload.model_dump(exclude_unset=True)
 
-    # Safety Rule: Prevent a lone workspace owner from accidentally demoting themselves
-    if "role" in update_data and update_data["role"] != BlogRole.OWNER and membership.role == BlogRole.OWNER:
-        owner_count = session.exec(
-            select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog_id, BlogMember.role == BlogRole.OWNER)
-        ).one()
-        if owner_count <= 1 and membership.user_id == current_user.id:
-            raise BadRequestError(
-                ErrorCode.OPERATION_NOT_ALLOWED,
-                "You are the only owner of this workspace. Make someone else an "
-                "owner before changing your own role.",
-            )
+    # One owner per workspace, matching blog.owner_id (billing, the owned-
+    # workspace cap and owner notifications all follow it). Ownership only
+    # moves through transfer_ownership, never through a role edit.
+    if "role" in update_data and (update_data["role"] == BlogRole.OWNER) != (membership.role == BlogRole.OWNER):
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            "Ownership can't be changed with a role. Use \"Make owner\" on the Team page instead.",
+        )
 
     # Capture BEFORE values so the audit log can say what actually changed
     # (e.g. role: editor -> owner) instead of just which fields were touched.

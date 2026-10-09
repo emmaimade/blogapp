@@ -79,6 +79,10 @@ class BlogMemberUpdate(BaseModel):
     role: Optional[BlogRole] = None
     permissions: Optional[Dict[str, bool]] = None
 
+class OwnershipTransfer(BaseModel):
+    # The BlogMember id (not the user id) of the member who becomes owner.
+    member_id: int
+
 class BlogInvitationCreate(BaseModel):
     email: EmailStr
     role: BlogRole = BlogRole.AUTHOR
