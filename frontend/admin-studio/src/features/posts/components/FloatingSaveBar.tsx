@@ -23,6 +23,7 @@ export const FloatingSaveBar = ({ isDirty, isSaving, status, onSave }: FloatingS
   <div
     role="status"
     aria-live="polite"
+    data-floating-save-bar
     className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-4"
   >
     {isDirty && (

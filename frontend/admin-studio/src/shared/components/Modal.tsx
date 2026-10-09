@@ -28,7 +28,8 @@ export const Modal: React.FC<ModalProps> = ({
     : false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 p-4 backdrop-blur-sm">
+    // z-60: above the studio's sidebar and header (z-50) and a fullscreen post editor (z-55/56).
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/45 p-4 backdrop-blur-sm">
       <div className="admin-card w-full max-w-md overflow-hidden rounded-[1.8rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl">
         <div className="p-6">
           <div className="mb-4 flex items-center justify-between">

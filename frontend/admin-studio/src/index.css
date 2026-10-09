@@ -480,7 +480,11 @@ h1, h2, h3, h4, h5, h6 {
 .editor-container .editor-toolbar {
   border: 0;
   border-bottom: 1px solid var(--admin-line);
-  background: color-mix(in srgb, var(--admin-primary-soft) 32%, var(--admin-panel-solid));
+  /* The tint is translucent, so lay it over the solid panel: in fullscreen the
+     toolbar floats over the page, which would otherwise show through. */
+  background:
+    linear-gradient(color-mix(in srgb, var(--admin-primary-soft) 32%, transparent) 0 0),
+    var(--admin-panel-solid);
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
@@ -501,6 +505,24 @@ h1, h2, h3, h4, h5, h6 {
 .editor-container .editor-toolbar button {
   color: var(--admin-text-tertiary);
   flex-shrink: 0;
+}
+
+/* Fullscreen and side-by-side: EasyMDE's fixed layers default to z-index 8-9,
+   under the studio's sidebar and header (z-40/50). Keep them above the app
+   chrome but under dialogs (Modal, z-60) and toasts. */
+.editor-container .CodeMirror-fullscreen {
+  z-index: 55;
+}
+
+.editor-container .editor-toolbar.fullscreen,
+.editor-container .editor-preview-side {
+  z-index: 56;
+}
+
+/* The floating save bar is the only way to save, so keep it reachable over
+   the fullscreen editor. */
+body:has(.editor-container .editor-toolbar.fullscreen) [data-floating-save-bar] {
+  z-index: 57;
 }
 
 /* Lucide icons (EditorToolbarIcons) replace EasyMDE's empty Font Awesome <i>. */
