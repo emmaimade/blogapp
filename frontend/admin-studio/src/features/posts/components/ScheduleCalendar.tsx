@@ -100,21 +100,23 @@ export const ScheduleCalendar = ({
         <label htmlFor="schedule-time" className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
           Time <span className="font-normal text-zinc-400">(your local time)</span>
         </label>
-        <div className="flex items-center gap-1.5">
-          <input
-            id="schedule-time"
-            type="time"
-            value={time}
-            onChange={(e) => onTimeChange(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-          />
+        {/* The sidebar card is narrow: sharing a row with the quick times
+            squeezed the input until it clipped its own value ("08:0"). */}
+        <input
+          id="schedule-time"
+          type="time"
+          value={time}
+          onChange={(e) => onTimeChange(e.target.value)}
+          className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+        />
+        <div role="group" aria-label="Quick times" className="mt-1.5 flex gap-1.5">
           {QUICK_TIMES.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => onTimeChange(t)}
               aria-pressed={time === t}
-              className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition ${
+              className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition ${
                 time === t
                   ? 'bg-primary text-white'
                   : 'bg-zinc-200/70 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600'
