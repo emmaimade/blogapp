@@ -1,66 +1,11 @@
-import { Check, X, ChevronDown } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaqList } from '../shared/components/FaqList';
+import { PageHero } from '../shared/components/PageHero';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
 import { usePageMeta } from '../shared/hooks/usePageMeta';
-
-// Keep in step with the admin studio's plan catalogue
-// (frontend/admin-studio/src/shared/lib/plans.ts), the limits in
-// backend/app/core/plans.py, and the plan amounts set in Paystack.
-
-type Interval = 'monthly' | 'yearly';
-
-const TRIAL_DAYS = 14;
-
-const naira = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
-
-const pricingPlans = [
-  {
-    name: 'Free',
-    price: { monthly: 0, yearly: 0 },
-    description: 'For trying Inko out on your own',
-    features: [
-      { name: 'Just you: 1 member', included: true },
-      { name: 'Up to 30 published posts', included: true },
-      { name: '7 days of activity history', included: true },
-      { name: 'Community support', included: true },
-      { name: 'Scheduled publishing', included: false },
-      { name: 'Remove Inko branding', included: false },
-    ],
-    cta: 'Start free',
-    highlighted: false,
-  },
-  {
-    name: 'Pro',
-    price: { monthly: 5_000, yearly: 50_000 },
-    description: 'For serious bloggers and small teams',
-    features: [
-      { name: 'Up to 3 team members', included: true },
-      { name: 'Unlimited published posts', included: true },
-      { name: '90 days of activity history', included: true },
-      { name: 'Email support', included: true },
-      { name: 'Scheduled publishing', included: true },
-      { name: 'Remove Inko branding', included: true },
-    ],
-    cta: `Start ${TRIAL_DAYS}-day free trial`,
-    highlighted: true,
-  },
-  {
-    name: 'Team',
-    price: { monthly: 15_000, yearly: 150_000 },
-    description: 'For content teams and agencies',
-    features: [
-      { name: 'Up to 15 team members', included: true },
-      { name: 'Unlimited published posts', included: true },
-      { name: '1 year of activity history', included: true },
-      { name: 'Priority support', included: true },
-      { name: 'Scheduled publishing', included: true },
-      { name: 'Remove Inko branding', included: true },
-    ],
-    cta: `Start ${TRIAL_DAYS}-day free trial`,
-    highlighted: false,
-  },
-];
+import { TRIAL_DAYS, naira, pricingPlans, type Interval } from '../shared/plans';
 
 const comparisonRows: { feature: string; values: [string | boolean, string | boolean, string | boolean] }[] = [
   { feature: 'Team members', values: ['1', '3', '15'] },
@@ -68,6 +13,7 @@ const comparisonRows: { feature: string; values: [string | boolean, string | boo
   { feature: 'Drafts', values: ['Unlimited', 'Unlimited', 'Unlimited'] },
   { feature: 'Scheduled publishing', values: [false, true, true] },
   { feature: 'Remove Inko branding', values: [false, true, true] },
+  { feature: 'Custom domain', values: [false, true, true] },
   { feature: 'Activity history', values: ['7 days', '90 days', '1 year'] },
   { feature: 'Support', values: ['Community', 'Email', 'Priority'] },
 ];
@@ -111,7 +57,6 @@ const ComparisonCell = ({ value }: { value: string | boolean }) =>
   );
 
 export const PricingPage = () => {
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [interval, setBillingInterval] = useState<Interval>('monthly');
 
   usePageMeta(
@@ -121,27 +66,11 @@ export const PricingPage = () => {
 
   return (
     <div className="space-y-0">
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-zinc-50">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_top_right,_rgba(124,58,237,0.18),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_bottom_left,_rgba(124,58,237,0.12),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_center,_rgba(139,92,246,0.06),_transparent)]" />
-        </div>
-
-        <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
-            Plans built for{' '}
-            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              every stage
-            </span>
-          </h1>
-
-          <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto">
-            Start free and upgrade when you're ready. Pro and Team come with a {TRIAL_DAYS}-day free trial. No card required.
-          </p>
-        </div>
-      </section>
+      <PageHero
+        title="Plans built for"
+        highlight="every stage"
+        description={`Start free and upgrade when you're ready. Pro and Team come with a ${TRIAL_DAYS}-day free trial. No card required.`}
+      />
 
       {/* Pricing Cards */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
@@ -180,7 +109,6 @@ export const PricingPage = () => {
                 >
                   {plan.highlighted && (
                     <div className="flex items-center gap-2 mb-4 text-primary font-bold text-sm">
-                      <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                       Most popular
                     </div>
                   )}
@@ -240,7 +168,7 @@ export const PricingPage = () => {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Compare plans</h2>
+            <h2 className="font-display text-4xl sm:text-5xl text-zinc-900 mb-4">Compare plans</h2>
             <p className="text-xl text-zinc-600">Everything that changes from plan to plan</p>
           </div>
 
@@ -275,35 +203,11 @@ export const PricingPage = () => {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Frequently asked questions</h2>
+            <h2 className="font-display text-4xl sm:text-5xl text-zinc-900 mb-4">Frequently asked questions</h2>
             <p className="text-xl text-zinc-600">Have questions? We're here to help.</p>
           </div>
 
-          <div className="w-full overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-sm">
-            {faqs.map((faq, index) => {
-              const isOpen = openFaqIndex === index;
-              return (
-                <div key={index} className="border-b border-zinc-100 last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                    className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-zinc-50 transition-colors"
-                  >
-                    <span className="text-lg font-medium text-zinc-900">{faq.question}</span>
-                    <ChevronDown
-                      size={18}
-                      className={`text-zinc-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 pt-0">
-                      <p className="text-zinc-600 leading-relaxed">{faq.answer}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <FaqList faqs={faqs} />
         </div>
       </section>
 

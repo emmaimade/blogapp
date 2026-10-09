@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 /* ============================================================
@@ -16,6 +15,10 @@
    ============================================================ */
 
 @theme {
+  /* Fonts are loaded from Google Fonts in index.html */
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
+
   /* Primary — Deep Violet */
   --color-primary:           #7B39ED;
   --color-primary-hover:     #6D28D9;
@@ -112,6 +115,16 @@ select:focus {
   border-radius: 9999px;
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+/* Editorial display type for page and section headlines — use class="font-display".
+   Instrument Serif only ships weight 400, so pin it here (unlayered CSS beats
+   Tailwind's font-weight utilities) and never let the browser fake a bold. */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: -0.01em;
 }
 
 /* Purple gradient text — use class="text-gradient" */

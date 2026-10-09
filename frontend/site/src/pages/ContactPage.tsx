@@ -1,52 +1,53 @@
-import { Mail, Phone, MapPin, Send, ArrowRight, ChevronDown } from 'lucide-react';
+import { Send, ArrowRight, Clock, LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { FaqList } from '../shared/components/FaqList';
+import { PageHero } from '../shared/components/PageHero';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
 import { usePageMeta } from '../shared/hooks/usePageMeta';
+import { API_URL, ADMIN_STUDIO_URL } from '../shared/config';
+import { TRIAL_DAYS } from '../shared/plans';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const faqs = [
+  {
+    question: 'How quickly will you reply?',
+    answer: 'We read every message and reply within 1–2 business days.',
+  },
+  {
+    question: 'I already have an account. Where do I get help?',
+    answer: 'Open the support desk from inside the Inko studio. Your request is linked to your workspace, so we can help faster and you can track it until it is resolved.',
+  },
+  {
+    question: 'Can I run more than one blog?',
+    answer: 'Yes. Each workspace is a separate blog with its own team, branding and content, and each one has its own plan.',
+  },
+  {
+    question: 'How do payments work?',
+    answer: 'Payments are processed securely by Paystack in Nigerian naira. See the pricing page for plans and billing details.',
+  },
+];
+
+const emptyForm = { name: '', email: '', company: '', subject: '', message: '' };
+
+const inputClass =
+  'w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white';
 
 export const ContactPage = () => {
   usePageMeta(
     'Contact',
-    'Have questions or want a demo? Get in touch with the Inko team.'
+    'Questions about plans, want a walkthrough, or need a hand? Send the Inko team a message.'
   );
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    company: '',
-    subject: '',
-    message: '',
-  });
-
+  const [formData, setFormData] = useState(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-
-  const faqs = [
-    {
-      question: 'How long does a demo take?',
-      answer: 'A typical demo takes 30-45 minutes. We walk you through INKO features and answer any questions specific to your use case.',
-    },
-    {
-      question: 'Do you offer custom enterprise plans?',
-      answer: 'Yes! For enterprise customers, we offer custom plans with dedicated support, SSO, and advanced security features.',
-    },
-    {
-      question: 'What integrations do you support?',
-      answer: 'We support Zapier, Slack, webhooks, and custom API integrations. Let us know what tools you use and we can help.',
-    },
-    {
-      question: 'Can I migrate from another platform?',
-      answer: 'Absolutely. We help customers migrate their content from other platforms with minimal downtime.',
-    },
-  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    // A fresh edit means the last result no longer describes what's in the form.
+    if (submitStatus !== 'idle') setSubmitStatus('idle');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,13 +57,10 @@ export const ContactPage = () => {
     try {
       await axios.post(`${API_URL}/contact/`, formData);
       setSubmitStatus('success');
-      setFormData({ name: '', email: '', company: '', subject: '', message: '' });
-
-      // Reset after 3 seconds
-      setTimeout(() => setSubmitStatus('idle'), 3000);
+      setFormData(emptyForm);
     } catch (error) {
+      console.error('Contact form submission failed', error);
       setSubmitStatus('error');
-      setTimeout(() => setSubmitStatus('idle'), 3000);
     } finally {
       setIsSubmitting(false);
     }
@@ -70,281 +68,199 @@ export const ContactPage = () => {
 
   return (
     <div className="space-y-0">
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-zinc-50">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_top_right,_rgba(124,58,237,0.18),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_bottom_left,_rgba(124,58,237,0.12),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_center,_rgba(139,92,246,0.06),_transparent)]" />
-        </div>
+      <PageHero
+        title="Let's talk about"
+        highlight="your blog"
+        description="Questions about plans, want a walkthrough, or need a hand? Send us a message and we'll get back to you."
+      />
 
-        <div className="relative z-10 max-w-3xl mx-auto text-center">
-          
-          <h1 className="text-5xl sm:text-6xl font-black text-zinc-900 mb-6 leading-[1.1]">
-            Let's talk about{' '}
-            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              your blog
-            </span>
-          </h1>
-          
-          <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto">
-            Have questions? Want to schedule a demo? Our team is here to help you get the most out of INKO.
-          </p>
-        </div>
-      </section>
-
-      {/* Contact Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {/* Contact Info Cards */}
-            <div className="rounded-2xl border-2 border-zinc-200 p-8 hover:border-zinc-300 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4">
-                <Mail className="text-primary" size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-zinc-900 mb-2">Email</h3>
-              <p className="text-zinc-600 mb-4">
-                Reach out to our team for support and inquiries.
-              </p>
-              <a
-                href="mailto:hello@inko.blog"
-                className="text-primary hover:text-primary-hover font-semibold text-sm"
-              >
-                hello@inko.blog
-              </a>
-            </div>
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16">
+          <div>
+            <h2 className="font-display text-4xl text-zinc-900 mb-6">Send us a message</h2>
+            <p className="text-zinc-600 mb-8 leading-relaxed">
+              Fill out the form and our team will get back to you by email.
+            </p>
 
-            <div className="rounded-2xl border-2 border-zinc-200 p-8 hover:border-zinc-300 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4">
-                <Phone className="text-primary" size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-zinc-900 mb-2">Phone</h3>
-              <p className="text-zinc-600 mb-4">
-                Call our sales team for enterprise inquiries.
-              </p>
-              <a
-                href="tel:+1-555-0123"
-                className="text-primary hover:text-primary/80 font-semibold text-sm"
-              >
-                +1 (555) 0123
-              </a>
-            </div>
-
-            <div className="rounded-2xl border-2 border-zinc-200 p-8 hover:border-zinc-300 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-4">
-                <MapPin className="text-primary" size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-zinc-900 mb-2">Office</h3>
-              <p className="text-zinc-600 mb-4">
-                Visit our headquarters.
-              </p>
-              <a
-                href="#"
-                className="text-primary hover:text-primary/80 font-semibold text-sm"
-              >
-                San Francisco, CA
-              </a>
-            </div>
-          </div>
-
-          {/* Contact Form */}
-          <div className="grid md:grid-cols-2 gap-16">
-            <div>
-              <h2 className="text-3xl font-bold text-zinc-900 mb-6">Send us a message</h2>
-              <p className="text-zinc-600 mb-8 leading-relaxed">
-                Fill out the form and our team will get back to you within 24 hours. For urgent matters, please call us directly.
-              </p>
-
-              <div className="space-y-6">
+            <div className="space-y-8">
+              <div className="flex gap-4">
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-accent flex items-center justify-center">
+                  <Clock className="text-primary" size={22} aria-hidden="true" />
+                </div>
                 <div>
-                  <h4 className="font-bold text-zinc-900 mb-3">Response time</h4>
-                  <p className="text-sm text-zinc-600">
-                    ⚡ Average response: 2 hours
+                  <h3 className="font-bold text-zinc-900 mb-1">Response time</h3>
+                  <p className="text-sm text-zinc-600">We reply within 1–2 business days.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-accent flex items-center justify-center">
+                  <LifeBuoy className="text-primary" size={22} aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-900 mb-1">Already a customer?</h3>
+                  <p className="text-sm text-zinc-600 mb-2">
+                    The support desk inside the studio is the fastest way to get help with your workspace.
                   </p>
-                </div>
-                <div>
-                  <h4 className="font-bold text-zinc-900 mb-3">Support hours</h4>
-                  <p className="text-sm text-zinc-600">
-                    Monday - Friday: 9 AM - 6 PM EST<br />
-                    Saturday - Sunday: Closed
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-bold text-zinc-900 mb-3">Need help faster?</h4>
-                  <Link
-                    to="/signup"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                  <a
+                    href={`${ADMIN_STUDIO_URL}/admin/support-tickets`}
+                    className="text-primary hover:text-primary-hover font-semibold text-sm inline-flex items-center gap-1"
                   >
-                    Start free trial
-                    <ArrowRight size={16} />
-                  </Link>
+                    Open the support desk <ArrowRight size={14} />
+                  </a>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <form onSubmit={handleSubmit} className="space-y-6 bg-zinc-50 rounded-2xl p-8 border-2 border-zinc-200">
-                {/* Success Message */}
-                {submitStatus === 'success' && (
-                  <div className="rounded-xl border-2 border-green-200 bg-green-50 p-4 text-sm text-green-700">
-                    ✓ Message sent successfully! We'll be in touch soon.
-                  </div>
-                )}
-
-                {/* Error Message */}
-                {submitStatus === 'error' && (
-                  <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    ✗ Something went wrong. Please try again.
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-900 mb-2">
-                    Full name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="John Doe"
-                    required
-                    className="w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-900 mb-2">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="john@example.com"
-                    required
-                    className="w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-900 mb-2">
-                    Company
-                  </label>
-                  <input
-                    type="text"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleChange}
-                    placeholder="Acme Inc"
-                    className="w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-900 mb-2">
-                    Subject *
-                  </label>
-                  <select
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white"
-                  >
-                    <option value="">Select a subject</option>
-                    <option value="demo">Schedule a demo</option>
-                    <option value="sales">Sales inquiry</option>
-                    <option value="support">Support</option>
-                    <option value="partnership">Partnership</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-900 mb-2">
-                    Message *
-                  </label>
-                  <textarea
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    placeholder="Tell us more about your inquiry..."
-                    required
-                    rows={5}
-                    className="w-full px-4 py-3 rounded-lg border-2 border-zinc-300 focus:border-primary focus:outline-none transition-colors bg-white resize-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 px-4 bg-primary text-white font-bold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              <div>
+                <h3 className="font-bold text-zinc-900 mb-3">Just want to try it?</h3>
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover hover:shadow-lg transition-all"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send size={20} />
-                      Send message
-                    </>
-                  )}
-                </button>
-
-                <p className="text-xs text-zinc-600 text-center">
-                  We'll respond to your message within 24 hours.
-                </p>
-              </form>
+                  Start free
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6 bg-zinc-50 rounded-2xl p-8 border-2 border-zinc-200">
+            <div aria-live="polite">
+              {submitStatus === 'success' && (
+                <div className="rounded-xl border-2 border-green-200 bg-green-50 p-4 text-sm text-green-700">
+                  ✓ Message sent. We'll be in touch within 1–2 business days.
+                </div>
+              )}
+              {submitStatus === 'error' && (
+                <div role="alert" className="rounded-xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  ✗ We couldn't send your message. Please check your connection and try again.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="contact-name" className="block text-sm font-bold text-zinc-900 mb-2">
+                Full name *
+              </label>
+              <input
+                id="contact-name"
+                type="text"
+                name="name"
+                autoComplete="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Ada Lovelace"
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contact-email" className="block text-sm font-bold text-zinc-900 mb-2">
+                Email *
+              </label>
+              <input
+                id="contact-email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="you@example.com"
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contact-company" className="block text-sm font-bold text-zinc-900 mb-2">
+                Company
+              </label>
+              <input
+                id="contact-company"
+                type="text"
+                name="company"
+                autoComplete="organization"
+                value={formData.company}
+                onChange={handleChange}
+                placeholder="Acme Inc"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contact-subject" className="block text-sm font-bold text-zinc-900 mb-2">
+                Subject *
+              </label>
+              <select
+                id="contact-subject"
+                name="subject"
+                value={formData.subject}
+                onChange={handleChange}
+                required
+                className={inputClass}
+              >
+                <option value="">Select a subject</option>
+                <option value="demo">Schedule a demo</option>
+                <option value="sales">Plans & pricing</option>
+                <option value="support">Support</option>
+                <option value="partnership">Partnership</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="contact-message" className="block text-sm font-bold text-zinc-900 mb-2">
+                Message *
+              </label>
+              <textarea
+                id="contact-message"
+                name="message"
+                value={formData.message}
+                onChange={handleChange}
+                placeholder="Tell us more about your inquiry..."
+                required
+                rows={5}
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 bg-primary text-white font-bold rounded-lg hover:bg-primary-hover hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send size={20} aria-hidden="true" />
+                  Send message
+                </>
+              )}
+            </button>
+          </form>
         </div>
       </section>
 
-      {/* FAQ Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-50">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-zinc-900 mb-4">Common questions</h2>
-            <p className="text-zinc-600">Answers to frequently asked questions about INKO.</p>
+            <h2 className="font-display text-4xl text-zinc-900 mb-4">Common questions</h2>
+            <p className="text-zinc-600">Quick answers before you write in.</p>
           </div>
 
-          <div className="w-full overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-sm">
-            {faqs.map((faq, index) => {
-              const isOpen = openFaqIndex === index;
-              return (
-                <div key={index} className="border-b border-zinc-100 last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                    className="flex w-full items-center justify-between px-6 py-5 text-left hover:bg-zinc-50 transition-colors"
-                  >
-                    <span className="text-lg font-medium text-zinc-900">{faq.question}</span>
-                    <ChevronDown
-                      size={18}
-                      className={`text-zinc-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 pt-0">
-                      <p className="text-zinc-600 leading-relaxed">{faq.answer}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <FaqList faqs={faqs} />
         </div>
       </section>
 
-      {/* CTA Section */}
       <PrimaryCta
         title="Ready to get started?"
-        description="Join hundreds of teams using INKO. Start your 14-day free trial today."
-        ctaText="Start free trial"
+        description={`Start free, or try Pro or Team free for ${TRIAL_DAYS} days.`}
+        ctaText="Start free"
         ctaLink="/signup"
         className="bg-white"
       />

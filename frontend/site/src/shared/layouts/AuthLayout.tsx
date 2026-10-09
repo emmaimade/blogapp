@@ -16,12 +16,12 @@ export const AuthLayout = () => {
           <span className="py-1 rounded-md">Inko</span>
         </Link>
         <div className="flex items-center gap-4">
-          <a
-            href="mailto:support@inko.blog"
+          <Link
+            to="/contact"
             className="text-xs font-medium px-4 py-2 border border-zinc-200 rounded-full text-zinc-600 hover:bg-zinc-50 transition-all flex items-center gap-1.5"
           >
             <span>Need help?</span>
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -33,19 +33,19 @@ export const AuthLayout = () => {
       {/* Minimized Footer */}
       <footer className="w-full bg-white border-t border-zinc-100 py-8 px-4 flex flex-col items-center justify-center gap-2 text-center text-xs text-zinc-400">
         <div className="flex items-center gap-3 font-medium text-zinc-500 mb-1">
-          <a href="#" className="hover:text-violet-600 transition-colors">
+          <Link to="/privacy" className="hover:text-violet-600 transition-colors">
             Privacy
-          </a>
+          </Link>
           <span className="text-zinc-200 select-none">•</span>
-          <a href="#" className="hover:text-violet-600 transition-colors">
+          <Link to="/terms" className="hover:text-violet-600 transition-colors">
             Terms
-          </a>
+          </Link>
           <span className="text-zinc-200 select-none">•</span>
-          <a href="#" className="hover:text-violet-600 transition-colors">
+          <Link to="/acceptable-use" className="hover:text-violet-600 transition-colors">
             Acceptable Use
-          </a>
+          </Link>
         </div>
-        <p>© 2026 Inko. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Inko. All rights reserved.</p>
       </footer>
     </div>
   );

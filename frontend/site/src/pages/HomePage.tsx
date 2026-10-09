@@ -1,55 +1,90 @@
-import { ArrowRight, Building2, FileText, ShieldCheck, Users, Star, TrendingUp, Shield, Play } from 'lucide-react';
+import { ArrowRight, Check, Layers, PenTool, AppWindow, Megaphone } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { FaqList } from '../shared/components/FaqList';
+import { PageHero } from '../shared/components/PageHero';
 import { PrimaryCta } from '../shared/components/PrimaryCta';
+import {
+  BrowserFrame,
+  ModerationMock,
+  RolesMock,
+  ScheduleMock,
+  StudioMock,
+  WorkspaceSwitcherMock,
+} from '../shared/components/mockups';
 import { usePageMeta } from '../shared/hooks/usePageMeta';
+import { TRIAL_DAYS, lowestPaidMonthly, naira } from '../shared/plans';
 
-const features = [
+// Set to a real studio screenshot in /public (e.g. '/images/hero-studio.webp', 1600×1000)
+// to replace the coded dashboard mockup in the hero.
+const HERO_SCREENSHOT: string | undefined = undefined;
+
+const trustPoints = ['Free plan, forever', `${TRIAL_DAYS}-day trial of Pro and Team`, 'No card required'];
+
+const steps = [
   {
-    icon: Building2,
-    title: 'Multi-tenant Workspaces',
-    description: 'Run isolated blogs with separate branding, team members, and settings from one SaaS platform.',
+    title: 'Create a workspace',
+    description: 'Give your blog a name, a logo and its own public site. Add more workspaces whenever you need them.',
   },
   {
-    icon: Users,
-    title: 'Role-based Collaboration',
-    description: 'Owners, editors, and authors work with clear permissions and tenant-scoped workflows.',
+    title: 'Invite your team',
+    description: 'Bring in owners, editors and authors. Everyone gets exactly the access their role needs.',
   },
   {
-    icon: FileText,
-    title: 'Publishing Control',
-    description: 'Manage posts, tags, comments, and workspace dashboards without crossing tenant boundaries.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Platform-grade Admin',
-    description: 'Give super admins platform visibility while keeping everyday users focused on their own workspace.',
+    title: 'Write, schedule, publish',
+    description: 'Draft in the studio, schedule posts for the right moment, and keep the comments healthy.',
   },
 ];
 
-
-
-const testimonials = [
+const highlights: { eyebrow: string; title: string; description: string; points: string[]; visual: ReactNode }[] = [
   {
-    name: 'Sarah Chen',
-    role: 'Founder, Creative Studio',
-    content: 'INKO transformed how we manage multiple client blogs. The multi-tenant setup is exactly what we needed.',
-    avatar: '👩‍💼',
+    eyebrow: 'Roles',
+    title: 'The right access for everyone',
+    description: 'Owners run the workspace, editors manage content and settings, authors write. No shared passwords, no accidental changes.',
+    points: ['Owner, editor and author roles', 'Invite by email or link', 'Access scoped to each workspace'],
+    visual: <RolesMock />,
   },
   {
-    name: 'Marcus Johnson',
-    role: 'CTO, Media Group',
-    content: 'The role-based permissions and workspace isolation gave us the control we were looking for. Highly impressed.',
-    avatar: '👨‍💼',
+    eyebrow: 'Scheduling',
+    title: 'Publish at the right moment',
+    description: 'Finish a post today and pick when it goes live. Inko publishes it for you, right on time.',
+    points: ['Schedule any post for later', 'See everything queued up', 'Available on Pro and Team'],
+    visual: <ScheduleMock />,
   },
   {
-    name: 'Elena Rodriguez',
-    role: 'Content Manager, Publishing Co',
-    content: 'Setup was seamless and the dashboard is intuitive. Our team was productive on day one.',
-    avatar: '👩‍🦱',
+    eyebrow: 'Comments',
+    title: 'Conversation, with a safety net',
+    description: 'Readers can comment on your posts. Anything that looks like spam or abuse can be flagged, and flagged comments are reviewed and removed by moderators.',
+    points: ['Comments on every post', 'Flag spam and abuse in one click', 'Flagged comments reviewed by moderators'],
+    visual: <ModerationMock />,
   },
 ];
 
+const audiences = [
+  { icon: Layers, title: 'Agencies & studios', description: 'A branded workspace for every client.' },
+  { icon: PenTool, title: 'Content teams', description: 'Clear roles from first draft to published.' },
+  { icon: AppWindow, title: 'SaaS companies', description: 'Your product blog, on your own domain with Pro.' },
+  { icon: Megaphone, title: 'Creators', description: 'Start free, grow into a team.' },
+];
 
+const faqs = [
+  {
+    question: 'Is there really a free plan?',
+    answer: 'Yes. The Free plan is free forever for one person and up to 30 published posts. Upgrade only when you need more.',
+  },
+  {
+    question: 'How does the free trial work?',
+    answer: `Pro and Team start with a ${TRIAL_DAYS}-day free trial, and no card is needed. When it ends you move to the Free plan unless you add a payment, and nothing is deleted.`,
+  },
+  {
+    question: 'Can I run more than one blog?',
+    answer: 'Yes. Each workspace is a separate blog with its own team, branding, content and plan, and you can switch between them from one account.',
+  },
+  {
+    question: 'Can I use my own domain?',
+    answer: 'Yes, on the Pro and Team plans. Every workspace gets its own public site, and on a paid plan you can point your own domain at it.',
+  },
+];
 
 export const HomePage = () => {
   usePageMeta(
@@ -60,98 +95,166 @@ export const HomePage = () => {
 
   return (
     <div className="space-y-0">
-      {/* ✅ Hero Section - Industry Standard with Gradient Background */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Hero Background */}
-        <div className="absolute inset-0 bg-zinc-50">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_top_right,_rgba(124,58,237,0.18),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_bottom_left,_rgba(124,58,237,0.12),_transparent)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_30%_at_center,_rgba(139,92,246,0.06),_transparent)]" />
+      {/* 1. Hero */}
+      <PageHero
+        size="large"
+        title="Launch branded blogs"
+        highlight="at scale"
+        description="Inko is the multi-tenant blog platform for agencies, creators, and SaaS companies. Run every blog from one account, each with its own brand and team."
+        media={
+          <BrowserFrame>
+            {HERO_SCREENSHOT ? (
+              <img
+                src={HERO_SCREENSHOT}
+                alt="The Inko studio dashboard"
+                width={1600}
+                height={1000}
+                className="block w-full h-auto"
+              />
+            ) : (
+              <StudioMock />
+            )}
+          </BrowserFrame>
+        }
+      >
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+          <Link
+            to="/signup"
+            className="group flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/10 hover:bg-primary-hover hover:shadow-xl hover:shadow-primary/20 transition-all"
+          >
+            Start free
+            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <Link
+            to="/features"
+            className="flex items-center justify-center gap-2 px-8 py-4 border-2 border-zinc-200 bg-white text-zinc-900 font-bold rounded-xl hover:border-zinc-300 hover:bg-zinc-50 transition-all"
+          >
+            Explore features
+          </Link>
         </div>
 
-        <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-zinc-900 mb-6 leading-[1.1]">
-            Launch branded blogs{' '}
-            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              at scale
-            </span>
-          </h1>
-          
-          <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-            INKO is the multi-tenant blog platform built for agencies, creators, and SaaS companies. Create, manage, and scale multiple branded workspaces with role-based teams.
-          </p>
-          
-          {/* ✅ Industry-standard CTA buttons with proper gradient */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link 
-              to="/signup" 
-              className="group flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/10 hover:bg-primary-hover hover:shadow-xl hover:shadow-primary/20 transition-all"
-            >
-              Start free trial
-              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            
-            <a 
-              href="#demo" 
-              className="flex items-center justify-center gap-2 px-8 py-4 border-2 border-zinc-200 bg-white text-zinc-900 font-bold rounded-xl hover:border-zinc-300 hover:bg-zinc-50 transition-all"
-            >
-              <Play size={20} />
-              Watch demo
-            </a>
-          </div>
+        <ul className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-zinc-600">
+          {trustPoints.map((point) => (
+            <li key={point} className="flex items-center gap-2">
+              <Check size={18} className="text-primary" aria-hidden="true" />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      </PageHero>
 
-          {/* ✅ Trust badges with proper icons */}
-          <div className="flex flex-wrap justify-center gap-8 text-sm text-zinc-600">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={18} className="text-primary" />
-              <span>10K+ posts published</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users size={18} className="text-primary" />
-              <span>500+ active teams</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield size={18} className="text-primary" />
-              <span>99.9% uptime SLA</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ✅ Features Section - With proper ID for anchor navigation */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white scroll-mt-16">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Everything you need to publish</h2>
-            <p className="text-xl text-zinc-600">Built-in features that scale with your operation</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature) => {
-              const IconComponent = feature.icon;
-              return (
-                <div 
-                  key={feature.title} 
-                  className="group bg-white rounded-2xl p-8 border-2 border-zinc-200 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-all">
-                    <IconComponent className="text-zinc-700 group-hover:text-primary transition-colors" size={24} />
-                  </div>
-                  <h3 className="text-lg font-bold text-zinc-900 mb-2">{feature.title}</h3>
-                  <p className="text-zinc-600 text-sm leading-relaxed">{feature.description}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing teaser — links to dedicated /pricing page */}
-      <section className="py-14 px-4 sm:px-6 lg:px-8 bg-zinc-50 border-y border-zinc-200">
-        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+      {/* 2. One account, every blog */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <div>
+            <p className="text-sm font-bold uppercase tracking-wider text-primary mb-4">Workspaces</p>
+            <h2 className="font-display text-5xl sm:text-6xl text-zinc-900 mb-6 leading-[1.05]">
+              One account. <span className="italic text-primary">Every blog.</span>
+            </h2>
+            <p className="text-lg text-zinc-600 leading-relaxed mb-8">
+              Each workspace is its own blog, with its own logo, team, public site and plan. Switch between them in a click, without ever mixing up content or people.
+            </p>
+            <ul className="space-y-3">
+              {['Separate team and content per workspace', 'Your own branding on each, plus a custom domain on Pro and Team', 'A plan per workspace, so you only pay where you need to'].map((point) => (
+                <li key={point} className="flex items-start gap-3 text-zinc-700">
+                  <Check size={20} className="mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative rounded-3xl bg-zinc-50 px-6 py-12 sm:px-12">
+            <div className="absolute inset-0 rounded-3xl bg-[radial-gradient(ellipse_at_top_right,_rgba(124,58,237,0.14),_transparent_60%)]" aria-hidden="true" />
+            <div className="relative">
+              <WorkspaceSwitcherMock />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. How it works */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 bg-zinc-900 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_top,_rgba(124,58,237,0.22),_transparent)]" aria-hidden="true" />
+        <div className="relative max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="font-display text-4xl sm:text-5xl text-white mb-4">
+              Up and running in <span className="italic text-primary-light">minutes</span>
+            </h2>
+            <p className="text-xl text-zinc-400">Three steps from sign-up to your first published post</p>
+          </div>
+
+          <ol className="grid md:grid-cols-3 gap-6">
+            {steps.map((step, index) => (
+              <li key={step.title} className="rounded-2xl border border-white/10 bg-white/5 p-8">
+                <span className="font-display text-5xl text-primary-light">{index + 1}</span>
+                <h3 className="mt-4 mb-2 text-lg font-bold text-white">{step.title}</h3>
+                <p className="text-zinc-400 leading-relaxed">{step.description}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 4. Feature highlights */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-6xl mx-auto space-y-24">
+          {highlights.map((item, index) => (
+            <div key={item.title} className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
+              <div className={index % 2 === 1 ? 'md:order-last' : ''}>
+                <p className="text-sm font-bold uppercase tracking-wider text-primary mb-4">{item.eyebrow}</p>
+                <h2 className="font-display text-4xl sm:text-5xl text-zinc-900 mb-5 leading-[1.1]">{item.title}</h2>
+                <p className="text-lg text-zinc-600 leading-relaxed mb-6">{item.description}</p>
+                <ul className="space-y-3">
+                  {item.points.map((point) => (
+                    <li key={point} className="flex items-start gap-3 text-zinc-700">
+                      <Check size={20} className="mt-0.5 flex-shrink-0 text-primary" aria-hidden="true" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-3xl bg-gradient-to-br from-accent/70 to-zinc-50 p-6 sm:p-10">{item.visual}</div>
+            </div>
+          ))}
+
+          <div className="text-center">
+            <Link to="/features" className="inline-flex items-center gap-2 font-semibold text-primary hover:text-primary-hover">
+              See every feature <ArrowRight size={18} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Built for */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-50 border-y border-zinc-200">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="font-display text-4xl sm:text-5xl text-zinc-900 mb-12 text-center">Built for every kind of publisher</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {audiences.map(({ icon: Icon, title, description }) => (
+              <Link
+                key={title}
+                to="/features"
+                className="group rounded-2xl border border-zinc-200 bg-white p-6 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all"
+              >
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-accent">
+                  <Icon size={22} className="text-primary" aria-hidden="true" />
+                </div>
+                <h3 className="mb-1 font-bold text-zinc-900">{title}</h3>
+                <p className="text-sm text-zinc-600">{description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Pricing teaser */}
+      <section className="py-14 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border-2 border-zinc-200 p-8">
+          <div className="text-center sm:text-left">
             <p className="text-zinc-900 font-bold text-lg">Simple, transparent pricing</p>
-            <p className="text-zinc-500 text-sm mt-1">Plans from <span className="text-primary font-semibold">$29/month</span> · 14-day free trial · No credit card required</p>
+            <p className="text-zinc-500 text-sm mt-1">
+              Free plan available · Pro from <span className="text-primary font-semibold">{naira.format(lowestPaidMonthly)}/month</span> · {TRIAL_DAYS}-day free trial
+            </p>
           </div>
           <Link
             to="/pricing"
@@ -162,62 +265,25 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {/* ✅ Testimonials Section - With proper ID */}
-      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8 bg-white scroll-mt-16">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Loved by teams worldwide</h2>
-            <p className="text-xl text-zinc-600">See how teams use INKO to scale their publishing</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial) => (
-              <div key={testimonial.name} className="bg-white rounded-2xl p-8 border-2 border-zinc-200 hover:border-zinc-300 hover:shadow-xl transition-all">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={16} className="fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-zinc-700 mb-6 leading-relaxed">"{testimonial.content}"</p>
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">{testimonial.avatar}</div>
-                  <div>
-                    <p className="font-bold text-zinc-900">{testimonial.name}</p>
-                    <p className="text-sm text-zinc-600">{testimonial.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* 7. FAQ */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-50">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="font-display text-4xl sm:text-5xl text-zinc-900 mb-12 text-center">Questions, answered</h2>
+          <FaqList faqs={faqs} />
+          <p className="mt-8 text-center text-zinc-600">
+            Something else? <Link to="/contact" className="font-semibold text-primary hover:text-primary-hover">Get in touch</Link>
+          </p>
         </div>
       </section>
 
-      {/* Demo/Video Section */}
-      <section id="demo" className="py-20 px-4 sm:px-6 lg:px-8 bg-white scroll-mt-16">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-zinc-900 mb-4">See INKO in action</h2>
-          <p className="text-xl text-zinc-600 mb-8">Watch how easy it is to create and manage your blogs</p>
-          
-          {/* Placeholder for video/demo */}
-          <div className="aspect-video bg-zinc-100 rounded-2xl border-2 border-zinc-200 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform cursor-pointer">
-                <Play size={32} className="text-primary" />
-              </div>
-              <p className="text-zinc-600 font-semibold">Demo video coming soon</p>
-              <p className="text-sm text-zinc-500 mt-2">In the meantime, start your free trial</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ✅ Final CTA Section */}
+      {/* 8. Final CTA */}
       <PrimaryCta
-        title="Ready to launch your blogs?"
-        description="Join hundreds of teams using INKO to scale their publishing."
-        ctaText="Start free trial"
+        title="Ready to launch your blog?"
+        description="Start free and upgrade when you're ready."
+        ctaText="Start free"
         ctaLink="/signup"
-        secondaryText="✓ No credit card required  ✓ 14-day free trial  ✓ Cancel anytime"
+        className="bg-white"
+        secondaryText={`✓ Free plan forever  ✓ ${TRIAL_DAYS}-day trial of Pro and Team  ✓ No card required`}
       />
     </div>
   );

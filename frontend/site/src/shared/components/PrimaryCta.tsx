@@ -31,7 +31,7 @@ export const PrimaryCta = ({
   return (
     <section className={`py-20 px-4 sm:px-6 lg:px-8 ${isDark ? 'bg-zinc-900' : hasBgOverride ? '' : 'bg-zinc-50'} overflow-hidden ${className}`.trim()}>
       <div className="relative z-10 max-w-3xl mx-auto text-center">
-        <h2 className={`text-4xl font-bold mb-4 ${isDark ? 'text-white' : isLight ? 'text-zinc-900' : 'text-zinc-900'}`}>{title}</h2>
+        <h2 className={`font-display text-4xl sm:text-5xl mb-4 ${isDark ? 'text-white' : isLight ? 'text-zinc-900' : 'text-zinc-900'}`}>{title}</h2>
         <p className={`text-xl mb-8 ${isDark ? 'text-white/80' : isLight ? 'text-zinc-600' : 'text-zinc-600'}`}>{description}</p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

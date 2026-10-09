@@ -4,9 +4,8 @@ import axios from 'axios';
 import { InkoLogo } from '../shared/inko';
 import { Clock, Loader2, AlertCircle, LogIn, UserPlus } from 'lucide-react';
 import { usePageMeta } from '../shared/hooks/usePageMeta';
+import { API_URL, ADMIN_STUDIO_URL } from '../shared/config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || 'http://localhost:5173';
 
 interface InviteInfo {
   blog_name: string;
@@ -37,12 +36,14 @@ export const JoinPage = () => {
         setInfo(res.data);
         setStatus(res.data.already_accepted ? 'error' : 'ready');
         if (res.data.already_accepted) setErrorMsg('This invite link has already been used.');
-      } catch (err: any) {
-        if (err.response?.status === 410) {
+      } catch (err) {
+        const response = axios.isAxiosError(err) ? err.response : undefined;
+        if (response?.status === 410) {
           setStatus('expired');
         } else {
           setStatus('error');
-          setErrorMsg(err.response?.data?.detail || 'This invite link is invalid or has been revoked.');
+          const detail = response?.data?.detail;
+          setErrorMsg(typeof detail === 'string' ? detail : 'This invite link is invalid or has been revoked.');
         }
       }
     };
@@ -64,7 +65,7 @@ export const JoinPage = () => {
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 py-16 dark:bg-zinc-950">
       <Link to="/" className="mb-10 flex items-center gap-2">
         <InkoLogo size={24} />
-        <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">INKO</span>
+        <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Inko</span>
       </Link>
 
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">

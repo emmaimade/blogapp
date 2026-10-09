@@ -3,14 +3,21 @@ import { useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle, ArrowRight, Mail } from "lucide-react";
 import axios from "axios";
 import { usePageMeta } from "../shared/hooks/usePageMeta";
+import { API_URL, ADMIN_STUDIO_URL } from "../shared/config";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || "http://localhost:5173";
+
+const errorDetail = (err: unknown): string | undefined => {
+  if (!axios.isAxiosError(err)) return undefined;
+  const detail = err.response?.data?.detail;
+  return typeof detail === "string" ? detail : undefined;
+};
 
 export const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
-  const [message, setMessage] = useState("");
+  const token = searchParams.get("token");
+  // A link without a token can't be verified, so it starts out as an error.
+  const [status, setStatus] = useState<"verifying" | "success" | "error">(token ? "verifying" : "error");
+  const [message, setMessage] = useState(token ? "" : "Verification token is missing from the URL.");
   const [email, setEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
@@ -31,44 +38,32 @@ export const VerifyEmailPage = () => {
     try {
       await axios.post(`${API_URL}/auth/send-verification`, { email: email.trim() });
       setResendMessage("A new verification email has been sent. Please check your inbox.");
-    } catch (err: any) {
-      setResendMessage(err.response?.data?.detail || "We could not send a new verification email right now.");
+    } catch (err) {
+      setResendMessage(errorDetail(err) || "We could not send a new verification email right now.");
     } finally {
       setIsResending(false);
     }
   };
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (!token) {
-      setStatus("error");
-      setMessage("Verification token is missing from the URL.");
-      return;
-    }
-
-    if (hasVerified.current) return;
+    if (!token || hasVerified.current) return;
     hasVerified.current = true;
 
     const verifyToken = async () => {
       try {
-        const res = await axios.get(
-          `${API_URL}/auth/verify-email?token=${token}`,
-        );
+        const res = await axios.get(`${API_URL}/auth/verify-email`, { params: { token } });
         setStatus("success");
         setMessage(
           res.data.message || "Your email has been successfully verified!",
         );
-      } catch (err: any) {
+      } catch (err) {
         setStatus("error");
-        setMessage(
-          err.response?.data?.detail ||
-            "This verification link is invalid or has expired.",
-        );
+        setMessage(errorDetail(err) || "This verification link is invalid or has expired.");
       }
     };
 
     verifyToken();
-  }, [searchParams]);
+  }, [token]);
 
   return (
     <div className="w-full max-w-md mx-auto my-16 bg-white rounded-2xl border border-zinc-200/80 p-8 md:p-10 shadow-sm text-center">
@@ -76,7 +71,7 @@ export const VerifyEmailPage = () => {
         <div className="flex flex-col items-center py-6 space-y-4">
           <Loader2 className="animate-spin text-violet-600" size={40} />
           <h2 className="text-xl font-bold text-zinc-900">Verifying your email...</h2>
-          <p className="text-sm text-zinc-500">Please wait while we confirm your identity credentials.</p>
+          <p className="text-sm text-zinc-500">This only takes a moment.</p>
         </div>
       )}
 

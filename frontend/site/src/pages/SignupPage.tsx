@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { usePageMeta } from "../shared/hooks/usePageMeta";
+import { ADMIN_STUDIO_URL } from "../shared/config";
 
-const ADMIN_STUDIO_URL = import.meta.env.VITE_ADMIN_STUDIO_URL || "http://localhost:5173";
 
 // Signup itself now runs entirely on admin-studio's origin (see
 // frontend/admin-studio/src/features/auth/pages/SignupPage.tsx) — that's
