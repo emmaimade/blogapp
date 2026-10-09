@@ -42,25 +42,25 @@ export const SuperAdminDashboardPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center gap-4 text-zinc-800 mb-4"><Database size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Blogs</span></div>
-          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_blogs || 0}</div>
-          <p className="text-sm text-zinc-500 mt-2">{stats?.active_blogs || 0} active</p>
+          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{(stats?.total_blogs ?? 0).toLocaleString()}</div>
+          <p className="text-sm text-zinc-500 mt-2">{(stats?.active_blogs ?? 0).toLocaleString()} active</p>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center gap-4 text-violet-500 mb-4"><Users size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Users</span></div>
-          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_users || 0}</div>
+          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{(stats?.total_users ?? 0).toLocaleString()}</div>
           <p className="text-sm text-zinc-500 mt-2">Platform wide</p>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center gap-4 text-violet-400 mb-4"><Layout size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Posts</span></div>
-          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_posts || 0}</div>
+          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{(stats?.total_posts ?? 0).toLocaleString()}</div>
           <p className="text-sm text-zinc-500 mt-2">Published content</p>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center gap-4 text-zinc-900 mb-4"><Activity size={24} /> <span className="font-semibold text-zinc-700 dark:text-zinc-300">Total Views</span></div>
-          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{stats?.total_views || 0}</div>
+          <div className="text-4xl font-bold text-zinc-900 dark:text-white">{(stats?.total_views ?? 0).toLocaleString()}</div>
           <p className="text-sm text-zinc-500 mt-2">Across all blogs</p>
         </div>
       </div>
@@ -82,7 +82,7 @@ export const SuperAdminDashboardPage = () => {
               <div key={`mobile-b-${b.blog_id}`} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
                   <div className="font-medium text-sm text-zinc-900 dark:text-zinc-200 truncate">{b.blog_name}</div>
-                  <div className="text-xs text-zinc-500">{b.total_posts} posts · {b.total_views} views</div>
+                  <div className="text-xs text-zinc-500">{b.total_posts.toLocaleString()} posts · {b.total_views.toLocaleString()} views</div>
                 </div>
                 <div className="shrink-0">
                   <PlanBadge plan={b.plan} />
@@ -106,8 +106,8 @@ export const SuperAdminDashboardPage = () => {
               {displayedBlogs?.map((b) => (
                 <tr key={b.blog_id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-200">{b.blog_name}</td>
-                  <td className="px-6 py-4">{b.total_posts}</td>
-                  <td className="px-6 py-4">{b.total_views}</td>
+                  <td className="px-6 py-4">{b.total_posts.toLocaleString()}</td>
+                  <td className="px-6 py-4">{b.total_views.toLocaleString()}</td>
                   <td className="px-6 py-4"><PlanBadge plan={b.plan} /></td>
                 </tr>
               ))}

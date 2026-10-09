@@ -156,7 +156,7 @@ export const SearchResultsPage = () => {
                 )}
                 <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
                   <span>{post.author?.username || 'Unknown'}</span>
-                  <span className="flex items-center gap-1"><Eye size={12} /> {post.views}</span>
+                  <span className="flex items-center gap-1"><Eye size={12} /> {post.views.toLocaleString()}</span>
                 </div>
               </button>
             ))}

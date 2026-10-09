@@ -317,7 +317,7 @@ export const PostList = () => {
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
                   <span className="truncate">{post.author?.username || 'Unknown'}</span>
                   <span>·</span>
-                  <span className="flex items-center gap-1"><Eye size={12} /> {post.views}</span>
+                  <span className="flex items-center gap-1"><Eye size={12} /> {post.views.toLocaleString()}</span>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
