@@ -3,6 +3,10 @@ import { getPlatformStats, getBlogAnalytics } from '../api/superadminApi';
 import { BarChart3, TrendingUp, Eye, FileText, Users, Building2, ArrowUp } from 'lucide-react';
 import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { planName, type PlanKey } from '../../../shared/lib/plans';
+
+// Every plan gets a bar, even at zero, so the chart reads the same each time.
+const PLAN_ORDER: PlanKey[] = ['free', 'pro', 'team'];
 
 const SuperAdminAnalyticsSkeleton = () => (
   <div className="p-4 sm:p-8 max-w-full sm:max-w-7xl mx-auto space-y-8">
@@ -163,18 +167,13 @@ export const SuperAdminAnalyticsPage = () => {
           </div>
           {blogs && blogs.length > 0 ? (
             <div className="space-y-3">
-              {Object.entries(
-                blogs.reduce((acc, b) => {
-                  const plan = (b as any).plan ?? 'FREE';
-                  acc[plan] = (acc[plan] ?? 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).map(([plan, count]) => {
+              {PLAN_ORDER.map((plan) => {
+                const count = blogs.filter((b) => b.plan === plan).length;
                 const pct = Math.round((count / blogs.length) * 100);
                 return (
                   <div key={plan}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-zinc-700 dark:text-zinc-300">{plan}</span>
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">{planName(plan)}</span>
                       <span className="text-zinc-500">{count} ({pct}%)</span>
                     </div>
                     <div className="h-2 bg-zinc-100 dark:bg-zinc-700 rounded-full overflow-hidden">

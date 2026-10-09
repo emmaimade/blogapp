@@ -5,6 +5,7 @@ import { Activity, Users, Database, Layout } from 'lucide-react';
 import { SuperAdminDashboardSkeleton } from '../components/SuperAdminDashboardSkeleton';
 import { formatSmart } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { PlanBadge } from '../../../shared/ui/PlanBadge';
 
 const TENANT_PREVIEW_LIMIT = 5;
 
@@ -84,7 +85,7 @@ export const SuperAdminDashboardPage = () => {
                   <div className="text-xs text-zinc-500">{b.total_posts} posts · {b.total_views} views</div>
                 </div>
                 <div className="shrink-0">
-                  <span className="inline-flex items-center rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-950 dark:bg-zinc-900/50 dark:text-zinc-500">{b.plan}</span>
+                  <PlanBadge plan={b.plan} />
                 </div>
               </div>
             ))
@@ -107,7 +108,7 @@ export const SuperAdminDashboardPage = () => {
                   <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-200">{b.blog_name}</td>
                   <td className="px-6 py-4">{b.total_posts}</td>
                   <td className="px-6 py-4">{b.total_views}</td>
-                  <td className="px-6 py-4"><span className="inline-flex items-center rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-950 dark:bg-zinc-900/50 dark:text-zinc-500">{b.plan}</span></td>
+                  <td className="px-6 py-4"><PlanBadge plan={b.plan} /></td>
                 </tr>
               ))}
               {(!displayedBlogs || displayedBlogs.length === 0) && (

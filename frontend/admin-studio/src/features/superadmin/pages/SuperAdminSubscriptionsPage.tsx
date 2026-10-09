@@ -6,6 +6,7 @@ import api from '../../../shared/api/client';
 import { formatLocalDate } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { LoadError } from '../../../shared/ui/LoadError';
+import { PlanBadge } from '../../../shared/ui/PlanBadge';
 import { toastApiError } from '../../../shared/lib/apiErrors';
 import { formatKobo, planName, type PlanKey } from '../../../shared/lib/plans';
 import type { PaymentTransaction } from '../../billing/hooks/useBilling';
@@ -55,12 +56,6 @@ const CATEGORY_META: Record<Category, { label: string; className: string }> = {
   free: { label: 'Free', className: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
 };
 
-const PLAN_BADGE: Record<PlanKey, string> = {
-  free: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300',
-  pro: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  team: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-};
-
 const FILTERS: { key: Category | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'paying', label: 'Paying' },
@@ -100,12 +95,6 @@ const billingLabel = (row: SubscriptionRow) => {
   if (row.billing_interval) return row.billing_interval === 'yearly' ? 'Yearly' : 'Monthly';
   return '—';
 };
-
-const PlanBadge = ({ plan }: { plan: PlanKey }) => (
-  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${PLAN_BADGE[plan] ?? PLAN_BADGE.free}`}>
-    {planName(plan)}
-  </span>
-);
 
 const CategoryBadge = ({ category }: { category: Category }) => (
   <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_META[category].className}`}>

@@ -1,4 +1,5 @@
 import api from '../../../shared/api/client';
+import type { PlanKey } from '../../../shared/lib/plans';
 
 export interface PlatformStats {
   date?: string;
@@ -21,7 +22,8 @@ export interface BlogAnalytics {
   team_members: number;
   created_at: string;
   last_activity?: string | null;
-  plan: string;
+  /** The plan its features follow right now: a lapsed trial is 'free'. */
+  plan: PlanKey;
   is_active?: boolean;
   subdomain?: string;
 }
