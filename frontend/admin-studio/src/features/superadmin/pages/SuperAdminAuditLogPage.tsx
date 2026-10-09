@@ -1,555 +1,404 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  Building2,
-  ChevronDown,
-  Clock,
-  Database,
-  Download,
-  FileText,
-  Filter,
-  KeyRound,
-  Network,
-  RefreshCw,
-  Search,
-  Settings,
-  ShieldCheck,
-  Trash2,
-  User,
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import { Download, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
-import { formatLocalDateTime, formatRelative } from '../../../shared/utils/dates';
 import { ActivityFeedSkeleton } from '../../../shared/ui/Skeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { AuditRow, type FilterKey } from '../components/audit-log/AuditRow';
+import { EntityPicker } from '../components/audit-log/EntityPicker';
+import {
+  CATEGORY_OPTIONS,
+  FILTER_KEYS,
+  RANGE_OPTIONS,
+  readFilters,
+  toApiParams,
+  type AuditSummary,
+  type PlatformAuditEntry,
+  type Severity,
+} from '../components/audit-log/types';
 
-interface AuditLogEntry {
-  id: number;
-  actor_user_id: number | null;
-  actor_email: string | null;
-  actor: string | null;
-  action: string;
-  resource_type: string;
-  target_type: string | null;
-  resource_id: number | null;
-  blog_id: number | null;
-  blog_name: string | null;
-  resource_label: string | null;
-  details: Record<string, unknown> | null;
-  description: string | null;
-  ip_address: string | null;
-  user_agent?: string | null;
-  created_at: string;
-}
+const PAGE_SIZE = 50;
+const numberFormat = new Intl.NumberFormat();
 
-type Severity = 'info' | 'warning' | 'critical';
-type Category = 'all' | 'auth' | 'tenants' | 'users' | 'settings' | 'content' | 'moderation' | 'system';
+const controlClass =
+  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:focus-visible:ring-zinc-700';
 
-interface ActionMeta {
-  label: string;
-  category: Exclude<Category, 'all'>;
-  severity: Severity;
-  icon: ReactNode;
-}
-
-const PAGE_SIZE = 100;
-
-const ACTION_META: Record<string, ActionMeta> = {
-  'user.login': { label: 'User Login', category: 'auth', severity: 'info', icon: <KeyRound size={14} /> },
-  'user.register': { label: 'User Registered', category: 'users', severity: 'info', icon: <User size={14} /> },
-  'user.update_profile': { label: 'Profile Updated', category: 'users', severity: 'info', icon: <User size={14} /> },
-  'user.delete_account': { label: 'Account Deleted', category: 'users', severity: 'critical', icon: <Trash2 size={14} /> },
-  'blog.create': { label: 'Workspace Created', category: 'tenants', severity: 'info', icon: <Building2 size={14} /> },
-  'blog.update': { label: 'Workspace Updated', category: 'tenants', severity: 'info', icon: <Building2 size={14} /> },
-  'blog.member_add': { label: 'Workspace Member Added', category: 'users', severity: 'warning', icon: <User size={14} /> },
-  'blog.member_remove': { label: 'Workspace Member Removed', category: 'users', severity: 'warning', icon: <User size={14} /> },
-  'blog.member_permissions_update': { label: 'Workspace Permissions Updated', category: 'users', severity: 'warning', icon: <ShieldCheck size={14} /> },
-  'post.created': { label: 'Post Created', category: 'content', severity: 'info', icon: <FileText size={14} /> },
-  'post.updated': { label: 'Post Updated', category: 'content', severity: 'info', icon: <FileText size={14} /> },
-  'post.deleted': { label: 'Post Deleted', category: 'content', severity: 'critical', icon: <Trash2 size={14} /> },
-  'comment.delete': { label: 'Comment Deleted', category: 'moderation', severity: 'warning', icon: <Trash2 size={14} /> },
-  'moderation.approve': { label: 'Moderation Approved', category: 'moderation', severity: 'info', icon: <ShieldCheck size={14} /> },
-  'moderation.reject': { label: 'Moderation Rejected', category: 'moderation', severity: 'warning', icon: <AlertTriangle size={14} /> },
-  'moderation.remove': { label: 'Content Removed', category: 'moderation', severity: 'critical', icon: <Trash2 size={14} /> },
-  'settings.updated': { label: 'Workspace Settings Updated', category: 'settings', severity: 'info', icon: <Settings size={14} /> },
-  'branding.updated': { label: 'Branding Updated', category: 'settings', severity: 'info', icon: <Settings size={14} /> },
-  'superadmin.blog_status_update': { label: 'Workspace Status Changed', category: 'tenants', severity: 'warning', icon: <Building2 size={14} /> },
-  'superadmin.blog_delete': { label: 'Workspace Deleted', category: 'tenants', severity: 'critical', icon: <Trash2 size={14} /> },
-  'superadmin.user_status_update': { label: 'User Status Changed', category: 'users', severity: 'warning', icon: <User size={14} /> },
-  'superadmin.user_delete': { label: 'User Deleted', category: 'users', severity: 'critical', icon: <Trash2 size={14} /> },
-  'superadmin.platform_settings_update': { label: 'Platform Settings Updated', category: 'settings', severity: 'critical', icon: <Settings size={14} /> },
-};
-
-const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'auth', label: 'Auth' },
-  { value: 'tenants', label: 'Tenants' },
-  { value: 'users', label: 'Users' },
-  { value: 'settings', label: 'Settings' },
-  { value: 'content', label: 'Content' },
-  { value: 'moderation', label: 'Moderation' },
-  { value: 'system', label: 'System' },
+const SEVERITY_CHIPS: { value: Severity; label: string; dot: string }[] = [
+  { value: 'critical', label: 'Critical', dot: 'bg-red-500' },
+  { value: 'warning', label: 'Warning', dot: 'bg-amber-500' },
+  { value: 'info', label: 'Info', dot: 'bg-zinc-400' },
 ];
 
-const severityClass: Record<Severity, string> = {
-  info: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300',
-  warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300',
-  critical: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300',
-};
-
-const iconClass: Record<Severity, string> = {
-  info: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300',
-  warning: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300',
-  critical: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300',
-};
-
-const humanize = (value: string) =>
-  value
-    .replace(/\./g, ' ')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const getActionMeta = (log: AuditLogEntry): ActionMeta => {
-  if (ACTION_META[log.action]) return ACTION_META[log.action];
-  if (log.action.startsWith('http.')) {
-    return { label: log.action.toUpperCase(), category: 'system', severity: 'info', icon: <Network size={14} /> };
-  }
-  if (log.action.includes('delete') || log.action.includes('remove')) {
-    return { label: humanize(log.action), category: 'system', severity: 'critical', icon: <Trash2 size={14} /> };
-  }
-  if (log.action.includes('status') || log.action.includes('permission')) {
-    return { label: humanize(log.action), category: 'system', severity: 'warning', icon: <AlertTriangle size={14} /> };
-  }
-  return { label: humanize(log.action), category: 'system', severity: 'info', icon: <ShieldCheck size={14} /> };
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Owner',
-  editor: 'Editor',
-  author: 'Author',
-  viewer: 'Viewer',
-};
-
-const roleLabel = (role: unknown) =>
-  typeof role === 'string' ? ROLE_LABELS[role.toLowerCase()] ?? role : String(role ?? 'unknown');
-
-const describeLog = (log: AuditLogEntry, meta: ActionMeta): string => {
-  const details = log.details && typeof log.details === 'object' ? log.details : {};
-  const action = log.action.toLowerCase();
-
-  if (action.includes('member_add')) {
-    const email = (details.email as string) || null;
-    const role = details.role ? roleLabel(details.role) : null;
-    if (email && role) return `Added ${email} as ${role}`;
-    if (email) return `Added ${email} to the workspace`;
-  }
-
-  if (action.includes('member_remove')) {
-    const email = (details.email as string) || null;
-    const role = details.role ? ` (${roleLabel(details.role)})` : '';
-    if (email) return `Removed ${email}${role} from the workspace`;
-  }
-
-  if (action.includes('member_permissions_update')) {
-    const email = (details.email as string) || 'a team member';
-    const roleChange = details.changes && typeof details.changes === 'object'
-      ? (details.changes as Record<string, any>).role
-      : undefined;
-    if (roleChange) {
-      return `Changed ${email}'s role from ${roleLabel(roleChange.from)} to ${roleLabel(roleChange.to)}`;
-    }
-    return `Updated ${email}'s permissions`;
-  }
-
-  if (details.from !== undefined && details.to !== undefined) {
-    return `${meta.label}: ${String(details.from)} \u2192 ${String(details.to)}`;
-  }
-
-  const changes = details.changes;
-  if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
-    const parts = Object.entries(changes).map(
-      ([field, c]) => {
-        const changeObj = c && typeof c === 'object' ? (c as { from?: unknown; to?: unknown }) : {};
-        return `${humanize(field)} ${String(changeObj.from ?? '')} \u2192 ${String(changeObj.to ?? '')}`;
-      },
-    );
-    if (parts.length > 0) return `${meta.label}: ${parts.join('; ')}`;
-  }
-
-  return log.description || meta.label;
-};
-
-const formatTenantScope = (log: AuditLogEntry, withId = false): string => {
-  if (!log.blog_id) return 'Platform';
-  if (!log.blog_name) return `Blog #${log.blog_id}`;
-  return withId ? `${log.blog_name} (Blog #${log.blog_id})` : log.blog_name;
-};
-
-const formatResourceLabel = (log: AuditLogEntry, withId = false): string => {
-  const fallback = `${log.resource_type}${log.resource_id ? ` #${log.resource_id}` : ''}`;
-  if (!log.resource_label) return fallback;
-  return withId ? `${log.resource_label} (${fallback})` : log.resource_label;
-};
-
-const stringifyDetail = (value: unknown) => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return JSON.stringify(value);
-};
-
 export const SuperAdminAuditLogPage = () => {
-  useDocumentTitle('Audit log');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState<Category>('all');
-  const [severityFilter, setSeverityFilter] = useState<'all' | Severity>('all');
-  const [actionFilter, setActionFilter] = useState('all');
-  const [blogIdFilter, setBlogIdFilter] = useState('');
-  const [actorIdFilter, setActorIdFilter] = useState('');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  useDocumentTitle('Platform audit log');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(() => readFilters(searchParams), [searchParams]);
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const [exporting, setExporting] = useState(false);
 
-  const { data, isLoading, isFetching, refetch } = useQuery<{ logs: AuditLogEntry[]; totalCount: number }>({
-    queryKey: ['superadmin-audit-logs', page, actionFilter, blogIdFilter, actorIdFilter, search],
+  /** Changing any filter goes back to page 1; paging keeps the filters. */
+  const updateParams = (changes: Record<string, string>, { replace = false, keepPage = false } = {}) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(changes).forEach(([key, value]) => (value ? next.set(key, value) : next.delete(key)));
+        if (!keepPage) next.delete('page');
+        return next;
+      },
+      { replace },
+    );
+
+  // Search types ahead of the URL; see ActivityLogPage for the same pattern.
+  const [searchInput, setSearchInput] = useState(filters.q);
+  const [syncedQ, setSyncedQ] = useState(filters.q);
+  if (filters.q !== syncedQ) {
+    setSyncedQ(filters.q);
+    setSearchInput(filters.q);
+  }
+  useEffect(() => {
+    const next = searchInput.trim();
+    if (next === filters.q) return;
+    const handle = setTimeout(() => updateParams({ q: next }, { replace: true }), 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput, filters.q]);
+
+  const filterKey = JSON.stringify(filters);
+
+  const { data, isLoading, isError, isFetching, isPlaceholderData, refetch } = useQuery({
+    queryKey: ['superadmin-audit-logs', filterKey, page],
     queryFn: async () => {
-      const res = await api.get('/superadmin/audit-logs', {
-        params: {
-          skip: page * PAGE_SIZE,
-          limit: PAGE_SIZE,
-          action: actionFilter !== 'all' ? actionFilter : undefined,
-          blog_id: blogIdFilter.trim() ? Number(blogIdFilter) : undefined,
-          actor_user_id: actorIdFilter.trim() ? Number(actorIdFilter) : undefined,
-          search: search.trim() ? search.trim() : undefined,
-        },
+      const res = await api.get<PlatformAuditEntry[]>('/superadmin/audit-logs', {
+        params: { ...toApiParams(filters), skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE },
       });
-      const totalCount = Number(res.headers['x-total-count'] ?? res.data.length);
-      return { logs: res.data, totalCount };
+      return { logs: res.data, total: Number(res.headers['x-total-count'] ?? res.data.length) };
     },
+    placeholderData: keepPreviousData,
+  });
+
+  // The summary ignores the severity filter, so it isn't part of the key.
+  const { data: summary, refetch: refetchSummary } = useQuery<AuditSummary>({
+    queryKey: ['superadmin-audit-summary', JSON.stringify({ ...filters, severity: '' })],
+    queryFn: async () => (await api.get('/superadmin/audit-logs/summary', { params: toApiParams(filters) })).data,
+    placeholderData: keepPreviousData,
   });
 
   const logs = data?.logs ?? [];
-  const totalCount = data?.totalCount ?? 0;
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasFilters = FILTER_KEYS.some((key) => key !== 'logins' && !!filters[key]);
+  const isRefreshing = isFetching && !isLoading;
 
-  const actionOptions = useMemo(
-    () => Array.from(new Set([...Object.keys(ACTION_META), ...logs.map((log) => log.action)])).sort(),
-    [logs],
-  );
+  const goToPage = (next: number) => {
+    updateParams({ page: next > 1 ? String(next) : '' }, { keepPage: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
-      const meta = getActionMeta(log);
-      const matchesCategory = categoryFilter === 'all' || meta.category === categoryFilter;
-      const matchesSeverity = severityFilter === 'all' || meta.severity === severityFilter;
-      return matchesCategory && matchesSeverity;
-    });
-  }, [categoryFilter, logs, severityFilter]);
+  const handleFilter = (key: FilterKey, value: string) => updateParams({ [key]: value });
 
-  const metrics = useMemo(() => {
-    const critical = filteredLogs.filter((log) => getActionMeta(log).severity === 'critical').length;
-    const warning = filteredLogs.filter((log) => getActionMeta(log).severity === 'warning').length;
-    const superadmin = filteredLogs.filter((log) => log.action.startsWith('superadmin.')).length;
-    const uniqueActors = new Set(filteredLogs.map((log) => log.actor_email).filter(Boolean)).size;
-    return { critical, warning, superadmin, uniqueActors };
-  }, [filteredLogs]);
+  const clearFilters = () => {
+    setSearchInput('');
+    updateParams(Object.fromEntries(FILTER_KEYS.filter((key) => key !== 'logins').map((key) => [key, ''])));
+  };
 
-  const handleExportCsv = async () => {
-    const response = await api.get('/superadmin/audit-logs/export', {
-      params: {
-        action: actionFilter !== 'all' ? actionFilter : undefined,
-        blog_id: blogIdFilter.trim() ? Number(blogIdFilter) : undefined,
-        actor_user_id: actorIdFilter.trim() ? Number(actorIdFilter) : undefined,
-        search: search.trim() ? search.trim() : undefined,
-      },
-      responseType: 'blob',
-    });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `platform-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await api.get('/superadmin/audit-logs/export', { params: toApiParams(filters), responseType: 'blob' });
+      const disposition = String(res.headers['content-disposition'] ?? '');
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? 'platform-audit-log.csv';
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      if (res.headers['x-export-truncated'] === 'true') {
+        toast('Exported the newest 10,000 entries. Narrow the filters to export the rest.', { icon: '⚠️' });
+      } else {
+        toast.success('Export downloaded.');
+      }
+    } catch {
+      toast.error("Couldn't export the audit log. Try again.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">Platform Audit Log</h1>
-          <p className="mt-2 max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">
-            Cross-tenant forensic trail for privileged actions, security-sensitive changes, and operational events.
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Platform audit log</h1>
+          <p className="mt-1 max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
+            Every workspace's activity and every superadmin action, for investigating incidents.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            <Download size={14} /> Export CSV
+          <button type="button" onClick={handleExport} disabled={exporting} className={headerButtonClass}>
+            <Download size={14} aria-hidden="true" />
+            {exporting ? 'Exporting…' : 'Export CSV'}
           </button>
           <button
-            onClick={() => refetch()}
-            disabled={isLoading || isFetching}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            type="button"
+            onClick={() => {
+              refetch();
+              refetchSummary();
+            }}
+            disabled={isFetching}
+            className={headerButtonClass}
           >
-            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} /> Refresh
+            <RefreshCw size={14} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Refresh</span>
+            <span className="sr-only sm:hidden">Refresh audit log</span>
           </button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<Database size={16} />} label="Total Records Found" value={totalCount} tone="zinc" />
-        <MetricCard icon={<AlertTriangle size={16} />} label="Critical Events (Page)" value={metrics.critical} tone="red" />
-        <MetricCard icon={<ShieldCheck size={16} />} label="Superadmin Actions (Page)" value={metrics.superadmin} tone="amber" />
-        <MetricCard icon={<User size={16} />} label="Unique Actors (Page)" value={metrics.uniqueActors} tone="blue" />
-      </div>
-
-      <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">
-          <Filter size={14} /> Filters
-        </div>
-        <div className="grid gap-3 lg:grid-cols-[minmax(240px,1.4fr)_repeat(5,minmax(130px,1fr))]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+      {/* Filters */}
+      <div role="search" className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))]">
+          <div className="relative sm:col-span-2 xl:col-span-1">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
-              type="text"
-              placeholder="Search actor, action, IP, details..."
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); setPage(0); }}
-              className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-700"
+              type="search"
+              aria-label="Search the audit log"
+              placeholder="Search email, IP address, event, details…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className={`${controlClass} pl-9 placeholder:text-zinc-400`}
             />
           </div>
-
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as Category)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <EntityPicker kind="user" value={filters.actor} onChange={(id) => updateParams({ actor: id })} />
+          <EntityPicker kind="workspace" value={filters.workspace} onChange={(id) => updateParams({ workspace: id })} />
+          <select
+            aria-label="Category"
+            value={filters.category}
+            onChange={(e) => updateParams({ category: e.target.value })}
+            className={controlClass}
+          >
+            {CATEGORY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
-
-          <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value as 'all' | Severity)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            <option value="all">All Severity</option>
-            <option value="critical">Critical</option>
-            <option value="warning">Warning</option>
-            <option value="info">Info</option>
+          <select
+            aria-label="Time range"
+            value={filters.range}
+            onChange={(e) => updateParams({ range: e.target.value, from: '', to: '' })}
+            className={controlClass}
+          >
+            {RANGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
-
-          <select value={actionFilter} onChange={(event) => { setActionFilter(event.target.value); setPage(0); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            <option value="all">All Actions</option>
-            {actionOptions.map((action) => <option key={action} value={action}>{humanize(action)}</option>)}
-          </select>
-
-          <input value={blogIdFilter} onChange={(event) => { setBlogIdFilter(event.target.value.replace(/\D/g, '')); setPage(0); }} placeholder="Blog ID" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100" />
-          <input value={actorIdFilter} onChange={(event) => { setActorIdFilter(event.target.value.replace(/\D/g, '')); setPage(0); }} placeholder="Actor ID" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100" />
         </div>
-      </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        {isLoading ? (
-          <ActivityFeedSkeleton rows={8} />
-        ) : filteredLogs.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <ShieldCheck size={32} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
-            <p className="text-sm font-medium text-zinc-500">No audit entries match these filters.</p>
+        {filters.range === 'custom' && (
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-xs text-zinc-500 dark:text-zinc-400">
+              From
+              <input
+                type="datetime-local"
+                value={filters.from}
+                onChange={(e) => updateParams({ from: e.target.value })}
+                className={`${controlClass} mt-1 w-auto`}
+              />
+            </label>
+            <label className="text-xs text-zinc-500 dark:text-zinc-400">
+              To
+              <input
+                type="datetime-local"
+                value={filters.to}
+                min={filters.from || undefined}
+                onChange={(e) => updateParams({ to: e.target.value })}
+                className={`${controlClass} mt-1 w-auto`}
+              />
+            </label>
+            <p className="pb-2 text-xs text-zinc-400">Your local time.</p>
           </div>
-        ) : (
-          <>
-            {/* Mobile Card List View */}
-            <div className="block md:hidden divide-y divide-zinc-100 dark:divide-zinc-900">
-              {filteredLogs.map((log) => {
-                const meta = getActionMeta(log);
-                const isExpanded = expandedId === log.id;
-                return (
-                  <div key={`mobile-${log.id}`}>
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                      className="flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
-                    >
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
-                        {meta.icon}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
-                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
-                            {meta.severity}
-                          </span>
-                        </span>
-                        <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
-                        <span className="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-400">
-                          <span className="truncate">{log.actor_email || log.actor || 'System'}</span>
-                          <span className="shrink-0" title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
-                        </span>
-                      </span>
-                      <ChevronDown size={14} className={`mt-1 shrink-0 text-zinc-400 transition ${isExpanded ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isExpanded && <ExpandedLog log={log} meta={meta} />}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Desktop Table Layout View */}
-            <div className="hidden md:block overflow-x-auto">
-              <div className="min-w-full sm:min-w-200">
-                <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <span />
-                  <span>Event</span>
-                  <span>Actor</span>
-                  <span>Tenant</span>
-                  <span>Resource</span>
-                  <span>Time</span>
-                </div>
-
-                <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-                  {filteredLogs.map((log) => {
-                    const meta = getActionMeta(log);
-                    const isExpanded = expandedId === log.id;
-                    return (
-                      <div key={log.id}>
-                        <button
-                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                          className="grid w-full grid-cols-[44px_minmax(220px,1.4fr)_minmax(160px,1fr)_120px_120px_140px] items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
-                        >
-                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass[meta.severity]}`}>
-                            {meta.icon}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="flex items-center gap-2">
-                              <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{meta.label}</span>
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
-                                {meta.severity}
-                              </span>
-                            </span>
-                            <span className="mt-1 block truncate text-xs text-zinc-500 dark:text-zinc-400">{describeLog(log, meta)}</span>
-                          </span>
-                          <span className="min-w-0 text-xs text-zinc-600 dark:text-zinc-300">
-                            <span className="block truncate font-medium">{log.actor_email || log.actor || 'System'}</span>
-                            {log.actor_user_id && <span className="text-[11px] text-zinc-400">ID {log.actor_user_id}</span>}
-                          </span>
-                          <span title={formatTenantScope(log)} className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{formatTenantScope(log)}</span>
-                          <span title={formatResourceLabel(log)} className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{formatResourceLabel(log)}</span>
-                          <span className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                            <span title={formatLocalDateTime(log.created_at)}>{formatRelative(log.created_at)}</span>
-                            <ChevronDown size={14} className={`transition ${isExpanded ? 'rotate-180' : ''}`} />
-                          </span>
-                        </button>
-
-                        {isExpanded && <ExpandedLog log={log} meta={meta} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </>
         )}
 
-        <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <p className="text-xs text-zinc-400">
-            Showing Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE) || 1} ({totalCount} total entries).
-          </p>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.action && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                Event: <span className="font-mono">{filters.action}</span>
+                <button
+                  type="button"
+                  onClick={() => updateParams({ action: '' })}
+                  aria-label="Clear event filter"
+                  className="rounded-full p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </span>
+            )}
+            <label className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+              <input
+                type="checkbox"
+                checked={filters.logins || !!filters.actor}
+                disabled={!!filters.actor}
+                onChange={(e) => updateParams({ logins: e.target.checked ? '1' : '' })}
+                className="h-3.5 w-3.5 rounded border-zinc-300 accent-zinc-800 dark:border-zinc-600"
+              />
+              Include sign-ins
+              {filters.actor && <span className="text-zinc-400">(always, for one person)</span>}
+            </label>
+          </div>
+          {hasFilters && (
             <button
-              onClick={() => setPage((value) => Math.max(0, value - 1))}
-              disabled={page === 0 || isLoading}
-              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
-              Previous
+              <X size={13} aria-hidden="true" />
+              Clear filters
             </button>
-            <button
-              onClick={() => setPage((value) => value + 1)}
-              disabled={(page + 1) * PAGE_SIZE >= totalCount || isLoading}
-              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const MetricCard = ({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: 'zinc' | 'red' | 'amber' | 'blue' }) => {
-  const tones = {
-    zinc: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300',
-    red: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300',
-    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300',
-    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300',
-  };
-
-  return (
-    <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tones[tone]}`}>{icon}</div>
-      <p className="text-2xl font-bold text-zinc-900 dark:text-white">{value}</p>
-      <p className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
-    </div>
-  );
-};
-
-const ExpandedLog = ({ log, meta }: { log: AuditLogEntry; meta: ActionMeta }) => {
-  const detailEntries = Object.entries(log.details ?? {});
-
-  return (
-    <div className="border-t border-zinc-100 bg-zinc-50/60 px-4 py-5 dark:border-zinc-900 dark:bg-zinc-900/30">
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{meta.label}</p>
-              <p className="mt-0.5 font-mono text-xs text-zinc-400">{log.action}</p>
-            </div>
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[meta.severity]}`}>
-              {meta.category}
-            </span>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <DetailItem label="Actor" value={log.actor_email || log.actor || 'System'} />
-            <DetailItem label="Actor ID" value={log.actor_user_id ?? 'None'} />
-            <DetailItem label="Tenant Scope" value={formatTenantScope(log, true)} />
-            <DetailItem label="Resource" value={formatResourceLabel(log, true)} />
-            <DetailItem label="IP Address" value={log.ip_address || 'Not captured'} />
-            <DetailItem label="Created" value={formatLocalDateTime(log.created_at)} />
-          </div>
-          {log.user_agent && (
-            <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">User Agent</p>
-              <p className="wrap-break-word font-mono text-xs text-zinc-600 dark:text-zinc-300">{log.user_agent}</p>
-            </div>
           )}
         </div>
+      </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="mb-3 flex items-center gap-2">
-            <Clock size={14} className="text-zinc-400" />
-            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Event Details</p>
+      {/* Severity counts double as the severity filter */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by severity">
+        <SeverityChip
+          label="All"
+          count={summary?.total}
+          pressed={!filters.severity}
+          onClick={() => updateParams({ severity: '' })}
+        />
+        {SEVERITY_CHIPS.map((chip) => (
+          <SeverityChip
+            key={chip.value}
+            label={chip.label}
+            dot={chip.dot}
+            count={summary?.by_severity[chip.value]}
+            pressed={filters.severity === chip.value}
+            onClick={() => updateParams({ severity: filters.severity === chip.value ? '' : chip.value })}
+          />
+        ))}
+      </div>
+
+      {/* Log */}
+      <div
+        aria-busy={isFetching}
+        className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+      >
+        <div className="hidden grid-cols-[2rem_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_2rem] gap-x-3 border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 md:grid dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
+          <span />
+          <span>Event</span>
+          <span>Who</span>
+          <span>Workspace</span>
+          <span>When</span>
+          <span />
+        </div>
+
+        {isLoading ? (
+          <ActivityFeedSkeleton rows={8} />
+        ) : isError && logs.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Couldn't load the audit log.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-3 text-sm font-medium text-violet-600 hover:underline dark:text-violet-400"
+            >
+              Try again
+            </button>
           </div>
-          {detailEntries.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-zinc-200 px-3 py-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
-              No structured details were attached to this event.
+        ) : logs.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <ShieldCheck size={28} aria-hidden="true" className="mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">No entries match these filters.</p>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-3 text-sm font-medium text-violet-600 hover:underline dark:text-violet-400"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <ul
+            className={`divide-y divide-zinc-100 transition-opacity dark:divide-zinc-800/80 ${
+              isRefreshing && isPlaceholderData ? 'opacity-60' : ''
+            }`}
+          >
+            {logs.map((log) => (
+              <AuditRow key={log.id} log={log} onFilter={handleFilter} />
+            ))}
+          </ul>
+        )}
+
+        {total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Page {numberFormat.format(page)} of {numberFormat.format(pageCount)} · {numberFormat.format(total)}{' '}
+              {total === 1 ? 'entry' : 'entries'}
             </p>
-          ) : (
-            <div className="space-y-2">
-              {detailEntries.map(([key, value]) => (
-                <div key={key} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{humanize(key)}</p>
-                  <p className="wrap-break-word font-mono text-xs text-zinc-700 dark:text-zinc-300">{stringifyDetail(value)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-3 rounded-lg bg-zinc-950 p-3 text-xs text-zinc-100 dark:bg-black">
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap">{JSON.stringify(log, null, 2)}</pre>
+            <nav aria-label="Pages" className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => goToPage(page - 1)}
+                disabled={page <= 1 || isFetching}
+                className={pagerButtonClass}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(page + 1)}
+                disabled={page >= pageCount || isFetching}
+                className={pagerButtonClass}
+              >
+                Next
+              </button>
+            </nav>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
-const DetailItem = ({ label, value }: { label: string; value: ReactNode }) => (
-  <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">{label}</p>
-    <p className="wrap-break-word text-xs font-semibold text-zinc-700 dark:text-zinc-300">{value}</p>
-  </div>
+const headerButtonClass =
+  'inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900';
+
+const pagerButtonClass =
+  'rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800';
+
+const SeverityChip = ({
+  label,
+  count,
+  pressed,
+  onClick,
+  dot,
+}: {
+  label: string;
+  count: number | undefined;
+  pressed: boolean;
+  onClick: () => void;
+  dot?: string;
+}) => (
+  <button
+    type="button"
+    aria-pressed={pressed}
+    onClick={onClick}
+    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 ${
+      pressed
+        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900'
+    }`}
+  >
+    {dot && <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot}`} />}
+    {label}
+    <span className={`tabular-nums ${pressed ? 'opacity-80' : 'text-zinc-500 dark:text-zinc-400'}`}>
+      {count === undefined ? '–' : numberFormat.format(count)}
+    </span>
+  </button>
 );
