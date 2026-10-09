@@ -36,7 +36,11 @@ export const CommentManager = () => {
 
   const { data: comments, isLoading } = useQuery<Comment[]>({
     queryKey: ['blogComments', activeMembership?.blog_id],
-    queryFn: async () => (await api.get(`/blogs/${activeMembership!.blog_id}/comments/`)).data,
+    // First page only until the list gets real pagination controls.
+    queryFn: async () =>
+      (await api.get<{ items: Comment[] }>(`/blogs/${activeMembership!.blog_id}/comments/`, {
+        params: { limit: 100 },
+      })).data.items,
     enabled: !!activeMembership,
   });
 

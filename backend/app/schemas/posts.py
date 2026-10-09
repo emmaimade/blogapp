@@ -68,10 +68,18 @@ class PostRead(UTCDatetimeMixin, BaseModel):
     updated_at: datetime
     tags: List[TagRead] = Field(default_factory=list)
     project_metadata: Optional[MetadataRead] = None
-    comments: List["CommentRead"] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
+
+
+class PostDetailRead(PostRead):
+    """
+    A single post. The thread itself is fetched separately and paginated
+    (GET /comments/post/{id}); only the count rides along here. Lists use
+    PostRead, which deliberately carries no comment data at all.
+    """
+    comment_count: int = 0
 
 
 class PostShort(BaseModel):

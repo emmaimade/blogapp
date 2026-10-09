@@ -7,8 +7,17 @@ from app.core.db import get_session
 from app.core.moderation import flag_post, load_post_for_flag
 from app.core.security import get_current_user, get_current_user_optional
 from app.core.permissions import get_public_blog, require_blog_author, require_completed_onboarding
-from app.models import User, Blog
-from app.schemas import FlagContentCreate, ModerationQueueItemRead, PaginatedResponse, PostCreate, PostRead, PostUpdate
+from app.models import Blog, Post, User
+from app.modules.comments.service import count_live_comments
+from app.schemas import (
+    FlagContentCreate,
+    ModerationQueueItemRead,
+    PaginatedResponse,
+    PostCreate,
+    PostDetailRead,
+    PostRead,
+    PostUpdate,
+)
 from . import service as post_service
 
 router = APIRouter(prefix="/blogs/{blog_id}/posts", tags=["posts"])
@@ -169,14 +178,14 @@ def flag_post_for_moderation(
     )
 
 
-@router.get("/{post_id}", response_model=PostRead)
+@router.get("/{post_id}", response_model=PostDetailRead)
 def read_post(
     blog_id: int,
     post_id: int,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
 ):
-    return post_service.read_post(blog_id, post_id, session)
+    return _with_comment_count(post_service.read_post(blog_id, post_id, session), session)
 
 
 @router.get("/slug/{slug}/related", response_model=List[PostRead])
@@ -190,7 +199,7 @@ def read_related_posts(
     return post_service.get_related_posts(blog_id, slug, session, limit)
 
 
-@router.get("/slug/{slug}", response_model=PostRead)
+@router.get("/slug/{slug}", response_model=PostDetailRead)
 def read_post_by_slug(
     blog_id: int,
     slug: str,
@@ -198,4 +207,11 @@ def read_post_by_slug(
     blog: Blog = Depends(get_public_blog),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    return post_service.read_post_by_slug(blog_id, slug, session, current_user)
+    post = post_service.read_post_by_slug(blog_id, slug, session, current_user)
+    return _with_comment_count(post, session)
+
+
+def _with_comment_count(post: Post, session: Session) -> PostDetailRead:
+    detail = PostDetailRead.model_validate(post)
+    detail.comment_count = count_live_comments(session, post.id)
+    return detail

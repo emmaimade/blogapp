@@ -4,9 +4,10 @@ and what can still be changed once a comment is deleted. The router stays a
 thin HTTP layer over these.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import Request
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -16,6 +17,7 @@ from app.core.exceptions import AuthorizationError, BadRequestError, ConflictErr
 from app.core.notifications import add_notification
 from app.core.permissions import Permissions
 from app.models import Blog, BlogRole, Comment, Post, User
+from app.models.comment import CommentDeletedBy, utcnow
 from app.models.post import PostStatus
 from app.schemas import CommentCreate, CommentUpdate
 
@@ -69,8 +71,9 @@ def create_comment(
 
 
 def list_post_comments(
-    session: Session, post_id: int, current_user: Optional[User]
-) -> List[Comment]:
+    session: Session, post_id: int, current_user: Optional[User], skip: int, limit: int
+) -> Tuple[List[Comment], int, int]:
+    """Returns (top-level comments for this page, top-level total, live comment count)."""
     post = session.get(Post, post_id)
     blog = session.get(Blog, post.blog_id) if post else None
     if not post or not blog or not blog.is_active:
@@ -81,8 +84,42 @@ def list_post_comments(
     if post.status != PostStatus.PUBLISHED and not _is_workspace_writer(current_user, post.blog_id, session):
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
-    statement = select(Comment).where(Comment.post_id == post_id, Comment.parent_id == None)  # noqa: E711
-    return session.exec(statement).all()
+    top_level = (Comment.post_id == post_id, Comment.parent_id == None)  # noqa: E711
+    total = session.exec(select(func.count(Comment.id)).where(*top_level)).one()
+    items = session.exec(
+        select(Comment)
+        .where(*top_level)
+        .options(selectinload(Comment.user), selectinload(Comment.replies).selectinload(Comment.user))
+        .order_by(Comment.created_at, Comment.id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
+    return items, total, count_live_comments(session, post_id)
+
+
+def count_live_comments(session: Session, post_id: int) -> int:
+    """Every non-deleted comment on the post, replies included."""
+    return session.exec(
+        select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
+    ).one()
+
+
+def list_blog_comments(
+    session: Session, blog_id: int, q: Optional[str], skip: int, limit: int
+) -> Tuple[List[Comment], int]:
+    filters = [Post.blog_id == blog_id]
+    if q:
+        filters.append(Comment.content.ilike(f"%{q}%"))
+
+    base = select(Comment).join(Post, Comment.post_id == Post.id).where(*filters)
+    total = session.exec(select(func.count()).select_from(base.subquery())).one()
+    items = session.exec(
+        base.options(selectinload(Comment.user), selectinload(Comment.post))
+        .order_by(Comment.created_at.desc(), Comment.id.desc())
+        .offset(skip)
+        .limit(limit)
+    ).all()
+    return items, total
 
 
 def update_comment(
@@ -103,6 +140,7 @@ def update_comment(
         raise ConflictError(ErrorCode.COMMENT_DELETED)
 
     comment.content = payload.content
+    comment.edited_at = utcnow()
     session.add(comment)
 
     # Comments don't carry blog_id directly — resolve it through the parent
@@ -139,12 +177,9 @@ def delete_comment(
     if comment.is_deleted:
         raise ConflictError(ErrorCode.COMMENT_DELETED)
 
-    if is_author:
-        comment.content = "[This comment has been deleted by the author]"
-    else:
-        comment.content = "[This comment has been deleted by a moderator]"
-    comment.is_deleted = True
-    session.add(comment)
+    soft_delete_comment(
+        session, comment, CommentDeletedBy.AUTHOR if is_author else CommentDeletedBy.PLATFORM
+    )
 
     # Same as update_comment — resolve blog_id through the post so the
     # deletion lands in the workspace-scoped audit log.
@@ -165,6 +200,46 @@ def delete_comment(
         request=request,
     )
     session.commit()
+
+
+def moderate_blog_comment(
+    session: Session, blog_id: int, comment_id: int, current_user: User, request: Request
+) -> None:
+    comment = session.exec(
+        select(Comment)
+        .join(Post, Comment.post_id == Post.id)
+        .where(Comment.id == comment_id, Post.blog_id == blog_id)
+    ).first()
+    if not comment:
+        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
+    if comment.is_deleted:
+        raise ConflictError(ErrorCode.COMMENT_DELETED)
+
+    soft_delete_comment(session, comment, CommentDeletedBy.MODERATOR)
+
+    post = session.get(Post, comment.post_id)
+    add_audit_log(
+        session,
+        action="comment.moderator_delete",
+        resource_type="comment",
+        resource_id=comment.id,
+        blog_id=blog_id,
+        actor=current_user,
+        details={"post_id": comment.post_id, "post_title": post.title if post else None},
+        request=request,
+    )
+    session.commit()
+
+
+def soft_delete_comment(session: Session, comment: Comment, deleted_by: CommentDeletedBy) -> None:
+    """
+    The one way a comment is deleted. `content` is left intact for moderator
+    review and restore; public responses mask it (see CommentRead).
+    """
+    comment.is_deleted = True
+    comment.deleted_at = utcnow()
+    comment.deleted_by = deleted_by.value
+    session.add(comment)
 
 
 # ── Private helpers ───────────────────────────────────────────────────────────
@@ -221,7 +296,7 @@ def _load_comment(session: Session, comment_id: int) -> Comment:
     statement = (
         select(Comment)
         .where(Comment.id == comment_id)
-        .options(selectinload(Comment.user), selectinload(Comment.replies))
+        .options(selectinload(Comment.user), selectinload(Comment.replies).selectinload(Comment.user))
     )
     comment = session.exec(statement).first()
     if not comment:

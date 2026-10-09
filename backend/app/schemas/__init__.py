@@ -1,7 +1,7 @@
 from .audit import AuditLogRead, AuditLogQueryParams, MyAuditLogRead
 from .errors import ErrorResponse, ValidationErrorResponse
 from .pagination import PaginatedResponse
-from .comments import CommentAdminRead, CommentCreate, CommentRead, CommentUpdate
+from .comments import CommentAdminRead, CommentCreate, CommentRead, CommentReplyRead, CommentThreadPage, CommentUpdate
 from .moderation import (
     FlagContentCreate,
     ModerationActionCreate,
@@ -9,7 +9,7 @@ from .moderation import (
     ModerationQueueItemRead,
     ModerationQueueQueryParams,
 )
-from .posts import MetadataRead, PostCreate, PostRead, PostShort, PostUpdate
+from .posts import MetadataRead, PostCreate, PostDetailRead, PostRead, PostShort, PostUpdate
 from .settings import (
     AboutPageSettings,
     AboutPageSettingsResponse,
@@ -38,9 +38,7 @@ from .settings import (
 from .tags import PopularTagRead, TagCreate, TagRead, TagUpdate
 from .users import PublicAuthorRead, UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams
 
-CommentRead.model_rebuild(_types_namespace={"CommentRead": CommentRead})
-CommentAdminRead.model_rebuild(_types_namespace={"PostShort": PostShort, "CommentRead": CommentRead})
-PostRead.model_rebuild(_types_namespace={"CommentRead": CommentRead})
+CommentAdminRead.model_rebuild(_types_namespace={"PostShort": PostShort})
 
 from .blog import (
     BlogCreate,
@@ -96,10 +94,13 @@ __all__ = [
     "CommentRead",
     "CommentAdminRead",
     "CommentCreate",
+    "CommentReplyRead",
+    "CommentThreadPage",
     "CommentUpdate",
     "PostCreate",
     "PostUpdate",
     "PostRead",
+    "PostDetailRead",
     "PostShort",
     "SocialLinks",
     "SuperadminUserQueryParams",

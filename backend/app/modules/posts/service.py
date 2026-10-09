@@ -25,7 +25,7 @@ from app.core.exceptions import (
 )
 from app.core.logging_config import get_logger
 from app.core.plans import ensure_can_publish, ensure_can_schedule
-from app.models import Comment, Post, PostTagLink, Tag, User, BlogRole
+from app.models import Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
 from app.core.permissions import Permissions
@@ -594,8 +594,6 @@ def read_post(blog_id: int, post_id: int, session: Session) -> Post:
             selectinload(Post.author),
             selectinload(Post.tags),
             selectinload(Post.project_metadata),
-            selectinload(Post.comments).selectinload(Comment.user),
-            selectinload(Post.comments).selectinload(Comment.replies).selectinload(Comment.user),
         )
     )
     post = session.exec(statement).first()
@@ -613,7 +611,6 @@ def read_post_by_slug(
         .options(
             selectinload(Post.author),
             selectinload(Post.tags),
-            selectinload(Post.comments).selectinload(Comment.user),
         )
     )
     post = session.exec(statement).first()

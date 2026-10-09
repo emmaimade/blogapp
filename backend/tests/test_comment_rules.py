@@ -16,7 +16,9 @@ from sqlmodel import Session
 
 from app.core.db import engine
 from app.models import Blog, Comment, Post
+from app.models.comment import CommentDeletedBy
 from app.models.post import PostStatus
+from app.modules.comments.service import soft_delete_comment
 from app.schemas.comments import MAX_COMMENT_LENGTH
 from tests.test_comments_endpoints import _create_post, _register_owner
 
@@ -90,10 +92,7 @@ def test_author_cannot_edit_a_moderator_redacted_comment(client):
     comment_id = _comment(client, token, post_id, content="Something abusive").json()["id"]
 
     with Session(engine) as session:
-        comment = session.get(Comment, comment_id)
-        comment.content = "[This comment has been deleted by a moderator]"
-        comment.is_deleted = True
-        session.add(comment)
+        soft_delete_comment(session, session.get(Comment, comment_id), CommentDeletedBy.MODERATOR)
         session.commit()
 
     res = client.patch(
@@ -103,7 +102,8 @@ def test_author_cannot_edit_a_moderator_redacted_comment(client):
     assert res.json()["code"] == "COMMENT_DELETED"
 
     with Session(engine) as session:
-        assert session.get(Comment, comment_id).content == "[This comment has been deleted by a moderator]"
+        assert session.get(Comment, comment_id).content == "Something abusive"
+        assert session.get(Comment, comment_id).is_deleted is True
 
 
 def test_a_comment_cannot_be_deleted_twice(client):
@@ -233,7 +233,7 @@ def test_team_members_can_still_list_comments_on_a_draft(client):
 
     res = client.get(f"/comments/post/{post_id}", headers=_auth(token))
     assert res.status_code == 200, res.text
-    assert [c["content"] for c in res.json()] == ["Internal note"]
+    assert [c["content"] for c in res.json()["items"]] == ["Internal note"]
 
 
 # ── Platform switch ───────────────────────────────────────────────────────────

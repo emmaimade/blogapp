@@ -3,14 +3,16 @@ import api from '../api/blogApi';
 import { getApiErrorMessage } from '../api/errors';
 import toast from 'react-hot-toast';
 import { Link, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit2, Trash2, X, Check, MoreVertical } from 'lucide-react';
 import { formatLocalDate } from '../utils/dates';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
-import type { Comment } from '../types/post';
+import type { Comment, CommentThreadPage } from '../types/post';
 
-export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ postId, comments }) => {
+const PAGE_SIZE = 20;
+
+export const Comments: React.FC<{ postId: number }> = ({ postId }) => {
   const [text, setText] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
@@ -25,10 +27,20 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
   const queryClient = useQueryClient();
   const location = useLocation();
 
-  const { data: fetchedComments } = useQuery({
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['comments', postId],
-    queryFn: async () => (await api.get(`/comments/post/${postId}`)).data,
-    initialData: comments || [],
+    queryFn: async ({ pageParam }) =>
+      (await api.get<CommentThreadPage>(`/comments/post/${postId}`, {
+        params: { skip: pageParam, limit: PAGE_SIZE },
+      })).data,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.skip + lastPage.limit : undefined),
   });
 
   // Post new comment
@@ -120,7 +132,9 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
     ), { duration: 10000 });
   };
 
-  const displayComments = fetchedComments || [];
+  const displayComments = data?.pages.flatMap((page) => page.items) ?? [];
+  // From the newest page, so it reflects comments posted since the first load.
+  const commentCount = data?.pages[data.pages.length - 1]?.comment_count ?? 0;
 
   // Prefill draft if redirected from login
   useEffect(() => {
@@ -133,7 +147,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
   return (
     <div className="mt-12">
       <h2 className="text-2xl font-bold mb-6">
-        Comments ({displayComments.length})
+        Comments ({commentCount})
       </h2>
 
       {/* Comment Input */}
@@ -179,7 +193,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
 
       {/* Comments List */}
       <div className="space-y-6">
-        {displayComments.length === 0 ? (
+        {isLoading ? null : displayComments.length === 0 ? (
           <div className="text-center py-12 bg-zinc-50 rounded-2xl dark:bg-zinc-900">
             <p className="text-zinc-500 dark:text-zinc-400 font-medium">No comments yet. Be the first to share your thoughts!</p>
           </div>
@@ -187,7 +201,7 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
           displayComments.map((comment: Comment) => {
             const isAuthor = comment.user?.id === currentUserId;
             const isEditing = editingId === comment.id;
-            const isDeleted = comment.is_deleted || comment.content.includes('[This comment has been removed');
+            const isDeleted = comment.is_deleted;
 
             return (
               <div
@@ -302,6 +316,18 @@ export const Comments: React.FC<{ postId: number, comments?: Comment[] }> = ({ p
           })
         )}
       </div>
+
+      {hasNextPage && (
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="btn-ghost"
+          >
+            {isFetchingNextPage ? 'Loading…' : 'Load more comments'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

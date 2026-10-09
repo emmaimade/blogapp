@@ -230,7 +230,7 @@ export const PostDetail = () => {
               <RelatedPosts posts={nextPosts} title="Popular posts" subtitle="What other readers are enjoying." />
             )}
 
-            <Comments postId={post.id} comments={post.comments || []} />
+            <Comments postId={post.id} />
           </div>
         </div>
 

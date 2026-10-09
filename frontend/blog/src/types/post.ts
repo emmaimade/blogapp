@@ -40,9 +40,11 @@ export interface PaginatedPosts {
   has_more: boolean;
 }
 
-export interface Comment {
+export interface CommentReply {
   id: number;
   content: string;
+  post_id: number;
+  parent_id: number | null;
   user: {
     id: number;
     username: string;
@@ -50,9 +52,28 @@ export interface Comment {
     last_name: string;
   };
   created_at: string;
-  is_deleted?: boolean;
+  /** Set when the author edited the comment. */
+  edited_at?: string | null;
+  is_deleted: boolean;
+  /** Who removed it — the API already swaps `content` for a placeholder. */
+  deleted_by?: 'author' | 'moderator' | 'platform' | null;
+}
+
+export interface Comment extends CommentReply {
+  replies: CommentReply[];
+}
+
+export interface CommentThreadPage {
+  items: Comment[];
+  /** Top-level comments — what pagination walks. */
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+  /** Every non-deleted comment, replies included — what the heading shows. */
+  comment_count: number;
 }
 
 export interface PostDetail extends Post {
-  comments?: Comment[];
+  comment_count?: number;
 }

@@ -63,7 +63,7 @@ export const SearchResultsPage = () => {
   const commentsQuery = useQuery<CommentHit[]>({
     queryKey: ['adminSearch', 'comments', activeBlog?.id, q],
     queryFn: async () =>
-      (await api.get(`/blogs/${activeBlog!.id}/comments/`, { params: { q } })).data,
+      (await api.get(`/blogs/${activeBlog!.id}/comments/`, { params: { q, limit: 100 } })).data.items,
     enabled: !!activeBlog?.id && !!q && canSearchComments,
   });
   const commentResults = useMemo(

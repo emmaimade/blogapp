@@ -33,6 +33,8 @@ from app.models import (
     SupportMessage,
     TicketStatus,
     PlatformSettings as PlatformSettingsRecord)
+from app.models.comment import CommentDeletedBy
+from app.modules.comments.service import soft_delete_comment
 from app.modules.support.router import SupportTicketRead
 from app.schemas import (
     AuditLogRead,
@@ -840,11 +842,8 @@ def get_audit_logs(
 def _remove_flagged_content(session: Session, item: ModerationItem) -> None:
     if item.content_type == "comment":
         comment = session.get(Comment, item.content_id)
-        if comment:
-            comment.content = "[This comment has been removed by a moderator]"
-            comment.is_deleted = True
-            comment.updated_at = datetime.utcnow()
-            session.add(comment)
+        if comment and not comment.is_deleted:
+            soft_delete_comment(session, comment, CommentDeletedBy.PLATFORM)
         return
 
     if item.content_type == "post":

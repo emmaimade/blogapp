@@ -194,7 +194,7 @@ def test_superadmin_remove_action_soft_deletes_comment(client):
 
     fetched = client.get(f"/comments/post/{post_id}")
     assert fetched.status_code == 200, fetched.text
-    removed_comment = next(c for c in fetched.json() if c["id"] == comment_id)
+    removed_comment = next(c for c in fetched.json()["items"] if c["id"] == comment_id)
     assert removed_comment["is_deleted"] is True
     assert "removed by a moderator" in removed_comment["content"]
 

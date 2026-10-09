@@ -129,7 +129,7 @@ def test_listing_comments_still_works_when_comments_are_disabled(client):
 
     res = client.get(f"/comments/post/{post_id}")
     assert res.status_code == 200, res.text
-    assert any(c["content"] == "Before disabling" for c in res.json())
+    assert any(c["content"] == "Before disabling" for c in res.json()["items"])
 
 
 def test_subdomain_lookup_finds_an_active_blog(client):
