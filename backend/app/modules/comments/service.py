@@ -20,6 +20,7 @@ from app.models import Blog, BlogRole, Comment, Post, User
 from app.models.comment import CommentDeletedBy, utcnow
 from app.models.post import PostStatus
 from app.schemas import CommentCreate, CommentUpdate
+from app.services.content_throttle import check_comment_allowed
 
 
 # ── Public operations ─────────────────────────────────────────────────────────
@@ -30,6 +31,7 @@ def create_comment(
     _ensure_platform_comments_enabled(session)
     post = _get_commentable_post(session, payload.post_id)
     parent_id = _resolve_reply_parent(session, payload.parent_id, post.id)
+    check_comment_allowed(session, current_user.id, post.id, payload.content)
 
     comment = Comment(
         content=payload.content,

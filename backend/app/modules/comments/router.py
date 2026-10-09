@@ -106,6 +106,7 @@ def flag_comment_for_moderation(
         notes=item.notes,
         status=item.status,
         reported_by_id=item.reported_by_id,
+        report_count=item.report_count,
         created_at=item.created_at,
     )
 

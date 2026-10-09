@@ -1,6 +1,6 @@
 from .comment import Comment
 from .audit import AuditLog
-from .moderation import ModerationAction, ModerationItem
+from .moderation import ModerationAction, ModerationItem, ModerationReport
 from .post import Post, PostTagLink, ProjectMetadata, Tag
 from .settings import SiteSettings, PlatformSettings
 from .user import User, PlatformRole
@@ -32,6 +32,7 @@ __all__ = [
     "AuditLog",
     "ModerationAction",
     "ModerationItem",
+    "ModerationReport",
     "PlatformRole",
     "EmailVerification",
     "PasswordResetToken",
