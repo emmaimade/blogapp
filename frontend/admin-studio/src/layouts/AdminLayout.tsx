@@ -12,6 +12,7 @@ import {
     Sun,
     User,
     X,
+    PauseCircle,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -336,6 +337,8 @@ useEffect(() => {
   const isDashboardRoot =
     sectionPath === "/admin/dashboard" ||
     sectionPath === "/admin/superadmin";
+  // Suspended by a superadmin: readable, but the backend refuses changes.
+  const isSuspended = !!routeSlug && !!activeBlog && activeBlog.is_active === false;
   const showOnboardingLock =
     ((requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH) || !user?.email_verified) &&
     !userIsSuperAdmin;
@@ -501,6 +504,31 @@ useEffect(() => {
         {showQuickJump && <QuickJumpPalette onClose={() => setShowQuickJump(false)} />}
 
         <div className="mx-auto max-w-6xl px-5 pb-6 pt-6">
+          {isSuspended && (
+            <div
+              role="status"
+              className="mb-6 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">
+                  <PauseCircle size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">This workspace is suspended</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-200/80">
+                    Inko support has suspended {activeBlog?.name}. You can view it, but changes are turned off
+                    and the public blog is offline. Contact support to restore it.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/admin/support-tickets"
+                className="inline-flex flex-shrink-0 items-center justify-center rounded-xl bg-amber-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-950 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
+              >
+                Contact support
+              </Link>
+            </div>
+          )}
           {showOnboardingLock && (
             <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

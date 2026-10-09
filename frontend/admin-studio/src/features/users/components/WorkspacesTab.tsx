@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import toast from 'react-hot-toast';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useBlog, type BlogMembership } from '../../../app/providers/BlogProvider';
 import {
@@ -10,7 +12,7 @@ import {
   type AdminCapability,
 } from "../../auth/lib/accessControl";
 import { Modal } from '../../../shared/components/Modal';
-import { Shield, ShieldAlert, CheckCircle2, XCircle, Layout, FileText, Settings, type LucideIcon } from 'lucide-react';
+import { Shield, ShieldAlert, CheckCircle2, XCircle, Layout, FileText, Settings, LogOut, type LucideIcon } from 'lucide-react';
 import type { AuthUser } from '../../auth/types';
 
 interface WorkspacesTabProps {
@@ -33,8 +35,27 @@ const CAPABILITY_LABELS: Record<AdminCapability, { label: string; icon: LucideIc
 
 export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTabProps) {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
-  const { activeBlog } = useBlog();
+  const { user: currentUser, refreshUser } = useAuth();
+  const { activeBlog, routeSlug } = useBlog();
+  const navigate = useNavigate();
+  const isOwnProfile = !!targetUser && targetUser.id === currentUser?.id;
+  const [leaving, setLeaving] = useState<BlogMembership | null>(null);
+
+  const leaveMutation = useMutation({
+    mutationFn: async (membership: BlogMembership) => api.delete(`/blogs/${membership.blog_id}/members/me`),
+    onSuccess: async (_response, membership) => {
+      setLeaving(null);
+      await refreshUser();
+      if (targetUser?.id) queryClient.invalidateQueries({ queryKey: ['user-detail', targetUser.id] });
+      toast.success(`You left ${membership.blog.name}.`);
+      // Still inside the workspace we just left: go wherever /admin lands now.
+      if (routeSlug === membership.blog.slug) navigate('/admin', { replace: true });
+    },
+    onError: (error) => {
+      setLeaving(null);
+      toastApiError(error, 'Failed to leave the workspace.');
+    },
+  });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     blogId: number;
@@ -64,8 +85,8 @@ export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTa
       toast.success('Workspace role updated successfully!');
       setConfirmModal(null);
     },
-    onError: () => {
-      toast.error('Failed to update workspace role.');
+    onError: (error) => {
+      toastApiError(error, 'Failed to update workspace role.');
       setConfirmModal(null);
     }
   });
@@ -140,7 +161,8 @@ export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTa
 
               <div className="flex items-center gap-2 self-start sm:self-center">
                 <span className="text-xs text-zinc-400 font-medium mr-1">Workspace Role:</span>
-                {canManageThisWorkspace ? (
+                {/* Ownership moves only through "Make owner" on the Team page. */}
+                {canManageThisWorkspace && membership.role !== 'owner' ? (
                   <select
                     value={membership.role}
                     onChange={(e) => handleRoleSelectChange(membership, e.target.value)}
@@ -148,12 +170,20 @@ export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTa
                   >
                     <option value="author">Author</option>
                     <option value="editor">Editor</option>
-                    <option value="owner">Owner</option>
                   </select>
                 ) : (
                   <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 capitalize tracking-wide">
                     {membership.role}
                   </span>
+                )}
+                {isOwnProfile && membership.role !== 'owner' && (
+                  <button
+                    type="button"
+                    onClick={() => setLeaving(membership)}
+                    className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <LogOut size={13} /> Leave workspace
+                  </button>
                 )}
               </div>
             </div>
@@ -201,6 +231,17 @@ export default function WorkspacesTab({ targetUser, isSuperadmin }: WorkspacesTa
           </div>
         );
       })}
+
+      <Modal
+        isOpen={!!leaving}
+        title={`Leave ${leaving?.blog.name ?? 'workspace'}?`}
+        message={`You'll lose access to ${leaving?.blog.name ?? 'this workspace'}. An owner would need to invite you again.`}
+        confirmText={leaveMutation.isPending ? 'Leaving…' : 'Leave workspace'}
+        isDanger
+        autoClose={false}
+        onClose={() => setLeaving(null)}
+        onConfirm={() => leaving && !leaveMutation.isPending && leaveMutation.mutate(leaving)}
+      />
 
       <Modal
         isOpen={!!confirmModal?.isOpen}

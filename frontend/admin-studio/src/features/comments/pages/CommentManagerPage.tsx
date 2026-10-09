@@ -17,6 +17,7 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 
 interface Comment {
   id: number;
@@ -64,7 +65,7 @@ export const CommentManager = () => {
       toast.success('Comment redacted');
       setTargetComment(null);
     },
-    onError: () => toast.error('Moderation failed'),
+    onError: (error) => toastApiError(error, 'Moderation failed'),
   });
 
   if (isLoading) {

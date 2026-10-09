@@ -4,6 +4,7 @@ import api from '../../../shared/api/client';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import toast from 'react-hot-toast';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 
 export type BlogRole = "owner" | "editor" | "author";
 
@@ -35,7 +36,7 @@ export interface BlogInvitation {
 
 export const useUserManager = () => {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshUser } = useAuth();
   const { activeBlog, activeRole } = useBlog();
   const [searchTerm, setSearchTerm] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -71,8 +72,8 @@ export const useUserManager = () => {
       queryClient.invalidateQueries({ queryKey: ['blogInvitations', activeBlog?.id] });
       toast.success('Invitation revoked.');
     },
-    onError: () => {
-      toast.error('Failed to revoke invitation.');
+    onError: (error) => {
+      toastApiError(error, 'Failed to revoke invitation.');
     },
   });
 
@@ -101,8 +102,8 @@ export const useUserManager = () => {
 
       toast.success('Member role updated successfully!');
     },
-    onError: () => {
-      toast.error('Failed to update member role.');
+    onError: (error) => {
+      toastApiError(error, 'Failed to update member role.');
     },
   });
 
@@ -124,12 +125,29 @@ export const useUserManager = () => {
 
       toast.success('Member removed from workspace.');
     },
-    onError: () => {
-      toast.error('Failed to remove member.');
+    onError: (error) => {
+      toastApiError(error, 'Failed to remove member.');
     },
   });
 
-  // 4. Simple local search filtering
+  // 4. Hand ownership to another member; the current owner becomes an editor.
+  const transferOwnershipMutation = useMutation({
+    mutationFn: async (memberId: number) => {
+      if (!activeBlog?.id) throw new Error("No active workspace selected.");
+      return api.post(`/blogs/${activeBlog.id}/transfer-ownership`, { member_id: memberId });
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ['blogMembers', activeBlog?.id] });
+      queryClient.invalidateQueries({ queryKey: ['blogInvitations', activeBlog?.id] });
+      // Our own role changed, which drives what this page and the sidebar offer.
+      await refreshUser();
+      toast.success('Ownership transferred.');
+    },
+    // The backend explains refusals (e.g. the new owner is at their workspace limit).
+    onError: (error) => toastApiError(error, 'Failed to transfer ownership.'),
+  });
+
+  // 5. Simple local search filtering
   const filteredMembers = members.filter((member) => {
     const searchString = `${member.user.first_name} ${member.user.last_name} ${member.user.username} ${member.user.email}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
@@ -150,5 +168,6 @@ export const useUserManager = () => {
     isLoading,
     updateRoleMutation,
     removeMutation,
+    transferOwnershipMutation,
   };
 };

@@ -13,6 +13,7 @@ import { formatLocalDate, formatScheduled, formatShortDate } from '../../../shar
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 
 type FilterTab = 'all' | 'published' | 'scheduled' | 'draft';
 
@@ -186,9 +187,9 @@ export const PostList = () => {
       return { prev };
     },
     onSuccess: () => toast.success('Status updated'),
-    onError: (_err, __, ctx) => {
+    onError: (err, __, ctx) => {
       queryClient.setQueryData(postsQueryKey, ctx?.prev);
-      toast.error('Failed to update status');
+      toastApiError(err, 'Failed to update status');
     },
     onSettled: invalidatePosts,
   });
@@ -200,7 +201,7 @@ export const PostList = () => {
       setDeleteId(null);
       toast.success('Post deleted');
     },
-    onError: () => toast.error('Could not delete post'),
+    onError: (error) => toastApiError(error, 'Could not delete post'),
   });
 
   const TABS: { key: FilterTab; label: string }[] = [

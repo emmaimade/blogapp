@@ -10,6 +10,7 @@ import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton'; // Adjus
 type PostLayout = 'feed' | 'list' | 'cards' | 'compact';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 
 interface BrandingSettingsData {
   primary_color: string;
@@ -227,7 +228,7 @@ export const BrandingSettings: React.FC = () => {
         toast.success('Favicon uploaded successfully');
       }
     },
-    onError: () => toast.error('Upload failed'),
+    onError: (error) => toastApiError(error, 'Upload failed'),
   });
 
   const handleSave = () => saveMutation.mutate(formData);

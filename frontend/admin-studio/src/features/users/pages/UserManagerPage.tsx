@@ -52,7 +52,7 @@ export const UserManager = () => {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
     showInviteModal, setShowInviteModal,
     filteredMembers, pendingInvitations, revokeInvitationMutation,
-    isOwner, isLoading, updateRoleMutation, removeMutation
+    isOwner, isLoading, updateRoleMutation, removeMutation, transferOwnershipMutation
   } = useUserManager();
 
   const [modalConfig, setModalConfig] = useState<{
@@ -63,6 +63,20 @@ export const UserManager = () => {
     isDanger?: boolean;
     action: () => void;
   } | null>(null);
+
+  const askToMakeOwner = (member: (typeof filteredMembers)[number]) =>
+    setModalConfig({
+      isOpen: true,
+      title: "Transfer ownership",
+      message:
+        `Make ${member.user.first_name} ${member.user.last_name} the owner of ${activeBlog?.name ?? "this workspace"}?
+
+` +
+        "They'll take over the plan and billing, and you'll become an editor. Only the new owner can undo this.",
+      confirmText: "Make owner",
+      isDanger: true,
+      action: () => transferOwnershipMutation.mutate(member.id),
+    });
 
   if (isLoading) {
     return <UserManagerSkeleton />;
@@ -161,6 +175,7 @@ export const UserManager = () => {
                       <MemberActionsMenu
                         profileHref={toWorkspace(`/users/${member.user.id}`)}
                         canRemove={canRemove}
+                        onMakeOwnerClick={canRemove ? () => askToMakeOwner(member) : undefined}
                         onRemoveClick={() =>
                           setModalConfig({
                             isOpen: true,
@@ -259,6 +274,7 @@ export const UserManager = () => {
                             <MemberActionsMenu
                               profileHref={toWorkspace(`/users/${member.user.id}`)}
                               canRemove={canRemove}
+                              onMakeOwnerClick={canRemove ? () => askToMakeOwner(member) : undefined}
                               direction={isFirstRow ? "down" : "up"}
                               onRemoveClick={() =>
                                 setModalConfig({

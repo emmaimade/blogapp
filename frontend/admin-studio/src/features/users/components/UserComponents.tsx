@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, MoreHorizontal, Trash2, User } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Trash2, User, Crown } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -107,6 +107,8 @@ interface MemberActionsMenuProps {
   profileHref: string;
   canRemove: boolean;
   onRemoveClick: () => void;
+  /** Shown only to the owner, on other members' rows. */
+  onMakeOwnerClick?: () => void;
   direction?: "up" | "down";
 }
 
@@ -119,7 +121,7 @@ interface MemberActionsMenuProps {
 // against the hidden desktop row's node instead of the visible mobile one,
 // closing the menu on mousedown before the tap's click ever reached "View
 // Profile" / "Remove Member". Same fix as UserMenu in AdminLayout.tsx.
-export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, direction = "down" }: MemberActionsMenuProps) => {
+export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMakeOwnerClick, direction = "down" }: MemberActionsMenuProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,6 +166,18 @@ export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, direc
           >
             <User size={14} /> View Profile
           </Link>
+          {onMakeOwnerClick && (
+            <button
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onMakeOwnerClick();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left"
+            >
+              <Crown size={14} /> Make owner
+            </button>
+          )}
           {canRemove ? (
             <button
               role="menuitem"

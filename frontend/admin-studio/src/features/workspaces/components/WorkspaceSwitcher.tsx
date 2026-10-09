@@ -214,6 +214,11 @@ export const WorkspaceSwitcher = ({ variant, expanded = true, className = '' }: 
                           {planName(plan)}
                         </span>
                       )}
+                      {!blog.is_active && (
+                        <span className="rounded-full bg-zinc-200 px-1.5 py-px text-[10px] font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+                          Suspended
+                        </span>
+                      )}
                       {needsSetup && (
                         <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                           Setup incomplete

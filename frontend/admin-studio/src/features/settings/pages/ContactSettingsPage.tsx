@@ -8,6 +8,7 @@ import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 
 interface FAQItem {
   question: string;
@@ -84,7 +85,7 @@ export const ContactSettings = () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'contact', activeBlog?.id] });
       toast.success('Contact settings saved successfully!');
     },
-    onError: () => toast.error('Failed to save contact settings'),
+    onError: (error) => toastApiError(error, 'Failed to save contact settings'),
   });
 
   const handleSave = () => {

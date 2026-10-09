@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import { 
   BarChart3, Edit3, Eye, FileText, MessageSquare, Plus, 
-  Settings, Tag, Users, ArrowUpRight, Feather, Globe, Clock, AlertTriangle 
+  Settings, Tag, Users, ArrowUpRight, Feather, Globe, Clock 
 } from 'lucide-react';
 import { formatRelative } from '../../../shared/utils/dates';
 import { useDashboard } from '../hooks/useDashboard';
@@ -59,35 +59,6 @@ export const Dashboard = () => {
           )}
         </div>
       </div>
-
-      {/* System soft-lock warning banner */}
-      {activeBlog && activeBlog.is_active === false && (
-        <div className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
-              <AlertTriangle size={18} />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
-                Workspace Read-Only Soft-Lock Active
-              </h4>
-              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                This publication has been systematically suspended by
-                infrastructure administration. Reader public routing addresses
-                are locked, and modifications are restricted until reinstated.
-              </p>
-            </div>
-          </div>
-          {isOwner && (
-            <a
-              href="mailto:support@inko.blog"
-              className="inline-flex items-center justify-center rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 self-start sm:self-auto"
-            >
-              Contact Administration
-            </a>
-          )}
-        </div>
-      )}
 
       {/* Primary Analytic Metrics Matrices Grid */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
