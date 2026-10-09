@@ -11,6 +11,7 @@ import { TagSelector } from '../components/TagSelector';
 import { markdownComponents, getEditorOptions } from '../components/MarkdownConfig';
 import { SchedulePublishPanel } from '../components/SchedulePublishPanel';
 import { ContentBlueprint } from '../components/ContentBlueprint';
+import { FloatingSaveBar } from '../components/FloatingSaveBar';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
 import 'easymde/dist/easymde.min.css';
@@ -26,8 +27,8 @@ export const PostEditor: React.FC = () => {
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
     currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
-    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
-    isDirty, savedTitle, editedAt
+    handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
+    isDirty, errors, scheduledPosts, savedTitle, editedAt
   } = usePostEditor();
 
   // Saved title rather than the live input, so the tab doesn't churn while typing.
@@ -47,8 +48,9 @@ export const PostEditor: React.FC = () => {
   }
 
   return (
-    <div className="admin-page mx-auto max-w-6xl px-4 py-4 sm:p-6">
+    <div className="admin-page mx-auto max-w-6xl px-4 pt-4 pb-24 sm:px-6 sm:pt-6">
       <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
+      <FloatingSaveBar isDirty={isDirty} isSaving={mutation.isPending} status={currentStatus} onSave={quickSave} />
       {/* Top action bar */}
       <div className="mb-8 flex items-center justify-between gap-4">
         <button
@@ -69,11 +71,21 @@ export const PostEditor: React.FC = () => {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Main Canvas Column */}
         <div className="min-w-0 flex-1 space-y-6">
-          <input
-            {...register("title", { required: true })}
-            placeholder="Give your post a title…"
-            className="w-full border-none bg-transparent text-3xl font-extrabold text-zinc-900 placeholder:text-zinc-300 focus:ring-0 dark:text-white dark:placeholder:text-zinc-600 sm:text-4xl"
-          />
+          <div>
+            <input
+              {...register("title", { validate: (v) => !!v?.trim() || "Add a title before saving." })}
+              placeholder="Give your post a title…"
+              aria-label="Post title"
+              aria-invalid={!!errors.title}
+              aria-describedby={errors.title ? "title-error" : undefined}
+              className="w-full border-none bg-transparent text-3xl font-extrabold text-zinc-900 placeholder:text-zinc-300 focus:ring-0 dark:text-white dark:placeholder:text-zinc-600 sm:text-4xl"
+            />
+            {errors.title && (
+              <p id="title-error" role="alert" className="mt-1 text-sm font-medium text-red-600 dark:text-red-400">
+                {errors.title.message}
+              </p>
+            )}
+          </div>
 
           {/* Post Type Selector Switch */}
           <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-fit">
@@ -188,6 +200,7 @@ export const PostEditor: React.FC = () => {
             publishedAt={currentPubAt}
             editedAt={editedAt}
             isSaving={mutation.isPending}
+            scheduledPosts={scheduledPosts}
             onSaveDraft={() => saveWithStatus('draft')}
             onPublishNow={() => saveWithStatus('published')}
             onSchedule={(at) => saveWithStatus('scheduled', at)}

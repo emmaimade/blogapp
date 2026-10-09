@@ -8,6 +8,7 @@ import { toastApiError } from '../../../shared/lib/apiErrors';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { LEAVE_AFTER_SAVE } from '../../../shared/hooks/useUnsavedChangesGuard';
+import type { ScheduledPostSummary } from '../components/ScheduleCalendar';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 
@@ -34,7 +35,7 @@ export const usePostEditor = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
 
-  const { control, register, handleSubmit, reset, watch, setValue, formState: { isDirty } } = useForm<PostForm>({
+  const { control, register, handleSubmit, reset, watch, setValue, formState: { isDirty, errors } } = useForm<PostForm>({
     defaultValues: {
       is_project: false,
       is_featured: false,
@@ -144,6 +145,14 @@ export const usePostEditor = () => {
     }
   };
 
+  // The blog's other scheduled posts, marked on the scheduling calendar.
+  const { data: scheduledPosts = [] } = useQuery({
+    queryKey: ['scheduledPosts', activeBlog?.id],
+    queryFn: async () => (await api.get(`/blogs/${activeBlog!.id}/posts/scheduled`)).data,
+    enabled: !!activeBlog?.id,
+    select: (posts: ScheduledPostSummary[]) => posts.filter((p) => String(p.id) !== id),
+  });
+
   const { data: existingPost, isLoading } = useQuery({
     queryKey: ['post', id, activeBlog?.id],
     queryFn: async () => (await api.get(`/blogs/${activeBlog!.id}/posts/${id}`)).data,
@@ -166,17 +175,24 @@ export const usePostEditor = () => {
       isEditMode
         ? api.patch(`/blogs/${activeBlog!.id}/posts/${id}`, data)
         : api.post(`/blogs/${activeBlog!.id}/posts/`, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] });
-      if (isEditMode) queryClient.invalidateQueries({ queryKey: ['post', id, activeBlog?.id] });
+      queryClient.invalidateQueries({ queryKey: ['scheduledPosts', activeBlog?.id] });
       const msg = variables.status === 'scheduled'
         ? 'Post scheduled!'
         : variables.status === 'published'
         ? (isEditMode ? 'Changes published!' : 'Post published!')
         : 'Draft saved!';
       toast.success(msg);
-      // The form still reads as dirty for this navigation; it's been saved.
-      navigate(toWorkspace('/posts'), { state: LEAVE_AFTER_SAVE });
+      // Stay in the editor. Seeding the post query re-runs the reset effect
+      // above, so the form takes the saved values and is no longer dirty.
+      const saved = res.data;
+      queryClient.setQueryData(['post', String(saved.id), activeBlog?.id], saved);
+      if (!isEditMode) {
+        // A new post moves to its edit URL so later saves update it rather
+        // than creating another. The form still reads as dirty for this navigation.
+        navigate(toWorkspace(`/posts/edit/${saved.id}`), { replace: true, state: LEAVE_AFTER_SAVE });
+      }
     },
     onError: (error: any) => toastApiError(error, 'Failed to save post'),
   });
@@ -191,13 +207,24 @@ export const usePostEditor = () => {
     })();
   };
 
+  // Saves without changing what readers see: a draft stays a draft, a
+  // scheduled post keeps its time, a published post is updated in place.
+  // Never publishes — that stays a deliberate click in the Publish panel.
+  const quickSave = () => {
+    if (currentStatus === 'scheduled' && currentPubAt) {
+      saveWithStatus('scheduled', new Date(currentPubAt));
+    } else {
+      saveWithStatus(currentStatus === 'published' ? 'published' : 'draft');
+    }
+  };
+
   return {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
     currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
-    handleThumbnailUpload, isLoading, mutation, saveWithStatus, navigate,
-    isDirty, savedTitle: existingPost?.title as string | undefined,
+    handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
+    isDirty, errors, scheduledPosts, savedTitle: existingPost?.title as string | undefined,
     editedAt: existingPost?.edited_at as string | null | undefined,
   };
 };

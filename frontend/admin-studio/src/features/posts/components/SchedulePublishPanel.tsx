@@ -3,7 +3,8 @@ import {
   Calendar, Clock, CheckCircle2, FileText,
   Send, X, ChevronDown, AlertCircle, Loader2, RotateCcw,
 } from 'lucide-react';
-import { format, formatDistanceToNow, isPast, parseISO } from 'date-fns';
+import { addDays, format, formatDistanceToNow, isPast, parseISO } from 'date-fns';
+import { ScheduleCalendar, type ScheduledPostSummary } from './ScheduleCalendar';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 
@@ -12,6 +13,8 @@ interface SchedulePublishPanelProps {
   publishedAt?: string | null;
   editedAt?: string | null;
   isSaving?: boolean;
+  /** Other scheduled posts on this blog, for the calendar's dots. */
+  scheduledPosts?: ScheduledPostSummary[];
   onSaveDraft:    () => void;
   onPublishNow:   () => void;
   onSchedule:     (publishAt: Date) => void;
@@ -20,18 +23,13 @@ interface SchedulePublishPanelProps {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const toLocalDatetimeValue = (d: Date): string => {
-  // Returns "YYYY-MM-DDTHH:mm" in local time for <input type="datetime-local">
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
-const defaultScheduleTime = (): string => {
-  // Default to tomorrow at 09:00 local time
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  return toLocalDatetimeValue(d);
+// Joins the calendar's day and the "HH:mm" time field into one local Date.
+const combineDateAndTime = (date: Date | undefined, time: string): Date | null => {
+  if (!date || !time) return null;
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(date);
+  d.setHours(h, m, 0, 0);
+  return d;
 };
 
 // ── Status pill ───────────────────────────────────────────────────────────────
@@ -57,6 +55,7 @@ export const SchedulePublishPanel = ({
   publishedAt,
   editedAt,
   isSaving = false,
+  scheduledPosts = [],
   onSaveDraft,
   onPublishNow,
   onSchedule,
@@ -64,25 +63,30 @@ export const SchedulePublishPanel = ({
   onUpdate,
 }: SchedulePublishPanelProps) => {
   const [showScheduler, setShowScheduler] = useState(false);
-  const [scheduleValue, setScheduleValue] = useState(defaultScheduleTime);
+  // Defaults to tomorrow at 09:00 local time
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(() => addDays(new Date(), 1));
+  const [scheduleTime, setScheduleTime] = useState('09:00');
   const [scheduleError, setScheduleError] = useState('');
+  const [confirmingRevert, setConfirmingRevert] = useState(false);
 
   // Pre-fill with existing scheduled time when editing a scheduled post
   useEffect(() => {
     if (status === 'scheduled' && publishedAt) {
       const d = typeof publishedAt === 'string' ? parseISO(publishedAt) : publishedAt;
-      setScheduleValue(toLocalDatetimeValue(d));
+      setScheduleDate(d);
+      setScheduleTime(format(d, 'HH:mm'));
       setShowScheduler(true);
     }
   }, [status, publishedAt]);
 
+  const picked = combineDateAndTime(scheduleDate, scheduleTime);
+
   const handleSchedule = () => {
     setScheduleError('');
-    if (!scheduleValue) {
-      setScheduleError('Please pick a date and time.');
+    if (!picked) {
+      setScheduleError('Pick a day and a time.');
       return;
     }
-    const picked = new Date(scheduleValue);
     if (isPast(picked)) {
       setScheduleError('Scheduled time must be in the future.');
       return;
@@ -141,15 +145,42 @@ export const SchedulePublishPanel = ({
                 : <><Send size={15} /> Update</>
               }
             </button>
-            <button
-              type="button"
-              onClick={onUnpublish}
-              disabled={isSaving}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
-              Revert to draft
-            </button>
+            {confirmingRevert ? (
+              <div role="alertdialog" aria-labelledby="revert-confirm-text" className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 space-y-2">
+                <p id="revert-confirm-text" className="text-xs font-medium text-red-800 dark:text-red-300">
+                  This takes the post off your blog. Readers won't be able to see it until you publish it again.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRevert(false)}
+                    disabled={isSaving}
+                    autoFocus
+                    className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
+                  >
+                    Keep it live
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmingRevert(false); onUnpublish(); }}
+                    disabled={isSaving}
+                    className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 px-3 py-2 text-xs font-semibold text-white transition-all disabled:opacity-50"
+                  >
+                    Revert to draft
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRevert(true)}
+                disabled={isSaving}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+                Revert to draft…
+              </button>
+            )}
           </>
         )}
 
@@ -193,19 +224,19 @@ export const SchedulePublishPanel = ({
 
             {showScheduler && (
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-3 space-y-3">
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Publish date & time (your local time)
-                </label>
-                <input
-                  type="datetime-local"
-                  value={scheduleValue}
-                  min={toLocalDatetimeValue(new Date())}
-                  onChange={(e) => {
-                    setScheduleValue(e.target.value);
-                    setScheduleError('');
-                  }}
-                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                <ScheduleCalendar
+                  date={scheduleDate}
+                  onDateChange={(d) => { setScheduleDate(d); setScheduleError(''); }}
+                  time={scheduleTime}
+                  onTimeChange={(t) => { setScheduleTime(t); setScheduleError(''); }}
+                  scheduledPosts={scheduledPosts}
                 />
+                {picked && !isPast(picked) && (
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    Goes live <span className="font-semibold text-zinc-900 dark:text-white">{format(picked, "EEE, MMM d 'at' h:mm a")}</span>
+                    {' · '}{formatDistanceToNow(picked, { addSuffix: true })}
+                  </p>
+                )}
                 {scheduleError && (
                   <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
                     <AlertCircle size={12} />
@@ -215,12 +246,12 @@ export const SchedulePublishPanel = ({
                 <button
                   type="button"
                   onClick={handleSchedule}
-                  disabled={isSaving || !scheduleValue}
+                  disabled={isSaving || !picked}
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   {isSaving
                     ? <><Loader2 size={15} className="animate-spin" /> Scheduling…</>
-                    : <><Clock size={15} /> Schedule post</>
+                    : <><Clock size={15} /> {status === 'scheduled' ? 'Reschedule' : 'Schedule post'}</>
                   }
                 </button>
               </div>
@@ -230,8 +261,25 @@ export const SchedulePublishPanel = ({
 
         {/* ── Primary action buttons ────────────────────────────────────── */}
         <div className="space-y-2 pt-1">
-          {/* Save draft — always available except when published */}
-          {status !== 'published' && (
+          {/* Save changes — re-saves a scheduled post at its current time, so
+              editing it doesn't quietly cancel the schedule */}
+          {status === 'scheduled' && parsedPublishedAt && (
+            <button
+              type="button"
+              onClick={() => onSchedule(parsedPublishedAt)}
+              disabled={isSaving}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
+            >
+              {isSaving
+                ? <Loader2 size={15} className="animate-spin" />
+                : <FileText size={15} />
+              }
+              Save changes
+            </button>
+          )}
+
+          {/* Save draft — drafts only; a scheduled post leaves via "Cancel schedule" */}
+          {status === 'draft' && (
             <button
               type="button"
               onClick={onSaveDraft}
@@ -273,11 +321,6 @@ export const SchedulePublishPanel = ({
             </button>
           )}
         </div>
-
-        {/* Timezone note */}
-        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center">
-          Times shown in your local timezone. Published on server in UTC.
-        </p>
       </div>
     </div>
   );
