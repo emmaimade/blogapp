@@ -25,7 +25,7 @@ from app.core.exceptions import (
     RateLimitError,
 )
 from app.core.permissions import Permissions
-from app.core.plans import ensure_member_capacity, get_effective_plan
+from app.core.plans import ensure_can_use_custom_domain, ensure_member_capacity, get_effective_plan
 from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
@@ -586,6 +586,10 @@ def update_blog(blog_id: int, blog_data: BlogUpdate, session: Session, current_u
         update_dict["custom_domain"] = _normalize_and_validate_custom_domain(
             session, blog_id, update_dict["custom_domain"]
         )
+        # Only connecting or changing a domain needs the plan; re-saving the
+        # current one (e.g. after a downgrade) or removing it never does.
+        if update_dict["custom_domain"] != blog.custom_domain:
+            ensure_can_use_custom_domain(session, blog_id)
 
     # Capture the previous values BEFORE mutating, so the audit log can show
     # exactly what changed (e.g. name "Old Blog" -> "New Blog") rather than

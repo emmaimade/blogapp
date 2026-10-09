@@ -28,6 +28,7 @@ class PlanLimits:
     max_published_posts: Optional[int]
     can_schedule_posts: bool
     can_remove_branding: bool
+    can_use_custom_domain: bool
     activity_log_days: int
 
 
@@ -37,6 +38,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         max_published_posts=30,
         can_schedule_posts=False,
         can_remove_branding=False,
+        can_use_custom_domain=False,
         activity_log_days=7,
     ),
     SubscriptionPlan.PRO: PlanLimits(
@@ -44,6 +46,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         max_published_posts=None,
         can_schedule_posts=True,
         can_remove_branding=True,
+        can_use_custom_domain=True,
         activity_log_days=90,
     ),
     SubscriptionPlan.TEAM: PlanLimits(
@@ -51,6 +54,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         max_published_posts=None,
         can_schedule_posts=True,
         can_remove_branding=True,
+        can_use_custom_domain=True,
         activity_log_days=365,
     ),
 }
@@ -189,4 +193,15 @@ def ensure_can_schedule(session: Session, blog_id: int) -> None:
     if not get_blog_limits(session, blog_id).can_schedule_posts:
         raise _upgrade_required(
             "Scheduled publishing is available on the Pro and Team plans."
+        )
+
+
+def ensure_can_use_custom_domain(session: Session, blog_id: int) -> None:
+    """
+    Block connecting or changing a custom domain on a plan without them. A domain
+    connected on a paid plan keeps working after a downgrade, and can still be removed.
+    """
+    if not get_blog_limits(session, blog_id).can_use_custom_domain:
+        raise _upgrade_required(
+            "Custom domains are available on the Pro and Team plans."
         )

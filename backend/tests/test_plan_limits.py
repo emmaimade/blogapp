@@ -1,6 +1,7 @@
 """
-Plan limits: team seats, published-post cap, scheduling, activity log history
-and the onboarding plan step starting a trial instead of granting the plan.
+Plan limits: team seats, published-post cap, scheduling, custom domains,
+activity log history and the onboarding plan step starting a trial instead of
+granting the plan.
 
 Limits only ever block adding something new — every test that downgrades a
 workspace also checks what was already there keeps working.
@@ -15,11 +16,12 @@ from sqlmodel import Session, select
 from app.core.db import engine
 from app.core.exceptions import AuthorizationError
 from app.core.security import ACCESS_TOKEN_COOKIE_NAME
-from app.models import AuditLog, BlogSubscription, Post, SubscriptionPlan, User
+from app.models import AuditLog, Blog, BlogSubscription, Post, SubscriptionPlan, User
 from app.models.post import PostStatus
+from app.modules.blogs import service as blog_service
 from app.modules.blogs.service import _apply_onboarding_plan_choice
 from app.modules.posts import service as post_service
-from app.schemas import PostCreate, PostUpdate
+from app.schemas import BlogUpdate, PostCreate, PostUpdate
 
 
 def _unique_email() -> str:
@@ -245,6 +247,69 @@ def test_already_scheduled_post_stays_editable_after_downgrade(client):
 
     edited = _update(blog_id, scheduled.id, user_id, PostUpdate(title="Edited", status="scheduled", published_at=_future()))
     assert edited.status == PostStatus.SCHEDULED
+
+
+# ── Custom domains ───────────────────────────────────────────────────────────
+
+def _set_domain(blog_id: int, user_id: int, domain: str | None) -> Blog:
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        blog = blog_service.update_blog(blog_id, BlogUpdate(custom_domain=domain), session, user)
+        session.expunge(blog)
+        return blog
+
+
+def _domain() -> str:
+    return f"blog-{uuid.uuid4().hex[:8]}.example.com"
+
+
+def test_free_workspace_cannot_connect_custom_domain(client):
+    _, blog_id, user_id = _register(client)
+
+    with pytest.raises(AuthorizationError) as exc:
+        _set_domain(blog_id, user_id, _domain())
+    assert exc.value.code == "PLAN_UPGRADE_REQUIRED"
+
+
+def test_paid_and_trialing_workspaces_can_connect_custom_domain(client):
+    _, pro_blog, pro_user = _register(client)
+    _set_plan(pro_blog, SubscriptionPlan.PRO)
+    domain = _domain()
+    assert _set_domain(pro_blog, pro_user, domain).custom_domain == domain
+
+    _, trial_blog, trial_user = _register(client)
+    _set_plan(trial_blog, SubscriptionPlan.TEAM, status="trialing", trial_ends_at=_future())
+    assert _set_domain(trial_blog, trial_user, _domain()).custom_domain
+
+
+def test_expired_trial_cannot_connect_custom_domain(client):
+    _, blog_id, user_id = _register(client)
+    _set_plan(
+        blog_id, SubscriptionPlan.PRO, status="trialing",
+        trial_ends_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    with pytest.raises(AuthorizationError) as exc:
+        _set_domain(blog_id, user_id, _domain())
+    assert exc.value.code == "PLAN_UPGRADE_REQUIRED"
+
+
+def test_custom_domain_survives_downgrade_but_cannot_change(client):
+    _, blog_id, user_id = _register(client)
+    _set_plan(blog_id, SubscriptionPlan.PRO)
+    domain = _domain()
+    _set_domain(blog_id, user_id, domain)
+
+    _set_plan(blog_id, SubscriptionPlan.FREE)
+
+    # Re-saving the domain already connected is fine; switching to another isn't.
+    assert _set_domain(blog_id, user_id, domain.upper()).custom_domain == domain
+    with pytest.raises(AuthorizationError) as exc:
+        _set_domain(blog_id, user_id, _domain())
+    assert exc.value.code == "PLAN_UPGRADE_REQUIRED"
+
+    # Removing it is always allowed.
+    assert _set_domain(blog_id, user_id, None).custom_domain is None
 
 
 # ── Activity log history ─────────────────────────────────────────────────────

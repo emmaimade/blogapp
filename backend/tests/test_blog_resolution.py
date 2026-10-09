@@ -7,11 +7,11 @@ for custom_domain (format + uniqueness).
 
 import uuid
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.db import engine
 from app.core.security import ACCESS_TOKEN_COOKIE_NAME
-from app.models import Blog, User
+from app.models import Blog, BlogSubscription, SubscriptionPlan, User
 from app.models.blog import OnboardingStatus
 
 
@@ -52,6 +52,17 @@ def _complete_onboarding_and_verify_email(blog_id: int, user_id: int) -> None:
         session.commit()
 
 
+def _give_pro_plan(blog_id: int) -> None:
+    """Custom domains need a paid plan; see test_plan_limits for that rule."""
+    with Session(engine) as session:
+        subscription = session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
+        subscription = subscription or BlogSubscription(blog_id=blog_id)
+        subscription.plan = SubscriptionPlan.PRO
+        subscription.status = "active"
+        session.add(subscription)
+        session.commit()
+
+
 # ── resolve_blog_by_host ──────────────────────────────────────────────────────
 
 def test_resolve_by_host_matches_a_subdomain(client):
@@ -71,6 +82,7 @@ def test_resolve_by_host_is_case_insensitive(client):
 def test_resolve_by_host_matches_a_custom_domain(client):
     token, blog_id, user_id, _ = _register_owner(client)
     _complete_onboarding_and_verify_email(blog_id, user_id)
+    _give_pro_plan(blog_id)
     headers = {"Authorization": f"Bearer {token}"}
 
     domain = f"blog-{uuid.uuid4().hex[:8]}.example.com"
@@ -123,6 +135,7 @@ def test_update_blog_rejects_malformed_custom_domain(client):
 def test_update_blog_rejects_duplicate_custom_domain(client):
     token1, blog_id1, user_id1, _ = _register_owner(client)
     _complete_onboarding_and_verify_email(blog_id1, user_id1)
+    _give_pro_plan(blog_id1)
     headers1 = {"Authorization": f"Bearer {token1}"}
 
     domain = f"taken-{uuid.uuid4().hex[:8]}.example.com"
@@ -131,6 +144,7 @@ def test_update_blog_rejects_duplicate_custom_domain(client):
 
     token2, blog_id2, user_id2, _ = _register_owner(client)
     _complete_onboarding_and_verify_email(blog_id2, user_id2)
+    _give_pro_plan(blog_id2)
     headers2 = {"Authorization": f"Bearer {token2}"}
 
     second = client.patch(f"/blogs/{blog_id2}", json={"custom_domain": domain}, headers=headers2)
@@ -141,6 +155,7 @@ def test_update_blog_rejects_duplicate_custom_domain(client):
 def test_update_blog_accepts_a_valid_custom_domain(client):
     token, blog_id, user_id, _ = _register_owner(client)
     _complete_onboarding_and_verify_email(blog_id, user_id)
+    _give_pro_plan(blog_id)
     headers = {"Authorization": f"Bearer {token}"}
 
     domain = f"MyBlog-{uuid.uuid4().hex[:8]}.Example.com"
