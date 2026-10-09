@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     TRIAL_DAYS: int = Field(14, ge=0)
     # How long a failed renewal keeps paid features before dropping to Free.
     PAST_DUE_GRACE_DAYS: int = Field(3, ge=0)
+    # Workspaces one account may own (superadmins exempt), and how many it
+    # may create per hour — a guard against scripted sign-up abuse.
+    MAX_OWNED_WORKSPACES: int = Field(10, ge=1)
+    WORKSPACE_CREATIONS_PER_HOUR: int = Field(5, ge=1)
 
     # ── Observability ──
     LOG_LEVEL: str = "INFO"

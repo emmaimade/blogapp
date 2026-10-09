@@ -99,6 +99,7 @@ class ErrorCode(str, Enum):
     NO_ACTIVE_SUBSCRIPTION = "NO_ACTIVE_SUBSCRIPTION"
     INVALID_WEBHOOK_SIGNATURE = "INVALID_WEBHOOK_SIGNATURE"
     WORKSPACE_FULL = "WORKSPACE_FULL"
+    WORKSPACE_LIMIT_REACHED = "WORKSPACE_LIMIT_REACHED"
     PAYMENT_METHOD_REQUIRED = "PAYMENT_METHOD_REQUIRED"
     NO_PENDING_CHANGE = "NO_PENDING_CHANGE"
 
@@ -350,6 +351,11 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
         status.HTTP_403_FORBIDDEN,
         "This workspace can't take new members right now, so the invitation "
         "can't be accepted yet. Let the person who invited you know.",
+    ),
+    ErrorCode.WORKSPACE_LIMIT_REACHED: ErrorSpec(
+        status.HTTP_403_FORBIDDEN,
+        "You've reached the maximum number of workspaces you can own. "
+        "Delete one you no longer need, or contact support to raise the limit.",
     ),
 
     # ── Throttling ────────────────────────────────────────────────────────────

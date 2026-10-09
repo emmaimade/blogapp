@@ -84,3 +84,52 @@ def test_create_blog_makes_the_creator_owner(client):
 
     membership = next(m for m in me["blog_memberships"] if m["blog_id"] == blog_id)
     assert membership["role"] == "owner"
+
+
+# ── Limits ────────────────────────────────────────────────────────────────────
+
+def test_owner_cannot_exceed_the_workspace_cap(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "MAX_OWNED_WORKSPACES", 2)
+    headers = _register(client)  # sign-up already made one
+
+    assert client.post("/blogs/", json={"name": "Second"}, headers=headers).status_code == 200
+    res = client.post("/blogs/", json={"name": "Third"}, headers=headers)
+
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "WORKSPACE_LIMIT_REACHED"
+
+
+def test_workspace_creation_is_rate_limited(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "WORKSPACE_CREATIONS_PER_HOUR", 2)
+    headers = _register(client)  # counts: created within the hour
+
+    assert client.post("/blogs/", json={"name": "Second"}, headers=headers).status_code == 200
+    res = client.post("/blogs/", json={"name": "Third"}, headers=headers)
+
+    assert res.status_code == 429, res.text
+    assert res.json()["code"] == "RATE_LIMITED"
+    assert res.headers.get("Retry-After") == "3600"
+
+
+def test_superadmin_is_exempt_from_workspace_limits(client, monkeypatch):
+    from sqlmodel import Session
+
+    from app.core.config import settings
+    from app.core.db import engine
+    from app.models import User
+
+    monkeypatch.setattr(settings, "MAX_OWNED_WORKSPACES", 1)
+    monkeypatch.setattr(settings, "WORKSPACE_CREATIONS_PER_HOUR", 1)
+    headers = _register(client)
+    user_id = client.get("/auth/me", headers=headers).json()["id"]
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        user.is_super_admin = True
+        session.add(user)
+        session.commit()
+
+    assert client.post("/blogs/", json={"name": "Platform-made"}, headers=headers).status_code == 200

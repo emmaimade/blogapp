@@ -22,6 +22,7 @@ from app.core.exceptions import (
     ConflictError,
     GoneError,
     NotFoundError,
+    RateLimitError,
 )
 from app.core.permissions import Permissions
 from app.core.plans import ensure_member_capacity, get_effective_plan
@@ -334,7 +335,30 @@ def _resolve_new_blog_address(session: Session, name: str, requested: Optional[s
     return address
 
 
+def _ensure_can_create_workspace(session: Session, current_user: User) -> None:
+    """Caps how many workspaces one account owns, and how fast it makes them."""
+    if Permissions.is_super_admin(current_user):
+        return
+    owned = session.exec(
+        select(func.count()).select_from(Blog).where(Blog.owner_id == current_user.id)
+    ).one()
+    if owned >= settings.MAX_OWNED_WORKSPACES:
+        raise AuthorizationError(ErrorCode.WORKSPACE_LIMIT_REACHED)
+    recent = session.exec(
+        select(func.count()).select_from(Blog).where(
+            Blog.owner_id == current_user.id,
+            Blog.created_at >= utc_now() - timedelta(hours=1),
+        )
+    ).one()
+    if recent >= settings.WORKSPACE_CREATIONS_PER_HOUR:
+        raise RateLimitError(
+            message="You've created several workspaces in a short time. Please wait a while and try again.",
+            retry_after_seconds=3600,
+        )
+
+
 def create_blog(blog_data: BlogCreate, session: Session, current_user: User, request: Request | None = None) -> Blog:
+    _ensure_can_create_workspace(session, current_user)
     name = blog_data.name.strip()
     if not name:
         raise BadRequestError(ErrorCode.INVALID_INPUT, "Give your workspace a name.")
