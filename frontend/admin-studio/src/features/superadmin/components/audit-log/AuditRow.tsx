@@ -72,11 +72,13 @@ export const AuditRow = ({ log, onFilter }: AuditRowProps) => {
         </span>
 
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
+          {/* Phones wrap the event name; wider screens keep each row to one line. */}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 md:flex-nowrap">
             <FilterButton
               onClick={() => onFilter('action', log.action)}
               title={`Only show "${log.label}" events`}
-              className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+              wrap
+              className="min-w-0 text-sm font-semibold text-zinc-900 md:truncate dark:text-zinc-100"
             >
               {log.label}
             </FilterButton>
@@ -130,18 +132,21 @@ const FilterButton = ({
   onClick,
   title,
   className = '',
+  wrap = false,
   children,
 }: {
   onClick: () => void;
   title: string;
   className?: string;
+  /** Let the text wrap instead of cutting it off with an ellipsis. */
+  wrap?: boolean;
   children: ReactNode;
 }) => (
   <button
     type="button"
     onClick={onClick}
     title={title}
-    className={`max-w-full truncate text-left underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 ${className}`}
+    className={`max-w-full ${wrap ? '' : 'truncate'} text-left underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 ${className}`}
   >
     {children}
   </button>
@@ -245,7 +250,7 @@ const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
 };
 
 const linkClass =
-  'mt-0.5 inline-flex items-center gap-0.5 font-medium text-violet-600 hover:underline dark:text-violet-400';
+  'mt-0.5 flex w-fit items-center gap-0.5 font-medium text-violet-600 hover:underline dark:text-violet-400';
 
 const Detail = ({ label, children }: { label: string; children: ReactNode }) => (
   <>
