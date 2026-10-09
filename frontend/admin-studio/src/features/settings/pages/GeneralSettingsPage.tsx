@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap, MessageSquare } from 'lucide-react';
+import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap, MessageSquare, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
+import { useAuth } from '../../auth/context/AuthContext';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
@@ -35,6 +37,8 @@ export const GeneralSettings: React.FC = () => {
   useDocumentTitle('General settings');
   const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+  const toWorkspace = useWorkspacePath();
+  const { refreshUser } = useAuth();
   const [copied, setCopied] = useState(false);
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [savingDomain, setSavingDomain] = useState(false);
@@ -112,14 +116,18 @@ export const GeneralSettings: React.FC = () => {
     }
   };
 
-  const saveDomain = async () => {
+  const saveDomain = async (domain: string = customDomainInput) => {
     if (!activeBlog?.id) return;
     setSavingDomain(true);
     try {
-      await api.patch(`/blogs/${activeBlog.id}`, { custom_domain: customDomainInput || null });
+      await api.patch(`/blogs/${activeBlog.id}`, { custom_domain: domain || null });
       queryClient.invalidateQueries({ queryKey: ['blog', activeBlog.id] });
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
-      toast.success(customDomainInput ? 'Custom domain saved' : 'Custom domain removed');
+      // activeBlog comes from the signed-in user's memberships, not React Query,
+      // so the domain shown here (and on the dashboard) only updates after this.
+      await refreshUser();
+      if (!domain) setCustomDomainInput('');
+      toast.success(domain ? 'Custom domain saved' : 'Custom domain removed');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to save domain');
     } finally {
@@ -262,7 +270,7 @@ export const GeneralSettings: React.FC = () => {
                     className={`${inputClass} flex-1`}
                   />
                   <button
-                    onClick={saveDomain}
+                    onClick={() => saveDomain()}
                     disabled={savingDomain}
                     className="flex-shrink-0 flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all disabled:opacity-50"
                   >
@@ -278,13 +286,38 @@ export const GeneralSettings: React.FC = () => {
                   </p>
                 </div>
               </>
+            ) : customDomain ? (
+              // Connected on a paid plan before a downgrade: it keeps working and
+              // can be removed, but changing it needs Pro or Team again.
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                  <span className="flex-1 truncate font-mono text-sm font-semibold text-zinc-900 dark:text-white">{customDomain}</span>
+                  <button
+                    onClick={() => saveDomain('')}
+                    disabled={savingDomain}
+                    className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:border-red-200 hover:text-red-600 transition-all disabled:opacity-50"
+                  >
+                    {savingDomain ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
+                    Remove
+                  </button>
+                </div>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  Your domain keeps working. Upgrade to Pro to change it.
+                </p>
+                <Link
+                  to={toWorkspace('/settings/billing')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all"
+                >
+                  <Zap size={15} /> Upgrade to Pro
+                </Link>
+              </div>
             ) : (
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-5">
                 <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                   Upgrade to Pro to connect your own custom domain.
                 </p>
                 <Link
-                  to="/pricing"
+                  to={toWorkspace('/settings/billing')}
                   className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all"
                 >
                   <Zap size={15} /> Upgrade to Pro
