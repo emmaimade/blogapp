@@ -41,6 +41,7 @@ import { SuperAdminBlogDetailPage } from '../../features/superadmin/pages/SuperA
 import { JoinInvitationPage } from '../../features/users/pages/JoinInvitationPage';
 import { SearchResultsPage } from '../../features/search/pages/SearchResultsPage';
 import { BlogProviderOutlet } from '../providers/BlogProvider';
+import { NewWorkspacePage } from '../../features/workspaces/pages/NewWorkspacePage';
 import {
   DefaultAdminRedirect,
   LegacyWorkspaceRedirect,
@@ -80,6 +81,10 @@ const router = createBrowserRouter(
           workspace itself instead of showing "access denied". */}
       <Route element={<ProtectedRoute requiredCapability={null} />}>
         <Route path="/admin" element={<DefaultAdminRedirect />} />
+        {/* Reachable with no workspace at all, so it sits outside the capability checks. */}
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/workspaces/new" element={<NewWorkspacePage />} />
+        </Route>
         {LEGACY_WORKSPACE_PATHS.map((path) => (
           <Route key={path} path={path} element={<LegacyWorkspaceRedirect />} />
         ))}

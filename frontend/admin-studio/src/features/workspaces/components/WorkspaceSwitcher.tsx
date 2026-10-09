@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Check, ChevronDown, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, ChevronDown, Plus, Search } from 'lucide-react';
 import { useBlog, type BlogMembership } from '../../../app/providers/BlogProvider';
 import { planName } from '../../../shared/lib/plans';
+import { MAX_OWNED_WORKSPACES, NEW_WORKSPACE_PATH } from '../../../shared/lib/workspacePaths';
 
 // Past this many workspaces the menu gets a filter box.
 const SEARCH_THRESHOLD = 5;
@@ -37,6 +39,8 @@ export const WorkspaceSwitcher = ({ variant, expanded = true, className = '' }: 
   const listRef = useRef<HTMLDivElement>(null);
 
   const showSearch = memberships.length > SEARCH_THRESHOLD;
+  const atWorkspaceLimit =
+    memberships.filter((membership) => membership.role === 'owner').length >= MAX_OWNED_WORKSPACES;
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return needle
@@ -221,6 +225,25 @@ export const WorkspaceSwitcher = ({ variant, expanded = true, className = '' }: 
                 </button>
               );
             })}
+          </div>
+
+          <div className="border-t border-zinc-100 px-1.5 pt-1.5 dark:border-zinc-800">
+            {atWorkspaceLimit ? (
+              <div className="px-2 py-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Workspace limit reached ({MAX_OWNED_WORKSPACES} owned)
+              </div>
+            ) : (
+              <Link
+                to={NEW_WORKSPACE_PATH}
+                onClick={close}
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-950/40"
+              >
+                <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-violet-300 dark:border-violet-700">
+                  <Plus size={14} />
+                </span>
+                New workspace
+              </Link>
+            )}
           </div>
         </div>
       )}

@@ -27,6 +27,7 @@ import { SupportModal } from "../features/support/components/SupportModal";
 import { NotificationBell } from "../features/notifications/components/NotificationBell";
 import { QuickJumpPalette } from "../features/superadmin/components/QuickJumpPalette";
 import { WorkspaceSwitcher } from "../features/workspaces/components/WorkspaceSwitcher";
+import { NEW_WORKSPACE_PATH } from "../shared/lib/workspacePaths";
 
 interface UserMenuProps {
   user: ReturnType<typeof useAuth>["user"];
@@ -198,8 +199,10 @@ useEffect(() => {
     return;
   }
   // Onboarding lives outside this layout, so being here means it isn't open.
+  // An unfinished workspace doesn't stop the user creating another one.
+  const onNewWorkspace = location.pathname === NEW_WORKSPACE_PATH;
   const needsGate =
-    (requiresOnboarding || !user?.email_verified) && !userIsSuperAdmin && !!activeBlog;
+    ((requiresOnboarding && !onNewWorkspace) || !user?.email_verified) && !userIsSuperAdmin && !!activeBlog;
   if (needsGate) {
     navigate(toWorkspace("/onboarding"), { replace: true });
   }
@@ -333,7 +336,7 @@ useEffect(() => {
     sectionPath === "/admin/dashboard" ||
     sectionPath === "/admin/superadmin";
   const showOnboardingLock =
-    (requiresOnboarding || !user?.email_verified) &&
+    ((requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH) || !user?.email_verified) &&
     !userIsSuperAdmin;
   const onboardingStepOrder = ["about", "profile", "publication", "team", "plan"];
   const onboardingStepsTotal = 5;

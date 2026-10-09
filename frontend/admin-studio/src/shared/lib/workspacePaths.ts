@@ -2,6 +2,13 @@ import type { UserBlogMembership } from '../../features/auth/types';
 import { lastWorkspace } from './blogSession';
 
 export const WORKSPACE_ROUTE_PATTERN = '/admin/w/:workspaceSlug/*';
+export const NEW_WORKSPACE_PATH = '/admin/workspaces/new';
+
+/**
+ * Mirrors the backend's MAX_OWNED_WORKSPACES default, only to explain the
+ * limit up front in the switcher; the backend enforces the real value.
+ */
+export const MAX_OWNED_WORKSPACES = 10;
 
 /** `/admin/w/{slug}{path}` — `path` starts with a slash, e.g. `/posts/new`. */
 export const workspacePath = (slug: string, path = '/dashboard') => `/admin/w/${slug}${path}`;

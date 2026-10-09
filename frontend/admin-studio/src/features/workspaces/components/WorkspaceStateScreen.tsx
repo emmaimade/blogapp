@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useStoredTheme } from '../../../shared/lib/theme';
+import { NEW_WORKSPACE_PATH } from '../../../shared/lib/workspacePaths';
 
 interface WorkspaceStateScreenProps {
   kind: 'not-found' | 'none';
@@ -19,7 +20,7 @@ const COPY = {
   none: {
     eyebrow: 'No workspace yet',
     title: "You're not in any workspace yet",
-    body: 'Accept an invitation from your email to join a team, or sign up to start your own blog.',
+    body: 'Accept an invitation from your email to join a team, or create a workspace to start your own blog.',
   },
 } as const;
 
@@ -45,6 +46,11 @@ export const WorkspaceStateScreen = ({ kind, fallbackPath }: WorkspaceStateScree
           {fallbackPath && (
             <Link to={fallbackPath} replace className="admin-btn admin-btn-primary px-6 py-3 text-sm">
               Go to my workspace
+            </Link>
+          )}
+          {kind === 'none' && (
+            <Link to={NEW_WORKSPACE_PATH} className="admin-btn admin-btn-primary px-6 py-3 text-sm">
+              Create a workspace
             </Link>
           )}
           <button
