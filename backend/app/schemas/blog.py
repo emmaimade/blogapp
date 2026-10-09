@@ -157,6 +157,8 @@ class BlogAnalytics(UTCDatetimeMixin, BaseModel):
     total_posts: int
     total_views: int
     team_members: int
+    # Effective plan: a lapsed trial or ended paid period counts as Free.
+    plan: SubscriptionPlan
     created_at: datetime
     last_activity: Optional[datetime] = None
 

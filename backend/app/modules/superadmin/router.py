@@ -16,6 +16,7 @@ from app.core.exceptions import BadRequestError, NotFoundError, ValidationError
 from app.core.moderation import record_moderation_action
 from app.core.notifications import add_notification
 from app.core.permissions import require_super_admin
+from app.core.plans import get_effective_plan
 from app.core.security import get_current_user, get_password_hash
 from app.core.email import dispatch_email
 from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
@@ -27,6 +28,7 @@ from app.models import (
     Comment,
     ModerationItem,
     BlogMember,
+    BlogSubscription,
     SupportTicket,
     SupportMessage,
     TicketStatus,
@@ -126,36 +128,59 @@ def get_all_blogs_analytics(
     _: None = Depends(require_super_admin),
     session: Session = Depends(get_session),
 ):
-    blogs = session.exec(select(Blog)).all()
-    results = []
-    for blog in blogs:
-        posts_count = session.exec(
-            select(func.count(Post.id)).where(Post.blog_id == blog.id)
-        ).first() or 0
-        views = session.exec(
-            select(func.sum(Post.views)).where(Post.blog_id == blog.id)
-        ).first() or 0
-        member_count = len(blog.members) if hasattr(blog, "members") else 0
-        last_post = session.exec(
-            select(Post.created_at)
-            .where(Post.blog_id == blog.id)
-            .order_by(Post.created_at.desc())
-        ).first()
-        results.append(
-            BlogAnalytics(
-                blog_id=blog.id,
-                blog_name=blog.name,
-                name=blog.name,
-                subdomain=blog.subdomain,
-                custom_domain=blog.custom_domain,
-                is_active=blog.is_active,
-                owner_email=blog.owner.email if blog.owner else "",
-                total_posts=posts_count,
-                total_views=views,
-                team_members=member_count,
-                created_at=blog.created_at,
-                last_activity=last_post,
-            )
+    return [BlogAnalytics(**row) for row in _blog_analytics(session).values()]
+
+
+def _blog_analytics(session: Session, blog_ids: Optional[list[int]] = None) -> dict[int, dict]:
+    """
+    The BlogAnalytics fields for every blog, or only `blog_ids`, keyed by blog id.
+
+    One grouped query per figure rather than several per blog — every query is
+    a round trip to the remote database.
+    """
+    def scoped(query, column):
+        return query if blog_ids is None else query.where(column.in_(blog_ids))
+
+    blogs = session.exec(
+        scoped(select(Blog, User.email).join(User, User.id == Blog.owner_id, isouter=True), Blog.id)
+    ).all()
+    post_stats = {
+        blog_id: (count, views or 0, last_created)
+        for blog_id, count, views, last_created in session.exec(
+            scoped(
+                select(Post.blog_id, func.count(Post.id), func.sum(Post.views), func.max(Post.created_at)),
+                Post.blog_id,
+            ).group_by(Post.blog_id)
+        ).all()
+    }
+    member_counts = dict(
+        session.exec(
+            scoped(select(BlogMember.blog_id, func.count(BlogMember.id)), BlogMember.blog_id).group_by(BlogMember.blog_id)
+        ).all()
+    )
+    subscriptions = {
+        sub.blog_id: sub
+        for sub in session.exec(scoped(select(BlogSubscription), BlogSubscription.blog_id)).all()
+    }
+
+    results = {}
+    for blog, owner_email in blogs:
+        posts_count, views, last_post = post_stats.get(blog.id, (0, 0, None))
+        results[blog.id] = dict(
+            blog_id=blog.id,
+            blog_name=blog.name,
+            name=blog.name,
+            subdomain=blog.subdomain,
+            custom_domain=blog.custom_domain,
+            is_active=blog.is_active,
+            owner_email=owner_email or "",
+            total_posts=posts_count,
+            total_views=views,
+            team_members=member_counts.get(blog.id, 0),
+            # The plan features follow right now, matching the Subscriptions page.
+            plan=get_effective_plan(subscriptions.get(blog.id)),
+            created_at=blog.created_at,
+            last_activity=last_post,
         )
     return results
 
@@ -173,19 +198,6 @@ def get_blog_detail(
     blog = session.get(Blog, blog_id)
     if not blog:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
-
-    posts_count = session.exec(
-        select(func.count(Post.id)).where(Post.blog_id == blog.id)
-    ).first() or 0
-    views = session.exec(
-        select(func.sum(Post.views)).where(Post.blog_id == blog.id)
-    ).first() or 0
-    member_count = len(blog.members) if hasattr(blog, "members") else 0
-    last_post = session.exec(
-        select(Post.created_at)
-        .where(Post.blog_id == blog.id)
-        .order_by(Post.created_at.desc())
-    ).first()
 
     # --- new: recent posts (last 8) ---
     recent_posts_rows = session.exec(
@@ -220,18 +232,7 @@ def get_blog_detail(
             )
 
     return BlogDetailAnalytics(
-        blog_id=blog.id,
-        blog_name=blog.name,
-        name=blog.name,
-        subdomain=blog.subdomain,
-        custom_domain=blog.custom_domain,
-        is_active=blog.is_active,
-        owner_email=blog.owner.email if blog.owner else "",
-        total_posts=posts_count,
-        total_views=views,
-        team_members=member_count,
-        created_at=blog.created_at,
-        last_activity=last_post,
+        **_blog_analytics(session, [blog.id])[blog.id],
         recent_posts=recent_posts,
         members=members,
     )
@@ -265,35 +266,8 @@ def update_blog_status(
         request=request,
     )
     session.commit()
-    session.refresh(blog)
-    
-    posts_count = session.exec(
-        select(func.count(Post.id)).where(Post.blog_id == blog.id)
-    ).first() or 0
-    views = session.exec(
-        select(func.sum(Post.views)).where(Post.blog_id == blog.id)
-    ).first() or 0
-    member_count = len(blog.members) if hasattr(blog, "members") else 0
-    last_post = session.exec(
-        select(Post.created_at)
-        .where(Post.blog_id == blog.id)
-        .order_by(Post.created_at.desc())
-    ).first()
-    
-    return BlogAnalytics(
-        blog_id=blog.id,
-        blog_name=blog.name,
-        name=blog.name,
-        subdomain=blog.subdomain,
-        custom_domain=blog.custom_domain,
-        is_active=blog.is_active,
-        owner_email=blog.owner.email if blog.owner else "",
-        total_posts=posts_count,
-        total_views=views,
-        team_members=member_count,
-        created_at=blog.created_at,
-        last_activity=last_post,
-    )
+
+    return BlogAnalytics(**_blog_analytics(session, [blog.id])[blog.id])
 
 
 @router.delete("/blogs/{blog_id}", status_code=status.HTTP_204_NO_CONTENT)
