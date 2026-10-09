@@ -29,6 +29,8 @@ export const markdownComponents: Components = {
 
 export const getEditorOptions = (imageUploadFn: any): Options => ({
   spellChecker: false,
+  // Toolbar icons are Lucide (EditorToolbarIcons), so skip fetching Font Awesome from a CDN.
+  autoDownloadFontAwesome: false,
   placeholder: 'Write your story in Markdown…',
   status: false,
   minHeight: '450px',

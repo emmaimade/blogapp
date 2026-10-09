@@ -487,15 +487,32 @@ h1, h2, h3, h4, h5, h6 {
   scrollbar-width: thin;
 }
 
+/* EasyMDE separators are an <i> holding a "|"; show only a 1px divider. */
 .editor-container .editor-toolbar i.separator {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  font-style: normal !important;
+  height: 18px;
+  margin: 0 6px;
+  border-left: 1px solid var(--admin-line);
+  border-right: 0;
+  color: transparent;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
-.editor-container .editor-toolbar button,
-.editor-container .editor-toolbar i.separator {
+.editor-container .editor-toolbar button {
   color: var(--admin-text-tertiary);
   flex-shrink: 0;
+}
+
+/* Lucide icons (EditorToolbarIcons) replace EasyMDE's empty Font Awesome <i>. */
+.editor-container .editor-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.editor-container .editor-toolbar button > i {
+  display: none;
 }
 
 .editor-container .editor-toolbar button:hover,

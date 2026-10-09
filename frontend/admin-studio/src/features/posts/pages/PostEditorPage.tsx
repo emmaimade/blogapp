@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import type EasyMDE from 'easymde';
 import { Controller } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +11,7 @@ import { usePostEditor } from '../hooks/usePostEditor';
 import { TagSelector } from '../components/TagSelector';
 import { markdownComponents, getEditorOptions } from '../components/MarkdownConfig';
 import { SchedulePublishPanel } from '../components/SchedulePublishPanel';
+import { EditorToolbarIcons } from '../components/EditorToolbarIcons';
 import { ContentBlueprint } from '../components/ContentBlueprint';
 import { FloatingSaveBar } from '../components/FloatingSaveBar';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -38,6 +40,7 @@ export const PostEditor: React.FC = () => {
   const unsavedChangesBlocker = useUnsavedChangesGuard(isDirty);
 
   const editorOptions = useMemo(() => getEditorOptions(handleImageUpload), [handleImageUpload]);
+  const [editor, setEditor] = useState<EasyMDE | null>(null);
 
   if (isEditMode && isLoading) {
     return (
@@ -188,7 +191,8 @@ export const PostEditor: React.FC = () => {
             </div>
           ) : (
             <div className="editor-container">
-              <Controller name="content" control={control} render={({ field }) => <SimpleMDE {...field} options={editorOptions} />} />
+              <Controller name="content" control={control} render={({ field }) => <SimpleMDE {...field} options={editorOptions} getMdeInstance={setEditor} />} />
+              <EditorToolbarIcons editor={editor} />
             </div>
           )}
         </div>

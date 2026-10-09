@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,7 +35,7 @@ export const usePostEditor = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
 
-  const { control, register, handleSubmit, reset, watch, setValue, formState: { isDirty, errors } } = useForm<PostForm>({
+  const { control, register, handleSubmit, reset, watch, setValue, getValues, formState: { isDirty, errors } } = useForm<PostForm>({
     defaultValues: {
       is_project: false,
       is_featured: false,
@@ -102,19 +102,22 @@ export const usePostEditor = () => {
     }
   };
 
-  const handleImageUpload = async (file: File, onSuccess: (url: string) => void, onError: (err: string) => void) => {
+  // Stable across renders: the editor's options are built from it, and new
+  // options make EasyMDE tear down and rebuild the whole editor.
+  const blogId = activeBlog?.id;
+  const handleImageUpload = useCallback(async (file: File, onSuccess: (url: string) => void, onError: (err: string) => void) => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await api.post(`/blogs/${activeBlog!.id}/posts/upload-image`, formData, {
+      const res = await api.post(`/blogs/${blogId}/posts/upload-image`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       const url = res.data.url;
       if (!url) throw new Error('No URL in response');
       onSuccess(url);
       toast.success('Image uploaded');
-      if (!thumbnail) { setValue('thumbnail_url', url); toast.success('Set as featured thumbnail'); }
+      if (!getValues('thumbnail_url')) { setValue('thumbnail_url', url); toast.success('Set as featured thumbnail'); }
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Image upload failed';
       onError(msg);
@@ -122,7 +125,7 @@ export const usePostEditor = () => {
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [blogId, getValues, setValue]);
 
   const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
