@@ -4,7 +4,7 @@ import string
 from typing import Any, List, Optional
 from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, status, Request, Response, BackgroundTasks
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
@@ -323,19 +323,24 @@ def delete_blog(
     for member in members:
         session.delete(member)
     
+    # Not linked by blog_id: audit_logs.blog_id cascades, so the record of
+    # this delete would go with the blog. The id stays in the details.
     add_audit_log(
         session,
         action="superadmin.blog_delete",
         resource_type="blog",
         resource_id=blog.id,
-        blog_id=blog.id,
         actor=current_user,
-        details={"name": blog.name},
+        details={"name": blog.name, "blog_id": blog.id, "slug": blog.slug},
         request=request,
     )
 
-    # Delete blog
-    session.delete(blog)
+    # A bulk delete, so settings, tags, subscriptions and the rest go by the
+    # database's ON DELETE CASCADE; session.delete(blog) would have the ORM
+    # set their (NOT NULL) blog_id to null first and fail.
+    session.flush()
+    session.expunge(blog)
+    session.exec(delete(Blog).where(Blog.id == blog_id))
     session.commit()
 
 
