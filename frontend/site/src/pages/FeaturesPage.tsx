@@ -26,7 +26,7 @@ interface MainFeature {
   title: string;
   description: string;
   details: string[];
-  /** Illustration in /public; rows without one show an icon panel. */
+  /** 3:2 illustration or screenshot in /public; rows without one show an icon panel. */
   image?: string;
   use_case: string;
 }
@@ -42,7 +42,7 @@ const mainFeatures: MainFeature[] = [
       'A public site for every workspace, with custom domains on Pro and Team',
       'Separate team and plan per workspace',
     ],
-    image: '/modern-professional-illustration-of-a-digital-agen.jpeg',
+    image: '/images/multi-tenant-workspaces.webp',
     use_case: 'Agencies managing multiple client blogs',
   },
   {
@@ -54,7 +54,7 @@ const mainFeatures: MainFeature[] = [
       'Editor: Content & settings management',
       'Author: Create & edit posts',
     ],
-    image: '/modern-professional-illustration-for-role-based-co.jpeg',
+    image: '/images/role-based-collaboration.webp',
     use_case: 'Grow your team without giving everyone the keys',
   },
   {
@@ -67,6 +67,7 @@ const mainFeatures: MainFeature[] = [
       'Tags to organise your content',
       'Comments, with flagging for spam and abuse',
     ],
+    image: '/images/publishing-control.webp',
     use_case: 'Control over your whole publishing workflow',
   },
   {
@@ -79,6 +80,7 @@ const mainFeatures: MainFeature[] = [
       'Billing and subscription oversight',
       'Audit log for investigations',
     ],
+    image: '/images/platform-admin.webp',
     use_case: 'Oversight for whoever runs the platform',
   },
 ];

@@ -9,6 +9,22 @@
       content="Launch and manage branded multi-tenant blogs with publishing workflows, workspace roles, and platform-grade administration."
     />
 
+    <!-- Link previews. Crawlers need absolute URLs, so VITE_SITE_URL must be set at build time. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Inko" />
+    <meta property="og:title" content="Inko · Multi-tenant blog platform" />
+    <meta
+      property="og:description"
+      content="Launch and manage branded multi-tenant blogs with publishing workflows, workspace roles, and platform-grade administration."
+    />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Inko: launch branded blogs at scale" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-image.png" />
+
     <!-- Favicons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

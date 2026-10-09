@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Same fonts and headline as the site's home hero. -->
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    html, body { width: 1200px; height: 630px; overflow: hidden; }
+    body {
+      position: relative;
+      font-family: 'Manrope', system-ui, sans-serif;
+      background: #FAFAFA;
+      color: #18181B;
+    }
+    .glow {
+      position: absolute;
+      right: -120px;
+      top: 50%;
+      width: 760px;
+      height: 760px;
+      transform: translateY(-50%);
+      background: radial-gradient(closest-side, rgba(123, 57, 237, 0.18), transparent);
+    }
+    .art {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      width: 600px;
+      transform: translateY(-50%);
+      /* Feather the illustration's own background into the page so no edge shows. */
+      mix-blend-mode: multiply;
+      -webkit-mask-image: radial-gradient(closest-side, #000 70%, transparent);
+      mask-image: radial-gradient(closest-side, #000 70%, transparent);
+    }
+    .copy {
+      position: absolute;
+      left: 80px;
+      top: 0;
+      bottom: 0;
+      width: 520px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+    .brand img { width: 44px; height: 44px; }
+    .brand span { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+    h1 {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-weight: 400;
+      font-size: 84px;
+      line-height: 1.02;
+      letter-spacing: -0.01em;
+    }
+    h1 em {
+      padding-right: 0.08em;
+      background: linear-gradient(135deg, #7B39ED 0%, #8B5CF6 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    p { max-width: 440px; margin-top: 24px; font-size: 24px; line-height: 1.4; color: #52525B; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <img class="art" id="art" alt="" />
+  <div class="copy">
+    <div class="brand"><img id="logo" alt="" /><span>Inko</span></div>
+    <h1>Launch branded blogs <em>at scale</em></h1>
+    <p>Workspaces, roles and publishing for every blog you run.</p>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    document.getElementById('art').src = params.get('art');
+    document.getElementById('logo').src = params.get('logo');
+  </script>
+</body>
+</html>

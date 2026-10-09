@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Mirrors BrowserFrame in frontend/site/src/shared/components/mockups.tsx -->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    html, body { width: 1200px; height: 800px; overflow: hidden; }
+    body {
+      font-family: 'Manrope', system-ui, sans-serif;
+      background:
+        radial-gradient(60% 60% at 50% 45%, rgba(123, 57, 237, 0.16), transparent 70%),
+        #EDE9FE;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+    }
+    .window {
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid #E4E4E7;
+      background: #fff;
+      box-shadow: 0 30px 60px -20px rgba(76, 29, 149, 0.28), 0 0 0 1px rgba(24, 24, 27, 0.04);
+    }
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 16px;
+      border-bottom: 1px solid #E4E4E7;
+      background: #FAFAFA;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; background: #D4D4D8; }
+    .url {
+      margin: 0 auto;
+      padding: 3px 64px;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 0 0 1px #E4E4E7;
+      font-size: 12px;
+      color: #A1A1AA;
+    }
+    .shot { display: block; }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="bar">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="url" id="url"></span>
+    </div>
+    <img class="shot" id="shot" alt="" />
+  </div>
+  <script>
+    // ?src=<file url>&url=<address bar text>&w=<css width>&h=<css height>
+    const params = new URLSearchParams(location.search);
+    const w = Number(params.get('w'));
+    const h = Number(params.get('h'));
+    // Fit the screenshot inside the padded canvas, below the 40px bar.
+    const scale = Math.min(1, (1200 - 96) / w, (800 - 96 - 40) / h);
+    const shot = document.getElementById('shot');
+    shot.style.width = `${Math.round(w * scale)}px`;
+    shot.style.height = `${Math.round(h * scale)}px`;
+    shot.src = params.get('src');
+    document.getElementById('url').textContent = params.get('url');
+  </script>
+</body>
+</html>
