@@ -1,6 +1,7 @@
 from .comment import Comment
+from .comment_ban import BlogCommentBan
 from .audit import AuditLog
-from .moderation import ModerationAction, ModerationItem
+from .moderation import ModerationAction, ModerationItem, ModerationReport
 from .post import Post, PostTagLink, ProjectMetadata, Tag
 from .settings import SiteSettings, PlatformSettings
 from .user import User, PlatformRole
@@ -28,10 +29,12 @@ from .blog import (
 )
 
 __all__ = [
+    "BlogCommentBan",
     "User",
     "AuditLog",
     "ModerationAction",
     "ModerationItem",
+    "ModerationReport",
     "PlatformRole",
     "EmailVerification",
     "PasswordResetToken",

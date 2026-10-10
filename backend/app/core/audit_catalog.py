@@ -77,6 +77,9 @@ ACTIONS: dict[str, ActionInfo] = {
     "comment.delete": ActionInfo("Deleted a comment", "content", "info"),
     # ── Moderation ───────────────────────────────────────────────────────
     "comment.moderator_delete": ActionInfo("Moderator removed a comment", "moderation", "warning"),
+    "comment.restore": ActionInfo("Restored a removed comment", "moderation", "info"),
+    "comment.ban_user": ActionInfo("Blocked someone from commenting", "moderation", "warning"),
+    "comment.unban_user": ActionInfo("Unblocked someone from commenting", "moderation", "info"),
     "moderation.flag_post": ActionInfo("Flagged a post", "moderation", "warning"),
     "moderation.flag_comment": ActionInfo("Flagged a comment", "moderation", "warning"),
     "moderation.approve": ActionInfo("Approved flagged content", "moderation", "info"),

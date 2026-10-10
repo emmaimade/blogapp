@@ -28,6 +28,7 @@ class ModerationQueueItemRead(UTCDatetimeMixin, BaseModel):
     notes: Optional[str] = None
     status: str
     reported_by_id: Optional[int] = None
+    report_count: int = 1
     created_at: datetime
 
 

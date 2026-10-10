@@ -162,6 +162,17 @@ def describe_audit_log(log: AuditLog, details: dict[str, Any]) -> str:
                 return f"Removed a comment{on_post} (moderator)"
             return f"Deleted a comment{on_post}"
 
+        if action == "comment.restore":
+            return f"Restored a removed comment{on_post}"
+
+    # Blocks are logged against the blocked user, not a comment.
+    if action == "comment.ban_user":
+        who = details.get("username") or "someone"
+        reason = details.get("reason")
+        return f"Blocked {who} from commenting" + (f" ({reason})" if reason else "")
+    if action == "comment.unban_user":
+        return "Unblocked someone from commenting"
+
     # --- Tag Actions ---
     if "tag.created" in action or "tag.create" in action:
         name = details.get("name")

@@ -75,6 +75,9 @@ class ErrorCode(str, Enum):
     ALREADY_A_MEMBER = "ALREADY_A_MEMBER"
     INVITATION_ALREADY_ACCEPTED = "INVITATION_ALREADY_ACCEPTED"
     EMAIL_ALREADY_VERIFIED = "EMAIL_ALREADY_VERIFIED"
+    COMMENT_DELETED = "COMMENT_DELETED"
+    DUPLICATE_COMMENT = "DUPLICATE_COMMENT"
+    ALREADY_REPORTED = "ALREADY_REPORTED"
 
     # ── Expired / gone ────────────────────────────────────────────────────────
     LINK_EXPIRED = "LINK_EXPIRED"
@@ -269,6 +272,18 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.EMAIL_ALREADY_VERIFIED: ErrorSpec(
         status.HTTP_409_CONFLICT,
         "This email address is already verified.",
+    ),
+    ErrorCode.COMMENT_DELETED: ErrorSpec(
+        status.HTTP_409_CONFLICT,
+        "This comment has been deleted and can no longer be changed.",
+    ),
+    ErrorCode.DUPLICATE_COMMENT: ErrorSpec(
+        status.HTTP_409_CONFLICT,
+        "You just posted this comment.",
+    ),
+    ErrorCode.ALREADY_REPORTED: ErrorSpec(
+        status.HTTP_409_CONFLICT,
+        "You've already reported this. Our moderators will review it.",
     ),
 
     # ── Expired / gone ────────────────────────────────────────────────────────

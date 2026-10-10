@@ -1,6 +1,6 @@
 """
 Coverage for the flag → moderate flow: flagging a post/comment creates a
-pending ModerationItem (deduped on re-flag), and a superadmin's
+pending ModerationItem (one per content, one report per reporter), and a superadmin's
 approve/reject/remove actions resolve it — with "remove" actually mutating
 the underlying content.
 """
@@ -100,30 +100,44 @@ def test_flag_post_creates_pending_moderation_item(client):
     assert body["reason"] == "spam"
 
 
-def test_reflagging_same_post_updates_existing_item_not_duplicate(client):
+def test_reflagging_same_post_by_the_same_reporter_is_rejected(client):
     token, blog_id, user_id = _register_owner(client)
     headers = {"Authorization": f"Bearer {token}"}
+    post_id = _create_post(blog_id, user_id)
+
+    first = client.post(f"/blogs/{blog_id}/posts/{post_id}/flag", json={"reason": "spam"}, headers=headers)
+    second = client.post(f"/blogs/{blog_id}/posts/{post_id}/flag", json={"reason": "harassment"}, headers=headers)
+    assert first.status_code == 201, first.text
+    assert second.status_code == 409, second.text
+    assert second.json()["code"] == "ALREADY_REPORTED"
+
+
+def test_second_reporter_is_counted_on_the_same_item_without_replacing_the_reason(client):
+    token, blog_id, user_id = _register_owner(client)
+    other_token, _, _ = _register_owner(client)
     post_id = _create_post(blog_id, user_id)
 
     first = client.post(
         f"/blogs/{blog_id}/posts/{post_id}/flag",
         json={"reason": "spam"},
-        headers=headers,
+        headers={"Authorization": f"Bearer {token}"},
     )
     second = client.post(
         f"/blogs/{blog_id}/posts/{post_id}/flag",
         json={"reason": "harassment"},
-        headers=headers,
+        headers={"Authorization": f"Bearer {other_token}"},
     )
-    assert first.status_code == 201 and second.status_code == 201
+    assert first.status_code == 201 and second.status_code == 201, second.text
     assert first.json()["id"] == second.json()["id"]
-    assert second.json()["reason"] == "harassment"
+    assert second.json()["reason"] == "spam"
+    assert second.json()["report_count"] == 2
 
     admin_headers = _superadmin_headers(client)
     queue = client.get("/superadmin/moderation?content_type=post", headers=admin_headers)
     assert queue.status_code == 200, queue.text
     matches = [item for item in queue.json() if item["content_id"] == post_id]
     assert len(matches) == 1
+    assert matches[0]["report_count"] == 2
 
 
 def test_flag_comment_creates_pending_moderation_item(client):
@@ -137,10 +151,11 @@ def test_flag_comment_creates_pending_moderation_item(client):
     assert comment.status_code == 200, comment.text
     comment_id = comment.json()["id"]
 
+    reporter_token, _, _ = _register_owner(client)
     res = client.post(
         f"/comments/{comment_id}/flag",
         json={"reason": "spam"},
-        headers=headers,
+        headers={"Authorization": f"Bearer {reporter_token}"},
     )
     assert res.status_code == 201, res.text
     body = res.json()
@@ -180,7 +195,12 @@ def test_superadmin_remove_action_soft_deletes_comment(client):
     )
     comment_id = comment.json()["id"]
 
-    flag = client.post(f"/comments/{comment_id}/flag", json={"reason": "abuse"}, headers=headers)
+    reporter_token, _, _ = _register_owner(client)
+    flag = client.post(
+        f"/comments/{comment_id}/flag",
+        json={"reason": "abuse"},
+        headers={"Authorization": f"Bearer {reporter_token}"},
+    )
     item_id = flag.json()["id"]
 
     admin_headers = _superadmin_headers(client)
@@ -194,7 +214,7 @@ def test_superadmin_remove_action_soft_deletes_comment(client):
 
     fetched = client.get(f"/comments/post/{post_id}")
     assert fetched.status_code == 200, fetched.text
-    removed_comment = next(c for c in fetched.json() if c["id"] == comment_id)
+    removed_comment = next(c for c in fetched.json()["items"] if c["id"] == comment_id)
     assert removed_comment["is_deleted"] is True
     assert "removed by a moderator" in removed_comment["content"]
 

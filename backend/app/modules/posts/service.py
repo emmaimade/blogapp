@@ -25,7 +25,7 @@ from app.core.exceptions import (
 )
 from app.core.logging_config import get_logger
 from app.core.plans import ensure_can_publish, ensure_can_schedule
-from app.models import Comment, Post, PostTagLink, Tag, User, BlogRole
+from app.models import Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
 from app.core.permissions import Permissions
@@ -586,7 +586,7 @@ def delete_post(blog_id: int, post_id: int, session: Session, current_user: User
     return {"ok": True, "message": "Post deleted successfully"}
 
 
-def read_post(blog_id: int, post_id: int, session: Session) -> Post:
+def read_post(blog_id: int, post_id: int, session: Session, current_user: Optional[User]) -> Post:
     statement = (
         select(Post)
         .where(Post.id == post_id, Post.blog_id == blog_id)
@@ -594,13 +594,12 @@ def read_post(blog_id: int, post_id: int, session: Session) -> Post:
             selectinload(Post.author),
             selectinload(Post.tags),
             selectinload(Post.project_metadata),
-            selectinload(Post.comments).selectinload(Comment.user),
-            selectinload(Post.comments).selectinload(Comment.replies).selectinload(Comment.user),
         )
     )
     post = session.exec(statement).first()
     if not post:
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
+    _ensure_post_visible(post, blog_id, session, current_user)
     return post
 
 
@@ -613,7 +612,6 @@ def read_post_by_slug(
         .options(
             selectinload(Post.author),
             selectinload(Post.tags),
-            selectinload(Post.comments).selectinload(Comment.user),
         )
     )
     post = session.exec(statement).first()
@@ -632,21 +630,27 @@ def read_post_by_slug(
         session.commit()
         session.refresh(post)
 
-    # Draft/scheduled visibility check
+    _ensure_post_visible(post, blog_id, session, current_user)
+    return post
+
+
+# ── Private helpers ───────────────────────────────────────────────────────────
+
+def _ensure_post_visible(post: Post, blog_id: int, session: Session, current_user: Optional[User]) -> None:
+    """Drafts and scheduled posts are visible only to the workspace team."""
+    if post.status == PostStatus.PUBLISHED:
+        return
+
     can_view = False
     if current_user:
         role = Permissions.get_user_role_in_blog(current_user, blog_id, session)
         can_view = role in [BlogRole.OWNER, BlogRole.EDITOR, BlogRole.AUTHOR]
 
-    if post.status != PostStatus.PUBLISHED and not can_view:
+    if not can_view:
         # A draft is indistinguishable from a missing post to anyone without
-        # workspace access — 403 here would confirm that the slug exists.
+        # workspace access — 403 here would confirm that it exists.
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
-    return post
-
-
-# ── Private helpers ───────────────────────────────────────────────────────────
 
 def _get_post_or_404(session: Session, blog_id: int, post_id: int) -> Post:
     post = session.exec(
