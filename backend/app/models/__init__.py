@@ -1,4 +1,5 @@
 from .comment import Comment
+from .comment_ban import BlogCommentBan
 from .audit import AuditLog
 from .moderation import ModerationAction, ModerationItem, ModerationReport
 from .post import Post, PostTagLink, ProjectMetadata, Tag
@@ -28,6 +29,7 @@ from .blog import (
 )
 
 __all__ = [
+    "BlogCommentBan",
     "User",
     "AuditLog",
     "ModerationAction",

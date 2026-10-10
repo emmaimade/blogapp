@@ -370,14 +370,14 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                 <div className="space-y-1">
                   <NavLink to="/admin/posts" icon={FileText} label="Posts" />
                   {(activeRole === "owner" || activeRole === "editor") && (
-                    <>
-                      <NavLink to="/admin/tags" icon={Tag} label="Tags" />
-                      <NavLink
-                        to="/admin/comments"
-                        icon={MessageSquare}
-                        label="Comments"
-                      />
-                    </>
+                    <NavLink to="/admin/tags" icon={Tag} label="Tags" />
+                  )}
+                  {activeRole && (
+                    <NavLink
+                      to="/admin/comments"
+                      icon={MessageSquare}
+                      label="Comments"
+                    />
                   )}
                 </div>
               </div>

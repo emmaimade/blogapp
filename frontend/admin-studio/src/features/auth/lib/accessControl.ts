@@ -43,7 +43,8 @@ export const SUPER_ADMIN_CAPABILITIES: AdminCapability[] = [
 const ROLE_CAPABILITIES: Record<NonNullable<BlogMembership['role']>, AdminCapability[]> = {
   owner: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'manage_users', 'manage_settings', 'view_audit_logs'],
   editor: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'view_audit_logs'],
-  author: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts'],
+  // Authors moderate comments on their own posts only — the API scopes it.
+  author: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_comments'],
 };
 
 const normalizeRole = (role?: string | null) => role?.toLowerCase() ?? 'user';

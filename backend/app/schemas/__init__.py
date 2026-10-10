@@ -1,7 +1,16 @@
 from .audit import AuditLogRead, AuditLogQueryParams, MyAuditLogRead
 from .errors import ErrorResponse, ValidationErrorResponse
 from .pagination import PaginatedResponse
-from .comments import CommentAdminRead, CommentCreate, CommentRead, CommentReplyRead, CommentThreadPage, CommentUpdate
+from .comments import (
+    CommentAdminRead,
+    CommentBanCreate,
+    CommentBanRead,
+    CommentCreate,
+    CommentRead,
+    CommentReplyRead,
+    CommentThreadPage,
+    CommentUpdate,
+)
 from .moderation import (
     FlagContentCreate,
     ModerationActionCreate,
@@ -94,6 +103,8 @@ __all__ = [
     "CommentRead",
     "CommentAdminRead",
     "CommentCreate",
+    "CommentBanCreate",
+    "CommentBanRead",
     "CommentReplyRead",
     "CommentThreadPage",
     "CommentUpdate",

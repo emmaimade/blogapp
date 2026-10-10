@@ -1,15 +1,17 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlmodel import Session
 
 from app.core.db import get_session
 from app.core.moderation import flag_comment, load_comment_for_flag
-from app.core.permissions import require_blog_editor, require_completed_onboarding
+from app.core.permissions import require_blog_author, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user, get_current_user_optional
 from app.models import Post, User
 from app.schemas import (
     CommentAdminRead,
+    CommentBanCreate,
+    CommentBanRead,
     CommentCreate,
     CommentRead,
     CommentThreadPage,
@@ -19,7 +21,8 @@ from app.schemas import (
     PaginatedResponse,
 )
 
-from . import service
+from . import service, workspace
+from .workspace import CommentStatusFilter
 
 router = APIRouter(prefix="/comments", tags=["Comments"])
 
@@ -118,13 +121,52 @@ blog_router = APIRouter(prefix="/blogs/{blog_id}/comments", tags=["Comments"])
 def get_blog_comments(
     blog_id: int,
     q: Optional[str] = None,
+    status: CommentStatusFilter = "all",
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     session: Session = Depends(get_session),
-    _: None = Depends(require_blog_editor),
+    _: None = Depends(require_blog_author),
+    current_user: User = Depends(get_current_user),
 ):
-    items, total = service.list_blog_comments(session, blog_id, q, skip, limit)
+    items, total = workspace.list_blog_comments(session, blog_id, current_user, q, status, skip, limit)
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
+
+
+@blog_router.get("/bans", response_model=List[CommentBanRead])
+def list_comment_bans(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_editor),
+    current_user: User = Depends(get_current_user),
+):
+    return workspace.list_comment_bans(session, blog_id, current_user)
+
+
+@blog_router.post("/bans", response_model=CommentBanRead, status_code=201)
+def ban_commenter(
+    blog_id: int,
+    payload: CommentBanCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_editor),
+    __: None = Depends(require_completed_onboarding),
+    current_user: User = Depends(get_current_user),
+):
+    return workspace.ban_commenter(session, blog_id, payload, current_user, request)
+
+
+@blog_router.delete("/bans/{user_id}")
+def unban_commenter(
+    blog_id: int,
+    user_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_editor),
+    __: None = Depends(require_completed_onboarding),
+    current_user: User = Depends(get_current_user),
+):
+    workspace.unban_commenter(session, blog_id, user_id, current_user, request)
+    return {"ok": True, "message": "Unblocked"}
 
 
 @blog_router.delete("/{comment_id}")
@@ -133,9 +175,22 @@ def moderate_blog_comment(
     comment_id: int,
     request: Request,
     session: Session = Depends(get_session),
-    _: None = Depends(require_blog_editor),
+    _: None = Depends(require_blog_author),
     __: None = Depends(require_completed_onboarding),
     current_user: User = Depends(get_current_user),
 ):
-    service.moderate_blog_comment(session, blog_id, comment_id, current_user, request)
+    workspace.moderate_blog_comment(session, blog_id, comment_id, current_user, request)
     return {"ok": True, "message": "Comment moderated successfully"}
+
+
+@blog_router.post("/{comment_id}/restore", response_model=CommentAdminRead)
+def restore_blog_comment(
+    blog_id: int,
+    comment_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+    __: None = Depends(require_completed_onboarding),
+    current_user: User = Depends(get_current_user),
+):
+    return workspace.restore_blog_comment(session, blog_id, comment_id, current_user, request)

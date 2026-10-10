@@ -16,7 +16,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, BadRequestError, ConflictError, NotFoundError
 from app.core.notifications import add_notification
 from app.core.permissions import Permissions
-from app.models import Blog, BlogRole, Comment, Post, User
+from app.models import Blog, BlogCommentBan, BlogRole, Comment, Post, User
 from app.models.comment import CommentDeletedBy, utcnow
 from app.models.post import PostStatus
 from app.schemas import CommentCreate, CommentUpdate
@@ -30,6 +30,7 @@ def create_comment(
 ) -> Comment:
     _ensure_platform_comments_enabled(session)
     post = _get_commentable_post(session, payload.post_id)
+    _ensure_not_blocked(session, post.blog_id, current_user)
     parent_id = _resolve_reply_parent(session, payload.parent_id, post.id)
     check_comment_allowed(session, current_user.id, post.id, payload.content)
 
@@ -107,24 +108,6 @@ def count_live_comments(session: Session, post_id: int) -> int:
     return session.exec(
         select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
     ).one()
-
-
-def list_blog_comments(
-    session: Session, blog_id: int, q: Optional[str], skip: int, limit: int
-) -> Tuple[List[Comment], int]:
-    filters = [Post.blog_id == blog_id]
-    if q:
-        filters.append(Comment.content.ilike(f"%{q}%"))
-
-    base = select(Comment).join(Post, Comment.post_id == Post.id).where(*filters)
-    total = session.exec(select(func.count()).select_from(base.subquery())).one()
-    items = session.exec(
-        base.options(selectinload(Comment.user), selectinload(Comment.post))
-        .order_by(Comment.created_at.desc(), Comment.id.desc())
-        .offset(skip)
-        .limit(limit)
-    ).all()
-    return items, total
 
 
 def update_comment(
@@ -207,35 +190,6 @@ def delete_comment(
     session.commit()
 
 
-def moderate_blog_comment(
-    session: Session, blog_id: int, comment_id: int, current_user: User, request: Request
-) -> None:
-    comment = session.exec(
-        select(Comment)
-        .join(Post, Comment.post_id == Post.id)
-        .where(Comment.id == comment_id, Post.blog_id == blog_id)
-    ).first()
-    if not comment:
-        raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
-    if comment.is_deleted:
-        raise ConflictError(ErrorCode.COMMENT_DELETED)
-
-    soft_delete_comment(session, comment, CommentDeletedBy.MODERATOR)
-
-    post = session.get(Post, comment.post_id)
-    add_audit_log(
-        session,
-        action="comment.moderator_delete",
-        resource_type="comment",
-        resource_id=comment.id,
-        blog_id=blog_id,
-        actor=current_user,
-        details={"post_id": comment.post_id, "post_title": post.title if post else None},
-        request=request,
-    )
-    session.commit()
-
-
 def soft_delete_comment(session: Session, comment: Comment, deleted_by: CommentDeletedBy) -> None:
     """
     The one way a comment is deleted. `content` is left intact for moderator
@@ -277,6 +231,14 @@ def _get_commentable_post(session: Session, post_id: int) -> Post:
             "Comments are disabled for this blog.",
         )
     return post
+
+
+def _ensure_not_blocked(session: Session, blog_id: int, user: User) -> None:
+    blocked = session.exec(
+        select(BlogCommentBan.id).where(BlogCommentBan.blog_id == blog_id, BlogCommentBan.user_id == user.id)
+    ).first()
+    if blocked is not None:
+        raise AuthorizationError(ErrorCode.FORBIDDEN, "You've been blocked from commenting on this blog.")
 
 
 def _resolve_reply_parent(session: Session, parent_id: Optional[int], post_id: int) -> Optional[int]:

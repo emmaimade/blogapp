@@ -221,7 +221,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, currentUserI
       <div className="flex gap-4">
         {/* Avatar */}
         <div className="flex-shrink-0">
-          <div className="h-10 w-10 bg-zinc-900 rounded-full flex items-center justify-center font-bold text-white">
+          <div className="h-10 w-10 bg-zinc-900 rounded-full flex items-center justify-center font-bold text-white dark:bg-zinc-200 dark:text-zinc-900">
             {comment.user?.username ? comment.user.username[0].toUpperCase() : '?'}
           </div>
         </div>

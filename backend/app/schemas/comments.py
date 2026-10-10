@@ -61,6 +61,25 @@ class CommentAdminRead(_CommentFields):
     """Workspace moderation view — shows a deleted comment's original text."""
     mask_deleted_content: ClassVar[bool] = False
     post: "PostShort"
+    # People who've reported it in a still-pending moderation item.
+    open_reports: int = 0
+    # Whether this caller may restore it (see comments.service.can_restore).
+    can_restore: bool = False
+
+
+class CommentBanCreate(BaseModel):
+    user_id: int
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class CommentBanRead(UTCDatetimeMixin, BaseModel):
+    user_id: int
+    user: PublicAuthorRead
+    reason: Optional[str] = None
+    banned_by_id: Optional[int] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 MAX_COMMENT_LENGTH = 5000
