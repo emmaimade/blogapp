@@ -342,11 +342,11 @@ useEffect(() => {
   const showOnboardingLock =
     ((requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH) || !user?.email_verified) &&
     !userIsSuperAdmin;
-  const onboardingStepOrder = ["about", "profile", "publication", "team", "plan"];
-  const onboardingStepsTotal = 5;
+  const onboardingStepOrder = ["about", "profile", "publication", "plan"];
+  const onboardingStepsTotal = onboardingStepOrder.length;
   const onboardingCompleted =
     activeBlog?.onboarding_status === "completed"
-      ? 5
+      ? onboardingStepsTotal
       : Math.max(0, onboardingStepOrder.indexOf(activeBlog?.onboarding_step ?? "about"));
 
   if (!isDashboardRoot && sectionLabel && sectionLabel !== rootLabel) {

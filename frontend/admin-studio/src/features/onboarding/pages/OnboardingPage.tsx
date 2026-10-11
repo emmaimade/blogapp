@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { detectUserTimezone } from '../../../shared/utils/dates';
 import {
-  ArrowRight, ArrowLeft, Check, Loader2, Mail,
+  ArrowRight, ArrowLeft, Check, Loader2,
   Rocket, ShieldCheck, Sparkles, Users,
-  CheckCircle2, Globe, FileText, BarChart3, Building2, HelpCircle,
+  CheckCircle2, Globe, FileText, BarChart3, Building2, HelpCircle, UserPlus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -13,7 +13,7 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useAuth } from '../../auth/context/AuthContext';
 import { InkoLogo } from '../../../assets/inko';
-import { EmailVerificationBanner } from '../../auth/components/EmailVerificationBanner';
+import { EmailVerificationBanner, EmailVerificationCard } from '../../auth/components/EmailVerificationBanner';
 import { SupportModal } from '../../support/components/SupportModal';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { toastApiError } from '../../../shared/lib/apiErrors';
@@ -22,7 +22,7 @@ import { PLANS, TRIAL_DAYS, formatNaira, type PlanKey } from '../../../shared/li
 const planPrice = (key: PlanKey) => PLANS.find((plan) => plan.key === key)?.price.monthly ?? 0;
 
 type SubscriptionPlan = 'free' | 'pro' | 'team';
-type OnboardingStepKey = 'about' | 'profile' | 'publication' | 'team' | 'plan';
+type OnboardingStepKey = 'about' | 'profile' | 'publication' | 'plan';
 
 interface OnboardingState {
   blog: {
@@ -54,7 +54,9 @@ interface OnboardingState {
   };
 }
 
-const STEP_ORDER: OnboardingStepKey[] = ['about', 'profile', 'publication', 'team', 'plan'];
+// Inviting the team isn't a step: a workspace is on Free (one seat) until the
+// plan step, so invites go out from the ready screen instead.
+const STEP_ORDER: OnboardingStepKey[] = ['about', 'profile', 'publication', 'plan'];
 
 const TIMEZONES = [
   'UTC',
@@ -89,12 +91,11 @@ const TIMEZONES = [
   'Pacific/Auckland',
 ];
 
-const STEP_META: Record<OnboardingStepKey, { label: string; hint: string; optional?: boolean }> = {
-  about:       { label: 'About you',        hint: 'Your role and what you\'re building' },
-  profile:     { label: 'Blog profile',      hint: 'Name, tagline, and category' },
-  publication: { label: 'Publishing',        hint: 'Visibility, comments, and timezone' },
-  team:        { label: 'Invite team',       hint: 'Add collaborators', optional: true },
-  plan:        { label: 'Choose plan',       hint: 'Free trial or paid' },
+const STEP_META: Record<OnboardingStepKey, { label: string; hint: string }> = {
+  about:       { label: 'About you',     hint: 'Your role and what you\'re building' },
+  profile:     { label: 'Blog profile',  hint: 'Name, tagline, and category' },
+  publication: { label: 'Publishing',    hint: 'Visibility, comments, and timezone' },
+  plan:        { label: 'Choose plan',   hint: 'Free trial or paid' },
 };
 
 const inputClass =
@@ -102,15 +103,43 @@ const inputClass =
 
 const selectClass = inputClass;
 
-const Field = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+const tileClass = (selected: boolean) =>
+  `rounded-lg border text-sm font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+    selected
+      ? 'border-primary bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300'
+      : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+  }`;
+
+/**
+ * `htmlFor` ties the label to a single input; `labelId` lets a tile group
+ * (role="radiogroup") name itself with aria-labelledby instead.
+ */
+const Field = ({
+  label, hint, htmlFor, labelId, required, children,
+}: {
+  label: string;
+  hint?: string;
+  htmlFor?: string;
+  labelId?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) => (
   <div className="self-stretch h-full flex flex-col">
     <div className="space-y-1.5">
-      <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">{label}</label>
-      {hint && <p className="text-xs text-zinc-400">{hint}</p>}
+      <label htmlFor={htmlFor} id={labelId} className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        {label}
+        {required && <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>}
+      </label>
+      {hint && <p className="text-xs text-zinc-500">{hint}</p>}
     </div>
     <div className="mt-auto pt-1.5">{children}</div>
   </div>
 );
+
+const submitWith = (action: () => void) => (e: FormEvent) => {
+  e.preventDefault();
+  action();
+};
 
 export const OnboardingPage = () => {
   const toWorkspace = useWorkspacePath();
@@ -118,23 +147,25 @@ export const OnboardingPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeBlog, requiresOnboarding } = useBlog();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   const [checkingVerification, setCheckingVerification] = useState(false);
   const [currentStep, setCurrentStep] = useState<OnboardingStepKey>('about');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'editor' | 'author'>('editor');
-  const [showOptionalProfile, setShowOptionalProfile] = useState(false);
   const [done, setDone] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
 
   const hasInitialized = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(currentStep);
 
   const [aboutForm, setAboutForm] = useState({
     owner_role: 'blogger',
     workspace_type: 'personal_blog',
     team_size: 'solo',
   });
+  // logo_url / favicon_url aren't edited here any more (Settings → Branding
+  // has real uploads), but they're carried through so saving doesn't wipe them.
   const [profileForm, setProfileForm] = useState({
     name: '',
     tagline: '',
@@ -144,6 +175,7 @@ export const OnboardingPage = () => {
     logo_url: '',
     favicon_url: '',
   });
+  // posts_per_page likewise: left to Settings, but still sent.
   const [publicationForm, setPublicationForm] = useState({
     default_post_visibility: 'public',
     comments_enabled: true,
@@ -164,18 +196,31 @@ export const OnboardingPage = () => {
 
     setAboutForm({ owner_role: blog.owner_role ?? 'blogger', workspace_type: blog.workspace_type ?? 'personal_blog', team_size: blog.team_size ?? 'solo' });
     setProfileForm({ name: blog.name ?? '', tagline: blog.tagline ?? '', description: blog.description ?? '', category: blog.category ?? 'Tech', primary_language: blog.primary_language ?? 'en', logo_url: blog.logo_url ?? '', favicon_url: blog.favicon_url ?? '' });
-    setPublicationForm({ default_post_visibility: blog.default_post_visibility ?? 'public', comments_enabled: blog.comments_enabled, posts_per_page: blog.posts_per_page ?? 10, timezone: blog.timezone ?? 'UTC' });
+    // A new blog's timezone is the server default (UTC), not a choice — until
+    // the publishing step is saved, offer the browser's timezone instead.
+    const timezone = summary.checklist.publication ? blog.timezone ?? 'UTC' : detectUserTimezone();
+    setPublicationForm({ default_post_visibility: blog.default_post_visibility ?? 'public', comments_enabled: blog.comments_enabled, posts_per_page: blog.posts_per_page ?? 10, timezone });
     setSelectedPlan(subscription?.plan ?? 'free');
 
     if (!hasInitialized.current) {
-      setCurrentStep(summary.current_step);
+      setCurrentStep(STEP_ORDER.includes(summary.current_step) ? summary.current_step : 'plan');
       hasInitialized.current = true;
     }
   }, [onboardingQuery.data]);
 
   useEffect(() => {
-    if (activeBlog && !requiresOnboarding) navigate(toWorkspace('/dashboard'), { replace: true });
-  }, [activeBlog, navigate, requiresOnboarding, toWorkspace]);
+    if (activeBlog && !requiresOnboarding && !done) navigate(toWorkspace('/dashboard'), { replace: true });
+  }, [activeBlog, navigate, requiresOnboarding, toWorkspace, done]);
+
+  // A new step starts at its top, with focus on its heading for screen
+  // readers — otherwise Continue at the bottom of a long step lands mid-way
+  // down the next one.
+  useEffect(() => {
+    if (previousStep.current === currentStep) return;
+    previousStep.current = currentStep;
+    mainRef.current?.scrollTo({ top: 0 });
+    headingRef.current?.focus({ preventScroll: true });
+  }, [currentStep]);
 
   const syncAfterSave = async () => {
     await Promise.all([
@@ -184,35 +229,29 @@ export const OnboardingPage = () => {
     ]);
   };
 
+  const onSaveError = (err: unknown) => toastApiError(err, "Couldn't save this step. Please try again.");
+
   const saveAbout = useMutation({
     mutationFn: async () => api.put(`/blogs/${activeBlog?.id}/onboarding/about`, aboutForm),
+    onError: onSaveError,
     onSuccess: async () => {
       setCurrentStep('profile');
-      toast.success('Saved.');
       await syncAfterSave();
     },
   });
 
   const saveProfile = useMutation({
     mutationFn: async () => api.put(`/blogs/${activeBlog?.id}/onboarding/profile`, profileForm),
+    onError: onSaveError,
     onSuccess: async () => {
       setCurrentStep('publication');
-      toast.success('Saved.');
       await syncAfterSave();
     },
   });
 
   const savePublication = useMutation({
     mutationFn: async () => api.put(`/blogs/${activeBlog?.id}/onboarding/publication`, publicationForm),
-    onSuccess: async () => {
-      setCurrentStep('team');
-      toast.success('Saved.');
-      await syncAfterSave();
-    },
-  });
-
-  const completeTeam = useMutation({
-    mutationFn: async (skipped: boolean) => api.post(`/blogs/${activeBlog?.id}/onboarding/team/complete`, { skipped }),
+    onError: onSaveError,
     onSuccess: async () => {
       setCurrentStep('plan');
       await syncAfterSave();
@@ -228,48 +267,27 @@ export const OnboardingPage = () => {
     },
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: async () => api.post(`/blogs/${activeBlog?.id}/invitations`, { email: inviteEmail, role: inviteRole }),
-    onError: (err: any) => {
-      toastApiError(err, 'Failed to send invitation.');
-    },
-    onSuccess: async () => {
-      setInviteEmail('');
-      toast.success('Invite sent.');
-      await syncAfterSave();
-    },
-  });
+  const emailVerified = !!user?.email_verified;
 
   const handleLaunch = async () => {
     setCheckingVerification(true);
     try {
-      const { data: freshUser } = await api.get("/users/me");
-      if (!freshUser.email_verified) {
-        toast.error(
-          "Please verify your email before launching your blog. Check your inbox for the link.",
-        );
+      // The verification link may have been opened in another tab since
+      // this page loaded — ask the server rather than trust local state.
+      const freshUser = await refreshUser();
+      if (!freshUser?.email_verified) {
+        toast.error('Please verify your email before launching your blog.');
         return;
       }
-      await refreshUser();
       savePlan.mutate();
     } catch {
-      toast.error("Could not confirm verification status. Please try again.");
+      toast.error('Could not confirm verification status. Please try again.');
     } finally {
       setCheckingVerification(false);
     }
   };
 
   const progress = onboardingQuery.data?.summary;
-  const blog = onboardingQuery.data?.blog;
-
-  const completedMap: Record<string, boolean> = {
-    about:       !!(blog?.owner_role && blog?.workspace_type && blog?.team_size),
-    profile:     !!(blog?.tagline && blog?.name && blog?.category),
-    publication: !!(progress?.checklist?.publication && blog?.timezone),
-    team:        !!(progress?.checklist?.team),
-    plan:        !!(progress?.checklist?.plan),
-  };
-
   const currentIndex = STEP_ORDER.indexOf(currentStep);
 
   const goBack = () => {
@@ -278,17 +296,15 @@ export const OnboardingPage = () => {
 
   if (!activeBlog || onboardingQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="animate-spin text-primary" size={28} />
-        </div>
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="animate-spin text-primary" size={28} aria-label="Loading" />
       </div>
     );
   }
 
-  if (onboardingQuery.isError || !onboardingQuery.data) {
+  if (onboardingQuery.isError || !onboardingQuery.data || !progress) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-10 text-center max-w-sm w-full">
           <ShieldCheck className="mx-auto mb-4 text-red-500" size={28} />
           <h2 className="font-bold text-zinc-900 dark:text-white mb-2">Could not load onboarding</h2>
@@ -301,9 +317,10 @@ export const OnboardingPage = () => {
   }
 
   if (done) {
+    const canInvite = selectedPlan !== 'free';
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-10 text-center max-w-md w-full">
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 sm:p-10 text-center max-w-md w-full">
           <div className="w-16 h-16 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="text-green-500" size={32} />
           </div>
@@ -311,24 +328,38 @@ export const OnboardingPage = () => {
             {activeBlog.name} is ready
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-            Your workspace is fully unlocked. Start publishing, invite your team, and grow your audience.
+            {canInvite
+              ? 'Your workspace is fully unlocked. Write your first post, or bring your team in to start collaborating.'
+              : 'Your workspace is fully unlocked. Write your first post — and when you want teammates, upgrade from Settings → Billing.'}
           </p>
-          <button
-            onClick={() => navigate(toWorkspace('/dashboard'), { replace: true })}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white hover:bg-primary-hover transition-all shadow-md shadow-primary/20 cursor-pointer"
-          >
-            Go to dashboard <ArrowRight size={16} />
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate(toWorkspace('/dashboard'), { replace: true })}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white hover:bg-primary-hover transition-all shadow-md shadow-primary/20 cursor-pointer"
+            >
+              Go to dashboard <ArrowRight size={16} />
+            </button>
+            {canInvite && (
+              <button
+                onClick={() => navigate(toWorkspace('/users'), { replace: true })}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 px-6 py-3.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+              >
+                <UserPlus size={16} /> Invite your team
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col">
-<header className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center">
+    // h-dvh, not min-h-screen: the page must not grow past the viewport, so
+    // <main> is the only thing that scrolls and the header stays put.
+    <div className="h-dvh bg-zinc-50 dark:bg-zinc-950 flex flex-col">
+      <header className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
             <InkoLogo size={28} />
           </div>
           <span className="text-xl font-black text-zinc-900 dark:text-white">
@@ -342,28 +373,28 @@ export const OnboardingPage = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {(() => {
-            const completedCount =
-              Object.values(completedMap).filter(Boolean).length;
-            const pct = Math.round((completedCount / STEP_ORDER.length) * 100);
-            return (
-              <>
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                  {completedCount} / {STEP_ORDER.length} completed
-                </span>
-                <div className="w-32 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </>
-            );
-          })()}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            {progress.completed_steps} / {progress.total_steps}
+            <span className="hidden sm:inline"> completed</span>
+          </span>
+          <div
+            className="hidden sm:block w-32 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden"
+            role="progressbar"
+            aria-label="Setup progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress.percent_complete}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${progress.percent_complete}%` }}
+            />
+          </div>
           <button
+            type="button"
             onClick={() => setShowSupportModal(true)}
-            className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
             aria-label="Contact support"
           >
             <HelpCircle size={15} />
@@ -376,12 +407,12 @@ export const OnboardingPage = () => {
 
       <EmailVerificationBanner />
 
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="hidden md:flex flex-col w-56 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-8">
+      <div className="flex-1 min-h-0 flex">
+        <nav aria-label="Setup steps" className="hidden md:flex flex-col w-56 flex-shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-8">
           {STEP_ORDER.map((step, i) => {
-            const done = completedMap[step];
+            const stepDone = progress.checklist[step];
             const active = step === currentStep;
-            const locked = !done && i > currentIndex && !active;
+            const locked = !stepDone && i > currentIndex && !active;
             const isLast = i === STEP_ORDER.length - 1;
             const meta = STEP_META[step];
             return (
@@ -390,10 +421,11 @@ export const OnboardingPage = () => {
                   type="button"
                   onClick={() => !locked && setCurrentStep(step)}
                   disabled={locked}
+                  aria-current={active ? 'step' : undefined}
                   className={`flex items-start gap-3 rounded-xl px-3 py-3 text-left transition-all ${
                     active
                       ? "bg-accent dark:bg-violet-950/40"
-                      : done
+                      : stepDone
                         ? "bg-green-50/60 dark:bg-green-950/20 hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer"
                         : locked
                           ? "opacity-40 cursor-not-allowed"
@@ -402,36 +434,31 @@ export const OnboardingPage = () => {
                 >
                   <div
                     className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
-                      done
+                      stepDone
                         ? "bg-green-500 text-white dark:bg-green-600"
                         : active
-                          ? "bg-violet-600 text-white"
+                          ? "bg-primary text-white"
                           : locked
                             ? "border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400"
                             : "border-2 border-zinc-300 dark:border-zinc-600 text-zinc-500"
                     }`}
                   >
-                    {done ? <Check size={12} /> : i + 1}
+                    {stepDone ? <Check size={12} aria-label="Done" /> : i + 1}
                   </div>
 
                   <div className="min-w-0">
                     <div
                       className={`text-sm font-semibold leading-none ${
                         active
-                          ? "text-violet-600"
-                          : done
+                          ? "text-primary"
+                          : stepDone
                             ? "text-green-700 dark:text-green-400"
                             : "text-zinc-700 dark:text-zinc-300"
                       }`}
                     >
                       {meta.label}
-                      {meta.optional && (
-                        <span className="ml-1.5 text-[10px] font-normal text-zinc-400">
-                          optional
-                        </span>
-                      )}
                     </div>
-                    <div className="mt-1 text-xs text-zinc-400 dark:text-zinc-500 leading-snug">
+                    <div className="mt-1 text-xs text-zinc-500 leading-snug">
                       {meta.hint}
                     </div>
                   </div>
@@ -441,7 +468,7 @@ export const OnboardingPage = () => {
                   <div className="flex justify-start pl-[1.375rem]">
                     <div
                       className={`w-px h-3 transition-colors duration-300 ${
-                        done
+                        stepDone
                           ? "bg-green-300 dark:bg-green-700"
                           : "bg-zinc-200 dark:bg-zinc-700"
                       }`}
@@ -451,25 +478,20 @@ export const OnboardingPage = () => {
               </div>
             );
           })}
-        </aside>
+        </nav>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-xl mx-auto px-6 py-10">
+        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
+          <div className="max-w-xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
             <div className="mb-8">
-              <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-2">
+              <div className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
                 Step {currentIndex + 1} of {STEP_ORDER.length}
-                {STEP_META[currentStep].optional && (
-                  <span className="ml-2 text-zinc-400 normal-case tracking-normal">
-                    · optional
-                  </span>
-                )}
+                <span className="md:hidden normal-case tracking-normal text-zinc-500"> · {STEP_META[currentStep].label}</span>
               </div>
-              <h1 className="text-2xl font-black text-zinc-900 dark:text-white">
+              <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-black text-zinc-900 dark:text-white outline-none">
                 {currentStep === "about" && "Tell us about your setup"}
                 {currentStep === "profile" && "Set up your blog profile"}
                 {currentStep === "publication" &&
                   "Configure publishing defaults"}
-                {currentStep === "team" && "Invite your team"}
                 {currentStep === "plan" && "Choose how you want to start"}
               </h1>
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -479,18 +501,17 @@ export const OnboardingPage = () => {
                   "The basics readers will see. You can update these any time in Settings."}
                 {currentStep === "publication" &&
                   "Set sensible defaults once. Every new post will inherit these."}
-                {currentStep === "team" &&
-                  "Teammates added now will get an email invite instantly. You can always add more later."}
                 {currentStep === "plan" &&
-                  `Try Pro or Team free for ${TRIAL_DAYS} days — no card needed — or start on Free and upgrade when you're ready.`}
+                  `Try Pro or Team free for ${TRIAL_DAYS} days — no card needed — or start on Free and upgrade when you're ready. You can invite your team right after.`}
               </p>
             </div>
 
             {/* ── STEP: ABOUT ─────────────────────────────────────── */}
             {currentStep === "about" && (
-              <div className="space-y-5">
-                <Field label="Your role">
+              <form className="space-y-5" onSubmit={submitWith(() => saveAbout.mutate())}>
+                <Field label="Your role" htmlFor="onb-role">
                   <select
+                    id="onb-role"
                     className={selectClass}
                     value={aboutForm.owner_role}
                     onChange={(e) =>
@@ -506,8 +527,9 @@ export const OnboardingPage = () => {
                     <option value="content_team">Content team</option>
                   </select>
                 </Field>
-                <Field label="What are you building?">
+                <Field label="What are you building?" htmlFor="onb-workspace-type">
                   <select
+                    id="onb-workspace-type"
                     className={selectClass}
                     value={aboutForm.workspace_type}
                     onChange={(e) =>
@@ -523,8 +545,8 @@ export const OnboardingPage = () => {
                     <option value="developer_docs">Developer docs</option>
                   </select>
                 </Field>
-                <Field label="Team size">
-                  <div className="grid grid-cols-4 gap-2">
+                <Field label="Team size" labelId="onb-team-size">
+                  <div role="radiogroup" aria-labelledby="onb-team-size" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { value: "solo", label: "Just me" },
                       { value: "small", label: "2 – 5" },
@@ -534,14 +556,12 @@ export const OnboardingPage = () => {
                       <button
                         key={value}
                         type="button"
+                        role="radio"
+                        aria-checked={aboutForm.team_size === value}
                         onClick={() =>
                           setAboutForm((p) => ({ ...p, team_size: value }))
                         }
-                        className={`rounded-lg border py-3 text-sm font-semibold transition-all cursor-pointer ${
-                          aboutForm.team_size === value
-                            ? "border-violet-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
-                            : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
-                        }`}
+                        className={`${tileClass(aboutForm.team_size === value)} py-3`}
                       >
                         {label}
                       </button>
@@ -549,18 +569,19 @@ export const OnboardingPage = () => {
                   </div>
                 </Field>
                 <StepActions
-                  onContinue={() => saveAbout.mutate()}
                   loading={saveAbout.isPending}
                   showBack={false}
                 />
-              </div>
+              </form>
             )}
 
             {/* ── STEP: PROFILE ──────────────────────────────────── */}
             {currentStep === "profile" && (
-              <div className="space-y-5">
-                <Field label="Blog display name">
+              <form className="space-y-5" onSubmit={submitWith(() => saveProfile.mutate())}>
+                <Field label="Blog display name" htmlFor="onb-name" required>
                   <input
+                    id="onb-name"
+                    required
                     className={inputClass}
                     value={profileForm.name}
                     onChange={(e) =>
@@ -571,9 +592,13 @@ export const OnboardingPage = () => {
                 </Field>
                 <Field
                   label="Tagline"
+                  htmlFor="onb-tagline"
+                  required
                   hint="One sentence that captures what your blog is about."
                 >
                   <input
+                    id="onb-tagline"
+                    required
                     className={inputClass}
                     value={profileForm.tagline}
                     onChange={(e) =>
@@ -582,9 +607,10 @@ export const OnboardingPage = () => {
                     placeholder="Your ideas, amplified"
                   />
                 </Field>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Category">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Category" htmlFor="onb-category">
                     <select
+                      id="onb-category"
                       className={selectClass}
                       value={profileForm.category}
                       onChange={(e) =>
@@ -607,8 +633,9 @@ export const OnboardingPage = () => {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Primary language">
+                  <Field label="Primary language" htmlFor="onb-language">
                     <select
+                      id="onb-language"
                       className={selectClass}
                       value={profileForm.primary_language}
                       onChange={(e) =>
@@ -629,9 +656,11 @@ export const OnboardingPage = () => {
 
                 <Field
                   label="Description"
+                  htmlFor="onb-description"
                   hint="Optional — shown on your blog's about page."
                 >
                   <textarea
+                    id="onb-description"
                     className={`${inputClass} min-h-24 resize-none`}
                     value={profileForm.description}
                     onChange={(e) =>
@@ -644,62 +673,28 @@ export const OnboardingPage = () => {
                   />
                 </Field>
 
-                {!showOptionalProfile ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowOptionalProfile(true)}
-                    className="text-xs font-semibold text-violet-600 hover:text-violet-700 transition-colors cursor-pointer"
-                  >
-                    + Add logo and favicon (optional)
-                  </button>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Logo URL" hint="Optional">
-                      <input
-                        className={inputClass}
-                        value={profileForm.logo_url}
-                        onChange={(e) =>
-                          setProfileForm((p) => ({
-                            ...p,
-                            logo_url: e.target.value,
-                          }))
-                        }
-                        placeholder="https://…"
-                      />
-                    </Field>
-                    <Field label="Favicon URL" hint="Optional">
-                      <input
-                        className={inputClass}
-                        value={profileForm.favicon_url}
-                        onChange={(e) =>
-                          setProfileForm((p) => ({
-                            ...p,
-                            favicon_url: e.target.value,
-                          }))
-                        }
-                        placeholder="https://…"
-                      />
-                    </Field>
-                  </div>
-                )}
+                <p className="text-xs text-zinc-500">
+                  You can upload a logo and favicon later in Settings → Branding.
+                </p>
 
                 <StepActions
-                  onContinue={() => saveProfile.mutate()}
                   onBack={goBack}
                   loading={saveProfile.isPending}
-                  disabled={!profileForm.name || !profileForm.tagline}
+                  disabled={!profileForm.name.trim() || !profileForm.tagline.trim()}
+                  disabledReason="Add a name and a tagline to continue."
                 />
-              </div>
+              </form>
             )}
 
             {/* ── STEP: PUBLICATION ──────────────────────────────── */}
             {currentStep === "publication" && (
-              <div className="space-y-5">
+              <form className="space-y-5" onSubmit={submitWith(() => savePublication.mutate())}>
                 <Field
                   label="Default post visibility"
+                  labelId="onb-visibility"
                   hint="New posts will inherit this setting. Authors can override per post."
                 >
-                  <div className="grid grid-cols-3 gap-2">
+                  <div role="radiogroup" aria-labelledby="onb-visibility" className="grid grid-cols-3 gap-2">
                     {[
                       { value: "public", label: "Public", icon: Globe },
                       {
@@ -716,17 +711,15 @@ export const OnboardingPage = () => {
                       <button
                         key={value}
                         type="button"
+                        role="radio"
+                        aria-checked={publicationForm.default_post_visibility === value}
                         onClick={() =>
                           setPublicationForm((p) => ({
                             ...p,
-                            default_post_visibility: value as any,
+                            default_post_visibility: value,
                           }))
                         }
-                        className={`flex flex-col items-center gap-2 rounded-lg border py-4 text-xs font-semibold transition-all cursor-pointer ${
-                          publicationForm.default_post_visibility === value
-                            ? "border-violet-600 bg-accent text-accent-text dark:bg-violet-950/40 dark:border-violet-500 dark:text-violet-300"
-                            : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
-                        }`}
+                        className={`${tileClass(publicationForm.default_post_visibility === value)} flex flex-col items-center gap-2 px-1 py-4 text-xs text-center`}
                       >
                         <Icon size={16} />
                         {label}
@@ -735,55 +728,39 @@ export const OnboardingPage = () => {
                   </div>
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <Field
-                    label="Timezone"
-                    hint="Used for scheduling and post timestamps. Auto-detected from your browser."
+                <Field
+                  label="Timezone"
+                  htmlFor="onb-timezone"
+                  hint="Used for scheduling and post timestamps. Auto-detected from your browser."
+                >
+                  <select
+                    id="onb-timezone"
+                    className={selectClass}
+                    value={publicationForm.timezone}
+                    onChange={(e) =>
+                      setPublicationForm((p) => ({
+                        ...p,
+                        timezone: e.target.value,
+                      }))
+                    }
                   >
-                    <select
-                      className={selectClass}
-                      value={publicationForm.timezone}
-                      onChange={(e) =>
-                        setPublicationForm((p) => ({
-                          ...p,
-                          timezone: e.target.value,
-                        }))
-                      }
-                    >
-                      {!TIMEZONES.includes(publicationForm.timezone) && (
-                        <option value={publicationForm.timezone}>
-                          {publicationForm.timezone} (detected)
-                        </option>
-                      )}
-                      {TIMEZONES.map((tz) => (
-                        <option key={tz} value={tz}>
-                          {tz}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Posts per page">
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      className={inputClass}
-                      value={publicationForm.posts_per_page}
-                      onChange={(e) =>
-                        setPublicationForm((p) => ({
-                          ...p,
-                          posts_per_page: Number(e.target.value) || 1,
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
+                    {!TIMEZONES.includes(publicationForm.timezone) && (
+                      <option value={publicationForm.timezone}>
+                        {publicationForm.timezone} (detected)
+                      </option>
+                    )}
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
                 <label
                   className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-all ${
                     publicationForm.comments_enabled
-                      ? "border-violet-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700"
+                      ? "border-primary bg-accent/40 dark:bg-violet-950/30 dark:border-violet-700"
                       : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300"
                   }`}
                 >
@@ -796,13 +773,13 @@ export const OnboardingPage = () => {
                         comments_enabled: e.target.checked,
                       }))
                     }
-                    className="accent-primary w-4 h-4 cursor-pointer"
+                    className="accent-primary w-4 h-4 flex-shrink-0 cursor-pointer"
                   />
                   <div>
                     <div className="text-sm font-semibold text-zinc-900 dark:text-white">
                       Enable comments by default
                     </div>
-                    <div className="text-xs text-zinc-400 mt-0.5">
+                    <div className="text-xs text-zinc-500 mt-0.5">
                       Readers can comment on posts. You can moderate in
                       Comments.
                     </div>
@@ -810,127 +787,21 @@ export const OnboardingPage = () => {
                 </label>
 
                 <StepActions
-                  onContinue={() => savePublication.mutate()}
                   onBack={goBack}
                   loading={savePublication.isPending}
                 />
-              </div>
-            )}
-
-            {/* ── STEP: TEAM ─────────────────────────────────────── */}
-            {currentStep === "team" && (
-              <div className="space-y-5">
-                <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Users size={16} className="text-violet-600" />
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                      Invite a teammate
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Mail
-                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
-                        size={15}
-                      />
-                      <input
-                        className={`${inputClass} pl-10`}
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="teammate@company.com"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <select
-                        className={`${selectClass} flex-1`}
-                        value={inviteRole}
-                        onChange={(e) =>
-                          setInviteRole(e.target.value as "editor" | "author")
-                        }
-                      >
-                        <option value="editor">
-                          Editor — can manage all content
-                        </option>
-                        <option value="author">
-                          Author — can create and edit own posts
-                        </option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => inviteMutation.mutate()}
-                        disabled={inviteMutation.isPending || !inviteEmail}
-                        className="flex-shrink-0 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 cursor-pointer"
-                      >
-                        {inviteMutation.isPending ? "Sending…" : "Send invite"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-                  {[
-                    {
-                      role: "Editor",
-                      desc: "Full content access, can invite authors, moderate comments.",
-                    },
-                    {
-                      role: "Author",
-                      desc: "Creates and publishes own posts. No team or settings access.",
-                    },
-                  ].map(({ role, desc }) => (
-                    <div
-                      key={role}
-                      className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-3"
-                    >
-                      <div className="font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        {role}
-                      </div>
-                      {desc}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={goBack}
-                    className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 transition-all cursor-pointer"
-                  >
-                    <ArrowLeft size={14} /> Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => completeTeam.mutate(false)}
-                    disabled={completeTeam.isPending}
-                    className="flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold bg-violet-600 text-white shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {completeTeam.isPending ? (
-                      <Loader2 className="animate-spin" size={15} />
-                    ) : (
-                      <ArrowRight size={15} />
-                    )}
-                    Continue to plan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => completeTeam.mutate(true)}
-                    disabled={completeTeam.isPending}
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 px-5 py-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 transition-all cursor-pointer"
-                  >
-                    Skip for now
-                  </button>
-                </div>
-              </div>
+              </form>
             )}
 
             {/* ── STEP: PLAN ─────────────────────────────────────── */}
             {currentStep === "plan" && (
-              <div className="space-y-5">
+              <form className="space-y-5" onSubmit={submitWith(handleLaunch)}>
+                <EmailVerificationCard />
+
                 <div className="flex items-start gap-3 rounded-lg border border-accent-border bg-accent/40 dark:bg-violet-950/30 dark:border-violet-800/50 px-4 py-3">
                   <CheckCircle2
                     size={16}
-                    className="text-violet-600 flex-shrink-0 mt-0.5"
+                    className="text-primary flex-shrink-0 mt-0.5"
                   />
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
                     Pro and Team start with a{" "}
@@ -942,7 +813,7 @@ export const OnboardingPage = () => {
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div role="radiogroup" aria-label="Plan" className="space-y-3">
                   {[
                     {
                       key: "free",
@@ -973,15 +844,17 @@ export const OnboardingPage = () => {
                       <button
                         key={key}
                         type="button"
+                        role="radio"
+                        aria-checked={selectedPlan === key}
                         onClick={() => setSelectedPlan(key as SubscriptionPlan)}
-                        className={`w-full flex items-start gap-4 rounded-lg border p-4 text-left transition-all cursor-pointer ${
+                        className={`w-full flex items-start gap-4 rounded-lg border p-4 text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                           selectedPlan === key
-                            ? "border-violet-600 bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10"
+                            ? "border-primary bg-accent/40 dark:bg-violet-950/30 dark:border-violet-500 ring-2 ring-primary/10"
                             : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
                         }`}
                       >
                         <div
-                          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? "bg-violet-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+                          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-all ${selectedPlan === key ? "bg-primary text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
                         >
                           <Icon size={18} />
                         </div>
@@ -991,12 +864,12 @@ export const OnboardingPage = () => {
                               {title}
                             </span>
                             {recommended && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white">
                                 Popular
                               </span>
                             )}
                           </div>
-                          <div className="text-xs font-semibold text-violet-600 mt-0.5">
+                          <div className="text-xs font-semibold text-primary mt-0.5">
                             {price}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
@@ -1006,7 +879,7 @@ export const OnboardingPage = () => {
                         <div
                           className={`flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                             selectedPlan === key
-                              ? "border-violet-600 bg-violet-600"
+                              ? "border-primary bg-primary"
                               : "border-zinc-300 dark:border-zinc-600"
                           }`}
                         >
@@ -1019,21 +892,14 @@ export const OnboardingPage = () => {
                   )}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col-reverse sm:flex-row gap-3">
+                  <BackButton onClick={goBack} />
                   <button
-                    type="button"
-                    onClick={goBack}
-                    className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 transition-all cursor-pointer"
+                    type="submit"
+                    disabled={!emailVerified || savePlan.isPending || checkingVerification}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/20 hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    <ArrowLeft size={14} /> Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLaunch}
-                    disabled={savePlan.isPending || checkingVerification}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-violet-600 text-white shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {savePlan.isPending ? (
+                    {savePlan.isPending || checkingVerification ? (
                       <>
                         <Loader2 className="animate-spin" size={15} /> Launching
                         your blog…
@@ -1045,12 +911,12 @@ export const OnboardingPage = () => {
                     )}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
 
             {currentStep !== "plan" && (
               <div className="mt-10 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-4 py-4">
-                <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">
                   Unlocks when complete
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1062,11 +928,11 @@ export const OnboardingPage = () => {
                   ].map(({ icon: Icon, label }) => (
                     <div
                       key={label}
-                      className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500"
+                      className="flex items-center gap-2 text-xs text-zinc-500"
                     >
                       <Icon
                         size={13}
-                        className="text-zinc-300 dark:text-zinc-600"
+                        className="text-zinc-400 dark:text-zinc-600"
                       />
                       {label}
                     </div>
@@ -1082,39 +948,46 @@ export const OnboardingPage = () => {
 };
 
 // ─── Shared continue/back buttons ─────────────────────────────────────────
+const BackButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex items-center justify-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+  >
+    <ArrowLeft size={14} /> Back
+  </button>
+);
+
+// Continue is a submit button, so Enter in any field moves the step on.
 const StepActions = ({
-  onContinue,
   onBack,
   loading = false,
   disabled = false,
+  disabledReason,
   showBack = true,
 }: {
-  onContinue: () => void;
   onBack?: () => void;
   loading?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   showBack?: boolean;
 }) => (
-  <div className="flex gap-3 pt-2">
-    {showBack && onBack && (
+  <div className="pt-2">
+    <div className="flex flex-col-reverse sm:flex-row gap-3">
+      {showBack && onBack && <BackButton onClick={onBack} />}
       <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 transition-all cursor-pointer"
+        type="submit"
+        disabled={loading || disabled}
+        className="flex items-center justify-center gap-2 rounded-lg text-sm font-bold bg-primary text-white px-6 py-3.5 shadow-md shadow-primary/20 hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
-        <ArrowLeft size={14} /> Back
+        {loading
+          ? <><Loader2 className="animate-spin" size={15} /> Saving…</>
+          : <><ArrowRight size={15} /> Save and continue</>
+        }
       </button>
+    </div>
+    {disabled && disabledReason && (
+      <p className="mt-2 text-xs text-zinc-500">{disabledReason}</p>
     )}
-    <button
-      type="button"
-      onClick={onContinue}
-      disabled={loading || disabled}
-      className="flex items-center gap-2 rounded-lg text-sm font-bold bg-violet-600 text-white px-6 py-3.5 shadow-md shadow-primary/20 hover:bg-violet-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-    >
-      {loading
-        ? <><Loader2 className="animate-spin" size={15} /> Saving…</>
-        : <><ArrowRight size={15} /> Save and continue</>
-      }
-    </button>
   </div>
 );
