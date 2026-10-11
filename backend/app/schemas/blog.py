@@ -178,7 +178,6 @@ class OnboardingChecklist(BaseModel):
     about: bool
     profile: bool
     publication: bool
-    team: bool
     plan: bool
 
 
@@ -186,7 +185,7 @@ class OnboardingSummary(UTCDatetimeMixin, BaseModel):
     status: OnboardingStatus
     current_step: OnboardingStep
     completed_steps: int
-    total_steps: int = 5
+    total_steps: int
     percent_complete: int
     checklist: OnboardingChecklist
     completed_at: Optional[datetime] = None
@@ -217,10 +216,6 @@ class OnboardingPublicationUpdate(BaseModel):
 
 class OnboardingPlanUpdate(BaseModel):
     plan: SubscriptionPlan
-
-
-class OnboardingTeamComplete(BaseModel):
-    skipped: bool = False
 
 
 class OnboardingState(BaseModel):

@@ -27,7 +27,6 @@ from app.schemas import (
     OnboardingProfileUpdate,
     OnboardingPublicationUpdate,
     OnboardingState,
-    OnboardingTeamComplete,
     PageMeta,
     SubscriptionRead,
 )
@@ -151,16 +150,6 @@ def update_onboarding_publication(
     _: None = Depends(require_blog_owner),
 ):
     return blog_service.update_onboarding_publication(blog_id, payload, session)
-
-
-@router.post("/{blog_id}/onboarding/team/complete", response_model=OnboardingState)
-def complete_onboarding_team_step(
-    blog_id: int,
-    payload: OnboardingTeamComplete,
-    session: Session = Depends(get_session),
-    _: None = Depends(require_blog_owner),
-):
-    return blog_service.complete_onboarding_team_step(blog_id, payload, session)
 
 
 @router.put("/{blog_id}/onboarding/plan", response_model=OnboardingState)
