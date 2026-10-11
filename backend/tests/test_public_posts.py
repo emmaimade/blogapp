@@ -1,10 +1,13 @@
 """
 Coverage for the public-blog read paths: the opt-in reader view
 (`public_view`) on list/search — published, non-sample posts whoever is
-signed in — plus GET /posts/stats and GET /posts/slug/{slug}/related.
+signed in — plus GET /posts/stats and GET /posts/slug/{slug}/related, and
+the migration that turns old "Showcase Project" posts into a Projects tag.
 """
 
+import importlib.util
 import uuid
+from pathlib import Path
 
 from sqlmodel import Session, select
 
@@ -188,13 +191,76 @@ def test_public_view_ignores_a_status_filter(client):
 def test_stats_count_only_public_non_sample_posts(client):
     blog_id, user_id = _register_owner(client)
     _create_post(blog_id, user_id, views=10)
-    _create_post(blog_id, user_id, views=5, is_project=True)
+    _create_post(blog_id, user_id, views=5)
     _create_post(blog_id, user_id, views=100, is_sample=True)
     _create_post(blog_id, user_id, views=1000, status=PostStatus.DRAFT)
 
     res = client.get(f"/blogs/{blog_id}/posts/stats")
     assert res.status_code == 200, res.text
-    assert res.json() == {"articles": 2, "projects": 1, "views": 15}
+    assert res.json() == {"articles": 2, "views": 15}
+
+
+# ── project posts become a tag ───────────────────────────────────────────────
+
+_TAG_PROJECTS_MIGRATION = (
+    Path(__file__).resolve().parent.parent
+    / "alembic" / "versions" / "a4d7e2c9f1b3_tag_project_posts.py"
+)
+
+
+def _tag_project_posts() -> None:
+    spec = importlib.util.spec_from_file_location("tag_project_posts", _TAG_PROJECTS_MIGRATION)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with engine.begin() as connection:
+        module.tag_project_posts(connection)
+
+
+def _tag_names(slug: str) -> set[str]:
+    with Session(engine) as session:
+        post = session.exec(select(Post).where(Post.slug == slug)).one()
+        return {t.name for t in post.tags}
+
+
+def _projects_tags(blog_id: int) -> list[Tag]:
+    with Session(engine) as session:
+        return session.exec(select(Tag).where(Tag.blog_id == blog_id, Tag.name.ilike("projects"))).all()
+
+
+def test_project_posts_get_a_projects_tag_and_articles_do_not(client):
+    blog_id, user_id = _register_owner(client)
+    project = _create_post(blog_id, user_id, is_project=True, tags=["Design"])
+    article = _create_post(blog_id, user_id)
+
+    _tag_project_posts()
+
+    assert _tag_names(project) == {"Design", "Projects"}
+    assert _tag_names(article) == set()
+    # Readers find them on the ordinary tag page.
+    assert project in _list_slugs(client, blog_id, tag="Projects", public_view="true")
+
+
+def test_tagging_project_posts_reuses_the_blogs_own_tag_and_is_repeatable(client):
+    blog_id, user_id = _register_owner(client)
+    already_tagged = _create_post(blog_id, user_id, is_project=True, tags=["projects"])
+    untagged = _create_post(blog_id, user_id, is_project=True)
+
+    _tag_project_posts()
+    _tag_project_posts()
+
+    tags = _projects_tags(blog_id)
+    assert [t.name for t in tags] == ["projects"]
+    assert _tag_names(already_tagged) == {"projects"}
+    assert _tag_names(untagged) == {"projects"}
+
+
+def test_tagging_project_posts_leaves_blogs_without_projects_alone(client):
+    blog_id, user_id = _register_owner(client)
+    _create_post(blog_id, user_id)
+
+    _tag_project_posts()
+
+    assert _projects_tags(blog_id) == []
 
 
 # ── related ──────────────────────────────────────────────────────────────────

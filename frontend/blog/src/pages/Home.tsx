@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Eye, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
@@ -10,7 +10,6 @@ import { getPostDate, getPlainExcerpt, shouldShowViews } from '../utils/posts';
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import { usePostLayouts, useSiteName, useSiteSettings } from '../hooks/useSiteSettings';
 import { useSidebarData } from '../hooks/useSidebarData';
-import { useBlogStats } from '../hooks/useBlogStats';
 import { applyPageMeta } from '../utils/seo';
 import type { PaginatedPosts, Post } from '../types/post';
 
@@ -30,8 +29,6 @@ const MOST_READ_COUNT = 3;
 const POPULAR_FETCH_LIMIT = 10;
 
 export const Home: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'projects'>('all');
-
   // The homepage is the site's own identity, not "just another page" — it
   // keeps the brand-first title (and respects a tenant's custom SEO title
   // override verbatim) instead of the "{page} · {siteName}" pattern every
@@ -56,26 +53,18 @@ export const Home: React.FC = () => {
   const listWidthClass = homeLayout === 'cards' ? '' : 'max-w-3xl mx-auto';
   const gridPostCount = homeLayout === 'cards' ? CARD_POST_COUNT : ROW_POST_COUNT;
 
-  // Blogs that never publish projects don't get an always-empty Projects tab.
-  const { hasProjects } = useBlogStats();
-  const activeFilter = hasProjects === false ? 'all' : filter;
-
-  // The Projects toggle asks the server for projects, so it covers the whole
-  // blog rather than filtering whichever posts were already loaded. The
-  // server sorts the owner's featured post (if any) first.
+  // The server sorts the owner's featured post (if any) first.
   const { data, isLoading } = useQuery<PaginatedPosts>({
-    queryKey: ['posts', 'home', activeFilter, HOME_POST_LIMIT],
+    queryKey: ['posts', 'home', HOME_POST_LIMIT],
     queryFn: async () => {
       const res = await api.get('/posts/', {
         params: {
           limit: HOME_POST_LIMIT,
           sort: 'latest',
-          filter: activeFilter === 'projects' ? 'projects' : undefined,
         },
       });
       return res.data;
     },
-    placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
   });
 
@@ -90,7 +79,6 @@ export const Home: React.FC = () => {
   const shownPosts = posts.slice(0, gridPostCount + 1);
   const heroPost = shownPosts[0];
   const gridPosts = shownPosts.slice(1);
-  const blogLink = activeFilter === 'projects' ? '/blog?filter=projects' : '/blog';
 
   const shownPostIds = new Set(shownPosts.map((post) => post.id));
   const mostReadPosts = popularPosts
@@ -174,27 +162,9 @@ export const Home: React.FC = () => {
         <section>
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:flex-col lg:items-center lg:justify-start lg:text-center">
             <SectionHeading className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-              {activeFilter === 'projects' ? 'Latest projects' : 'Latest posts'}
+              Latest posts
             </SectionHeading>
 
-            {hasProjects && (
-              <div className="inline-grid grid-cols-2 gap-1 self-start lg:self-center rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900">
-                {(['all', 'projects'] as const).map((value) => (
-                  <button
-                    key={value}
-                    onClick={() => setFilter(value)}
-                    aria-pressed={activeFilter === value}
-                    className={
-                      activeFilter === value
-                        ? 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-primary text-white'
-                        : 'px-4 py-2 rounded-lg font-bold text-sm transition-colors text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
-                    }
-                  >
-                    {value === 'all' ? 'All posts' : 'Projects'}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {gridPosts.length > 0 && (
@@ -209,7 +179,7 @@ export const Home: React.FC = () => {
                 <TrendingUp className="text-zinc-400" size={28} />
               </div>
               <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-                {activeFilter === 'all' ? 'No posts yet' : 'No projects yet'}
+                No posts yet
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
                 Check back soon for new content.
@@ -219,7 +189,7 @@ export const Home: React.FC = () => {
 
           {totalPosts > shownPosts.length && (
             <div className="mt-10 flex justify-center">
-              <Link to={blogLink} className="btn-secondary">
+              <Link to="/blog" className="btn-secondary">
                 View all posts <ArrowRight size={16} />
               </Link>
             </div>

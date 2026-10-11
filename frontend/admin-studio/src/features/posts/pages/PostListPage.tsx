@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  Edit, Trash2, FolderOpen, FileText, Plus, Search,
+  Edit, Trash2, Plus, Search,
   Eye, Tag as TagIcon, Feather, Clock, ChevronLeft, ChevronRight, Star,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -328,9 +328,6 @@ export const PostList = () => {
 
             <div className="flex flex-wrap gap-2 items-center">
               <StatusBadge status={post.status ?? (post.published ? 'published' : 'draft')} publishedAt={post.published_at} />
-              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                {post.is_project ? <><FolderOpen size={12} /> Project</> : <><FileText size={12} /> Post</>}
-              </span>
               {post.is_featured && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                   <Star size={12} className="fill-amber-500 text-amber-500" /> Featured
@@ -409,10 +406,6 @@ export const PostList = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                              {post.is_project ? <><FolderOpen size={10} /> Project</> : <><FileText size={10} /> Post</>}
-                            </span>
-                            <span className="text-xs text-zinc-400">·</span>
                             <span className="text-xs text-zinc-500">
                               {postStatus === 'scheduled' && post.published_at
                                 ? <span className="flex items-center gap-1 text-yellow-700 dark:text-yellow-500"><Clock size={10} /> {formatScheduled(post.published_at)}</span>

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, FileText, FolderOpen, Hash, MessageSquare, Search } from 'lucide-react';
+import { Eye, Hash, MessageSquare, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../../shared/api/client';
 import { type Post, type Tag } from '../../../shared/types';
@@ -143,9 +143,6 @@ export const SearchResultsPage = () => {
                 className="flex w-full flex-col gap-1.5 p-4 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
               >
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                    {post.is_project ? <><FolderOpen size={10} /> Project</> : <><FileText size={10} /> Post</>}
-                  </span>
                   <span className="text-xs text-zinc-400">{formatLocalDate(post.created_at)}</span>
                 </div>
                 <div className="font-bold text-zinc-900 dark:text-white">{post.title}</div>

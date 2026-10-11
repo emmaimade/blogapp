@@ -52,7 +52,6 @@ def read_posts(
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
     current_user: Optional[User] = Depends(get_current_user_optional),
-    filter: Optional[str] = None,
     tag: Optional[str] = None,
     sort: Literal["latest", "popular"] = "latest",
     skip: int = Query(0, ge=0),
@@ -62,7 +61,7 @@ def read_posts(
     public_view: bool = False,
 ):
     items, total = post_service.read_posts(
-        blog_id, session, current_user, filter, tag, sort, skip, limit, status, q, public_view
+        blog_id, session, current_user, tag, sort, skip, limit, status, q, public_view
     )
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 

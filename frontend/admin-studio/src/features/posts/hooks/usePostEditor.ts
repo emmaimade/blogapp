@@ -16,7 +16,6 @@ export interface PostForm {
   title: string;
   content: string;
   thumbnail_url: string;
-  is_project: boolean;
   is_featured: boolean;
   status: PostStatus;
   published_at: string | null;
@@ -37,7 +36,6 @@ export const usePostEditor = () => {
 
   const { control, register, handleSubmit, reset, watch, setValue, getValues, formState: { isDirty, errors } } = useForm<PostForm>({
     defaultValues: {
-      is_project: false,
       is_featured: false,
       status: 'draft',
       published_at: null,
@@ -51,7 +49,6 @@ export const usePostEditor = () => {
   const selectedTagIds = watch('tag_ids', []);
   const currentStatus = watch('status');
   const currentPubAt = watch('published_at');
-  const isProject = watch('is_project', false);
   const isFeatured = watch('is_featured', false);
 
   const { data: allTags = [] } = useQuery({
@@ -224,7 +221,7 @@ export const usePostEditor = () => {
   return {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
-    currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
+    currentPubAt, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
     isDirty, errors, scheduledPosts, savedTitle: existingPost?.title as string | undefined,
