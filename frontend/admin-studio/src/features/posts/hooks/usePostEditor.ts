@@ -35,7 +35,12 @@ export const usePostEditor = () => {
   const [tagSearch, setTagSearch] = useState('');
 
   const { control, register, handleSubmit, reset, watch, setValue, getValues, formState: { isDirty, errors } } = useForm<PostForm>({
+    // Every field the page renders needs a default, or the editor filling in
+    // its empty value on mount reads as an edit — and a new, untouched post
+    // shows "Unsaved changes" and asks before you leave.
     defaultValues: {
+      title: '',
+      content: '',
       is_featured: false,
       status: 'draft',
       published_at: null,

@@ -174,10 +174,16 @@ export const PostEditor: React.FC = () => {
               </ReactMarkdown>
             </div>
           ) : (
-            <div className="editor-container space-y-3">
-              {!content?.trim() && <OutlineStarter onInsert={insertOutline} />}
+            <div className="editor-container relative">
               <Controller name="content" control={control} render={({ field }) => <SimpleMDE {...field} options={editorOptions} getMdeInstance={setEditor} />} />
               <EditorToolbarIcons editor={editor} />
+              {/* Sits inside the empty editor rather than above it, so nothing
+                  jumps when it goes away. */}
+              {!content?.trim() && (
+                <div className="absolute inset-x-0 bottom-0 z-10 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+                  <OutlineStarter onInsert={insertOutline} />
+                </div>
+              )}
             </div>
           )}
         </div>
