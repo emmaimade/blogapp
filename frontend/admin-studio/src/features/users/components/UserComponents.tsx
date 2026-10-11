@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, MoreHorizontal, Trash2, User, Crown } from "lucide-react";
+import { Check, ChevronDown, MoreHorizontal, Trash2, User, Crown } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -178,7 +178,7 @@ export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMak
               <Crown size={14} /> Make owner
             </button>
           )}
-          {canRemove ? (
+          {canRemove && (
             <button
               role="menuitem"
               onClick={() => {
@@ -187,15 +187,107 @@ export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMak
               }}
               className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
             >
-              <Trash2 size={14} /> Remove Member
+              <Trash2 size={14} /> Remove member
             </button>
-          ) : (
-            <div className="flex w-full items-center gap-2 px-3 py-2 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none">
-              <Trash2 size={14} /> Remove Member
-            </div>
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+interface MemberActionSheetProps {
+  member: BlogMember | null;
+  profileHref: string;
+  onClose: () => void;
+  onRoleSelect: (role: BlogRole) => void;
+  onMakeOwnerClick: () => void;
+  onRemoveClick: () => void;
+}
+
+// Mobile counterpart to RoleDropdown + MemberActionsMenu: one bottom sheet
+// with thumb-sized rows, so nothing has to be positioned against a narrow
+// screen edge. Only opened for members the owner can actually manage.
+export const MemberActionSheet = ({ member, profileHref, onClose, onRoleSelect, onMakeOwnerClick, onRemoveClick }: MemberActionSheetProps) => {
+  useEffect(() => {
+    if (!member) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [member, onClose]);
+
+  if (!member) return null;
+
+  const rowClass = "flex w-full min-h-12 items-center gap-3 px-5 text-left text-[15px] font-medium transition-colors active:bg-zinc-100 dark:active:bg-zinc-800";
+
+  return (
+    // z-60 matches Modal: above the studio's fixed mobile header (z-50).
+    <div className="fixed inset-0 z-60 flex items-end bg-zinc-950/45 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Manage ${member.user.first_name} ${member.user.last_name}`}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full rounded-t-2xl border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-xl"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+
+        <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+          <Avatar firstName={member.user.first_name} lastName={member.user.last_name} />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
+              {member.user.first_name} {member.user.last_name}
+            </p>
+            <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{member.user.email}</p>
+          </div>
+        </div>
+
+        <p className="px-5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Role</p>
+        <div role="radiogroup" aria-label="Role">
+          {ROLES.filter((r) => r !== "owner").map((r) => {
+            const selected = member.role === r;
+            return (
+              <button
+                key={r}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onRoleSelect(r)}
+                className={`${rowClass} ${selected ? "text-violet-700 dark:text-violet-400" : "text-zinc-800 dark:text-zinc-200"}`}
+              >
+                <span className="flex-1">{ROLE_META[r].label}</span>
+                {selected && <Check size={18} />}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+          <Link to={profileHref} onClick={onClose} className={`${rowClass} text-zinc-800 dark:text-zinc-200`}>
+            <User size={18} className="text-zinc-400" /> View profile
+          </Link>
+          <button onClick={onMakeOwnerClick} className={`${rowClass} text-zinc-800 dark:text-zinc-200`}>
+            <Crown size={18} className="text-zinc-400" /> Make owner
+          </button>
+          <button onClick={onRemoveClick} className={`${rowClass} text-red-600 dark:text-red-400`}>
+            <Trash2 size={18} /> Remove from workspace
+          </button>
+        </div>
+
+        <div className="px-4 pt-2">
+          <button
+            onClick={onClose}
+            className="h-12 w-full rounded-xl bg-zinc-100 text-[15px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
