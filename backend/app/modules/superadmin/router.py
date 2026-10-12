@@ -5,14 +5,14 @@ from typing import Any, List, Optional
 from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, status, Request, Response, BackgroundTasks
 from sqlmodel import Session, delete, select
-from sqlalchemy import func, cast, Date
+from sqlalchemy import and_, case, func, cast, Date, or_
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
-from app.core.exceptions import BadRequestError, NotFoundError, ValidationError
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError, ValidationError
 from app.core.moderation import record_moderation_action
 from app.core.notifications import add_notification
 from app.core.permissions import require_super_admin
@@ -47,6 +47,8 @@ from app.schemas import (
     PlatformSettingsUpdate,
     PlatformStats,
     UserRead,
+    SuperadminUserCounts,
+    SuperadminUserList,
     SuperadminUserQueryParams,
 )
 
@@ -321,35 +323,61 @@ def delete_blog(
 # USER MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@router.get("/users", response_model=List[UserRead])
+def _deleted_prefix(user_id: int) -> str:
+    # superadmin_delete_user renames accounts this way to free the username/email.
+    return f"deleted_{user_id}_"
+
+
+@router.get("/users", response_model=SuperadminUserList)
 def get_all_users(
-    params: SuperadminUserQueryParams = Depends(),  # Query parameters encapsulated
+    params: SuperadminUserQueryParams = Depends(),
     _: None = Depends(require_super_admin),
     session: Session = Depends(get_session),
 ):
-    # Base query optimizing loads
-    query = select(User).options(
-        selectinload(User.blog_memberships).selectinload(BlogMember.blog)
-    )
-
-    # Applying conditional adjustments from your schema parameter state
-    if not params.include_deleted:
-        query = query.where(User.deleted_at == None)
-        
+    filters = []
     if params.platform_role:
-        query = query.where(User.platform_role == params.platform_role)
-        
-    if params.search:
-        search_term = f"%{params.search}%"
-        query = query.where(
-            (User.username.ilike(search_term)) | (User.email.ilike(search_term))
-        )
+        filters.append(User.platform_role == params.platform_role)
+    if params.blog_id is not None:
+        filters.append(User.id.in_(select(BlogMember.user_id).where(BlogMember.blog_id == params.blog_id)))
+    term = (params.search or "").strip()
+    if term:
+        pattern = f"%{term}%"
+        full_name = func.coalesce(User.first_name, "") + " " + func.coalesce(User.last_name, "")
+        filters.append(or_(User.username.ilike(pattern), User.email.ilike(pattern), full_name.ilike(pattern)))
 
-    # Execute offset/limit pagination parameters clean boundary
-    query = query.order_by(User.created_at.desc()).offset(params.skip).limit(params.limit)
-    
-    users = session.exec(query).all()
-    return users
+    not_deleted = User.deleted_at.is_(None)
+    status_conditions = {
+        "all": not_deleted,
+        "active": and_(not_deleted, User.is_active == True),  # noqa: E712
+        "suspended": and_(not_deleted, User.is_active == False),  # noqa: E712
+        "deleted": User.deleted_at.is_not(None),
+    }
+
+    # One pass for every tab's count, so switching tabs never shows stale numbers.
+    count_row = session.exec(
+        select(*(func.coalesce(func.sum(case((cond, 1), else_=0)), 0) for cond in status_conditions.values()))
+        .where(*filters)
+    ).one()
+    counts = SuperadminUserCounts(**dict(zip(status_conditions.keys(), (int(n) for n in count_row))))
+
+    users = session.exec(
+        select(User)
+        .options(selectinload(User.blog_memberships).selectinload(BlogMember.blog))
+        .where(*filters, status_conditions[params.status])
+        .order_by(User.created_at.desc(), User.id.desc())
+        .offset(params.skip)
+        .limit(params.limit)
+    ).all()
+
+    total = getattr(counts, params.status)
+    return SuperadminUserList(
+        items=[UserRead.model_validate(user) for user in users],
+        total=total,
+        skip=params.skip,
+        limit=params.limit,
+        has_more=params.skip + len(users) < total,
+        counts=counts,
+    )
 
 
 @router.patch("/users/{user_id}", response_model=UserRead)
@@ -368,7 +396,11 @@ def update_user_status(
     
     if not user:
         raise NotFoundError(ErrorCode.USER_NOT_FOUND)
-    
+    if user.deleted_at is not None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "Restore this account before changing its status.")
+    if user.id == current_user.id and not data.is_active:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "You can't suspend your own account.")
+
     previous_is_active = user.is_active
     user.is_active = data.is_active
     session.add(user)
@@ -486,6 +518,8 @@ def superadmin_delete_user(
             ErrorCode.OPERATION_NOT_ALLOWED,
             "You cannot delete your own account from here.",
         )
+    if user.deleted_at is not None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "This account is already deleted.")
 
     # Prevent deleting the last superadmin
     if user.is_super_admin:
@@ -522,8 +556,8 @@ def superadmin_delete_user(
     user.deleted_at = datetime.now(timezone.utc) # Fixed deprecated utcnow()
     
     # Free up username and email for re-registration while maintaining DB integrity/FKs
-    user.username = f"deleted_{user.id}_{user.username}"
-    user.email = f"deleted_{user.id}_{user.email}"
+    user.username = f"{_deleted_prefix(user.id)}{user.username}"
+    user.email = f"{_deleted_prefix(user.id)}{user.email}"
 
     session.add(user)
     session.commit()
@@ -531,6 +565,61 @@ def superadmin_delete_user(
     # FIX: Explicitly return an empty Response with a 204 status code 
     # This prevents FastAPI from running validations on a 'None' return value
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/restore", response_model=UserRead)
+def superadmin_restore_user(
+    user_id: int,
+    request: Request,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Undo a soft delete while the account is still inside the purge window."""
+    user = session.exec(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.blog_memberships).selectinload(BlogMember.blog))
+    ).first()
+    if not user:
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
+    if user.deleted_at is None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "This account isn't deleted.")
+
+    # Superadmin deletes renamed the account; self-deletes didn't. Strip the
+    # prefix either way, then make sure nobody signed up with the freed name.
+    prefix = _deleted_prefix(user.id)
+    username = user.username.removeprefix(prefix) if user.username else user.username
+    email = user.email.removeprefix(prefix)
+    if username and session.exec(select(User.id).where(User.username == username, User.id != user.id)).first():
+        raise ConflictError(
+            ErrorCode.USERNAME_ALREADY_EXISTS,
+            f"Another account now uses the username @{username}, so this one can't be restored.",
+        )
+    if session.exec(select(User.id).where(User.email == email, User.id != user.id)).first():
+        raise ConflictError(
+            ErrorCode.EMAIL_ALREADY_EXISTS,
+            f"Another account now uses {email}, so this one can't be restored.",
+        )
+
+    user.username = username
+    user.email = email
+    user.deleted_at = None
+    user.is_active = True
+    session.add(user)
+
+    add_audit_log(
+        session,
+        action="superadmin.user_restore",
+        resource_type="user",
+        resource_id=user.id,
+        actor=current_user,
+        details={"username": username, "email": email},
+        request=request,
+    )
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 # ============================================================================

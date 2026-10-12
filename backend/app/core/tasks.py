@@ -10,6 +10,10 @@ from app.models import User
 
 logger = logging.getLogger("inko.tasks")
 
+# How long a soft-deleted account can be restored before it is purged.
+# The admin studio mirrors this (SOFT_DELETE_RETENTION_DAYS) to show purge dates.
+SOFT_DELETE_RETENTION_DAYS = 30
+
 def purge_expired_soft_deleted_users():
     """
     Background worker that runs automatically to permanently erase users 
@@ -17,7 +21,7 @@ def purge_expired_soft_deleted_users():
     """
     logger.info("⏰ Triggering scheduled background task: 30-Day Soft-Delete Purge...")
     
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=SOFT_DELETE_RETENTION_DAYS)
     
     with Session(engine) as session:
         statement = (

@@ -1,9 +1,10 @@
 from fastapi import Query
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, EmailStr
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
+from app.schemas.pagination import PaginatedResponse
 from app.models.blog import BlogRole, OnboardingStatus, OnboardingStep, PostVisibility, SubscriptionPlan
 from app.models.user import PlatformRole
 
@@ -88,9 +89,26 @@ class UserUpdate(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# "all" means every account that isn't deleted; deleted accounts are their own bucket.
+SuperadminUserStatus = Literal["all", "active", "suspended", "deleted"]
+
+
 class SuperadminUserQueryParams(BaseModel):
     skip: int = Query(default=0, ge=0)
-    limit: int = Query(default=100, ge=1, le=500)
+    limit: int = Query(default=50, ge=1, le=200)
+    status: SuperadminUserStatus = Query(default="all", description="Account status bucket")
+    blog_id: Optional[int] = Query(default=None, description="Only members of this workspace")
     platform_role: Optional[PlatformRole] = Query(default=None, description="Filter by platform role")
-    include_deleted: bool = Query(default=False, description="Whether to include soft-deleted accounts")
-    search: Optional[str] = Query(default=None, description="Search term for username or email fields")
+    search: Optional[str] = Query(default=None, description="Matches name, username or email")
+
+
+class SuperadminUserCounts(BaseModel):
+    """Per-status totals for the current search/workspace filter (status ignored)."""
+    all: int
+    active: int
+    suspended: int
+    deleted: int
+
+
+class SuperadminUserList(PaginatedResponse[UserRead]):
+    counts: SuperadminUserCounts

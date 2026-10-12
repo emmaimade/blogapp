@@ -46,7 +46,7 @@ from .settings import (
     SocialLinks,
 )
 from .tags import PopularTagRead, TagCreate, TagRead, TagUpdate
-from .users import PublicAuthorRead, UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams
+from .users import PublicAuthorRead, UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams, SuperadminUserCounts, SuperadminUserList
 
 CommentAdminRead.model_rebuild(_types_namespace={"PostShort": PostShort})
 
@@ -124,6 +124,8 @@ __all__ = [
     "PostShort",
     "SocialLinks",
     "SuperadminUserQueryParams",
+    "SuperadminUserCounts",
+    "SuperadminUserList",
     "GeneralSettings",
     "GeneralSettingsResponse",
     "PlatformFeatureFlags",

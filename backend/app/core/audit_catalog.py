@@ -51,6 +51,7 @@ ACTIONS: dict[str, ActionInfo] = {
     "user.delete_account": ActionInfo("Deleted own account", "users", "critical"),
     "superadmin.user_status_update": ActionInfo("Superadmin changed a user's status", "users", "critical"),
     "superadmin.user_delete": ActionInfo("Superadmin deleted a user", "users", "critical"),
+    "superadmin.user_restore": ActionInfo("Superadmin restored a deleted user", "users", "warning"),
     # ── Workspaces ───────────────────────────────────────────────────────
     "blog.create": ActionInfo("Created a workspace", "workspaces", "info"),
     "blog.update": ActionInfo("Updated workspace details", "workspaces", "info"),

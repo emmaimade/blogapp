@@ -1,229 +1,303 @@
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, MoreHorizontal, CheckCircle2, XCircle, Trash2, Layers, ChevronDown } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, MoreHorizontal, CheckCircle2, XCircle, Trash2, RotateCcw, User as UserIcon, ShieldCheck, Users } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/context/AuthContext';
+import type { BlogRole, PlatformRole } from '../../auth/types';
 import { formatLocalDate, formatLocalDateTime, formatSmart } from '../../../shared/utils/dates';
 import { Modal } from '../../../shared/components/Modal';
-import { SkeletonBar, SkeletonListRow, TableRowSkeleton } from '../../../shared/ui/Skeleton';
+import { SkeletonBar, SkeletonListRow } from '../../../shared/ui/Skeleton';
+import { Spinner } from '../../../shared/ui/Spinner';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 import api from '../../../shared/api/client';
 import { LoadError } from '../../../shared/ui/LoadError';
+import { Avatar, ROLE_META } from '../../users/components/UserComponents';
 
-const SuperAdminUsersSkeleton = () => (
-  <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
+type AccountStatus = 'all' | 'active' | 'suspended' | 'deleted';
+
+interface PlatformUser {
+  id: number;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  platform_role: PlatformRole;
+  is_super_admin: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_login: string | null;
+  deleted_at: string | null;
+  blog_memberships: { id: number; blog_id: number; role: BlogRole; blog: { id: number; name: string } }[];
+}
+
+interface UserListPage {
+  items: PlatformUser[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+  counts: Record<AccountStatus, number>;
+}
+
+const PAGE_SIZE = 50;
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Mirrors SOFT_DELETE_RETENTION_DAYS in backend/app/core/tasks.py.
+const SOFT_DELETE_RETENTION_DAYS = 30;
+
+const STATUS_TABS: { key: AccountStatus; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'suspended', label: 'Suspended' },
+  { key: 'deleted', label: 'Deleted' },
+];
+
+// Columns shared by the desktop header and each row (rows use subgrid).
+const GRID_COLS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_8.5rem_7rem_3rem]';
+
+// Superadmin deletes rename the account to free its username/email; show the
+// original identity instead of "deleted_12_…".
+const identityOf = (user: PlatformUser) => {
+  const prefix = `deleted_${user.id}_`;
+  const strip = (value: string | null) =>
+    value && user.deleted_at && value.startsWith(prefix) ? value.slice(prefix.length) : value;
+  const username = strip(user.username);
+  const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || (username ? `@${username}` : 'Unnamed account');
+  return { username, email: strip(user.email) ?? user.email, name };
+};
+
+const purgeLabel = (deletedAt: string, now: number) => {
+  const days = Math.ceil((new Date(deletedAt).getTime() + SOFT_DELETE_RETENTION_DAYS * DAY_MS - now) / DAY_MS);
+  if (days <= 0) return 'Purge pending';
+  return `Purges in ${days} ${days === 1 ? 'day' : 'days'}`;
+};
+
+const workspaceSummary = (user: PlatformUser) => {
+  const names = user.blog_memberships.map((m) => m.blog.name);
+  if (names.length === 0) return 'No workspace';
+  return names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+};
+
+const Pill = ({ className, children }: { className: string; children: ReactNode }) => (
+  <span className={`inline-flex flex-shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-none ${className}`}>
+    {children}
+  </span>
+);
+
+const UsersSkeleton = () => (
+  <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-5">
     <div className="space-y-2">
-      <SkeletonBar className="h-6 w-56" />
-      <SkeletonBar className="h-4 w-80" />
+      <SkeletonBar className="h-7 w-48" />
+      <SkeletonBar className="h-4 w-28" />
     </div>
-
-    <SkeletonBar className="h-16 w-full rounded-xl" />
-
-    <div className="block md:hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
-      {[...Array(5)].map((_, i) => (
-        <SkeletonListRow key={i} />
-      ))}
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <SkeletonBar className="h-11 sm:h-10 w-full sm:max-w-md rounded-lg" />
+      <SkeletonBar className="h-11 sm:h-10 w-full sm:w-56 rounded-lg" />
     </div>
-
-    <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden">
-      <table className="w-full border-collapse text-left">
-        <thead>
-          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50">
-            {['User Profile', 'Role', 'Last Login', 'Status', 'Date Registered', 'Actions'].map((h) => (
-              <th key={h} className="px-6 py-3">
-                <SkeletonBar className="h-3 w-20" />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <TableRowSkeleton columns={6} rows={6} />
-        </tbody>
-      </table>
+    <div className="flex gap-2">
+      {[...Array(4)].map((_, i) => <SkeletonBar key={i} className="h-9 w-24 rounded-full" />)}
+    </div>
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+      {[...Array(8)].map((_, i) => <SkeletonListRow key={i} />)}
     </div>
   </div>
 );
 
-// Requests go through the shared `api` client: it uses the same-origin /api
-// route in production, sends the session cookies, adds the CSRF header to
-// writes, and refreshes an expired session.
+type MenuItem =
+  | { kind: 'link'; label: string; to: string; icon: ReactNode }
+  | { kind: 'button'; label: string; icon: ReactNode; danger?: boolean; onSelect: () => void };
 
 export const SuperAdminUsersPage = () => {
   useDocumentTitle('Platform users');
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  
-  // Track composite unique keys (`${workspaceName}-${userId}`) instead of just user.id
-  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
-  
-  // Track EXPANDED workspaces instead of collapsed ones on page initialization
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<{ [key: string]: boolean }>({
-    "Global System Administrators": true,
+  const [now] = useState(() => Date.now());
+
+  // Filters live in the URL so refresh, back/forward and shared links keep them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const q = searchParams.get('q') ?? '';
+  const statusParam = searchParams.get('status');
+  const status: AccountStatus = STATUS_TABS.some((t) => t.key === statusParam) ? (statusParam as AccountStatus) : 'all';
+  const workspace = searchParams.get('workspace') ?? '';
+  const hasFilters = !!(q || workspace);
+
+  const updateParams = (changes: Record<string, string>, replace = false) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(changes).forEach(([key, value]) => {
+          if (value && value !== 'all') next.set(key, value);
+          else next.delete(key);
+        });
+        return next;
+      },
+      { replace },
+    );
+
+  // Debounced into the URL; reset when the URL changes underneath it.
+  const [searchInput, setSearchInput] = useState(q);
+  const [syncedQ, setSyncedQ] = useState(q);
+  if (q !== syncedQ) {
+    setSyncedQ(q);
+    setSearchInput(q);
+  }
+  useEffect(() => {
+    const next = searchInput.trim();
+    if (next === q) return;
+    const handle = setTimeout(() => updateParams({ q: next }, true), 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput, q]);
+
+  const { data: workspaces = [] } = useQuery<{ blog_id: number; name: string }[]>({
+    queryKey: ['superadmin-blogs'],
+    queryFn: async () => (await api.get('/superadmin/blogs')).data,
+    staleTime: 5 * 60 * 1000,
+  });
+  const workspaceOptions = useMemo(() => [...workspaces].sort((a, b) => a.name.localeCompare(b.name)), [workspaces]);
+
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    isFetchingNextPage,
+    isPlaceholderData,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['superadmin-users', status, workspace, q],
+    queryFn: async ({ pageParam }) =>
+      (
+        await api.get<UserListPage>('/superadmin/users', {
+          params: { skip: pageParam, limit: PAGE_SIZE, status, blog_id: workspace || undefined, search: q || undefined },
+        })
+      ).data,
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.has_more ? last.skip + last.limit : undefined),
+    placeholderData: keepPreviousData,
   });
 
-  // Dedicated config state to drive the shared confirmation modal cleanly
+  const users = useMemo(() => {
+    // Offsets can shift if accounts change between pages; drop repeats.
+    const seen = new Set<number>();
+    return (data?.pages ?? []).flatMap((p) => p.items).filter((u) => !seen.has(u.id) && !!seen.add(u.id));
+  }, [data]);
+  const firstPage = data?.pages[0];
+  const counts = firstPage?.counts;
+  const total = firstPage?.total ?? 0;
+
+  // ── Actions ────────────────────────────────────────────────────────────
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const [modalConfig, setModalConfig] = useState<{
-    isOpen: boolean;
     title: string;
     message: string;
     confirmText: string;
-    isDanger: boolean;
     action: () => void;
   } | null>(null);
-  
-  const activeMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: users, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ['superadmin-users'],
-    queryFn: async () => {
-      const res = await api.get('/superadmin/users', { params: { include_deleted: true } });
-      return res.data;
+  // The desktop popover and the mobile sheet are both mounted (CSS picks one),
+  // so an outside click has to miss both before it closes the menu.
+  useEffect(() => {
+    if (menuFor === null) return;
+    const onPointer = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || sheetRef.current?.contains(target)) return;
+      setMenuFor(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuFor(null);
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    const lockScroll = window.matchMedia('(max-width: 767px)').matches;
+    const prevOverflow = document.body.style.overflow;
+    if (lockScroll) document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+      if (lockScroll) document.body.style.overflow = prevOverflow;
+    };
+  }, [menuFor]);
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => api.patch(`/superadmin/users/${id}`, { is_active }),
+    onSuccess: (_, { is_active }) => {
+      invalidate();
+      toast.success(is_active ? 'Account reactivated' : 'Account suspended');
     },
+    onError: (error) => toastApiError(error, 'Failed to update the account.'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
-      api.delete(`/superadmin/users/${id}`),
+    mutationFn: (id: number) => api.delete(`/superadmin/users/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
-      toast.success('User account permanently deleted');
-      setOpenMenuKey(null);
+      invalidate();
+      toast.success('Account deleted. You can restore it from the Deleted tab.');
     },
-    onError: () => {
-      toast.error('Failed to delete user account');
-    },
+    onError: (error) => toastApiError(error, 'Failed to delete the account.'),
   });
 
-  const toggleSuspendMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
-      api.patch(`/superadmin/users/${id}`, { is_active }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
-      toast.success(variables.is_active ? 'User reactivated successfully' : 'User suspended successfully');
-      setOpenMenuKey(null);
+  const restoreMutation = useMutation({
+    mutationFn: (id: number) => api.post(`/superadmin/users/${id}/restore`),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Account restored');
     },
-    onError: () => {
-      toast.error('Failed to update suspension status');
-    },
+    onError: (error) => toastApiError(error, 'Failed to restore the account.'),
   });
 
-  // Close context dropdown menus when clicking anywhere outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (activeMenuRef.current && !activeMenuRef.current.contains(event.target as Node)) {
-        setOpenMenuKey(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const toggleWorkspaceCollapse = (workspaceName: string) => {
-    setExpandedWorkspaces((prev) => ({
-      ...prev,
-      [workspaceName]: !prev[workspaceName],
-    }));
-  };
-
-  const handleToggleSuspend = (e: React.MouseEvent, targetUser: any) => {
-    e.stopPropagation();
-    const willSuspend = targetUser.is_active;
-
-    if (willSuspend) {
-      // Industry Standard: Intercept destructive suspension workflows with a confirmation warning
-      setModalConfig({
-        isOpen: true,
-        title: "Suspend User Account",
-        message: `Are you sure you want to suspend ${targetUser.first_name} ${targetUser.last_name}? They will lose entire infrastructure access immediately.`,
-        confirmText: "Suspend Account",
-        isDanger: true,
-        action: () => toggleSuspendMutation.mutate({ id: targetUser.id, is_active: false })
+  const menuItemsFor = (user: PlatformUser): MenuItem[] => {
+    const { name } = identityOf(user);
+    const items: MenuItem[] = [
+      { kind: 'link', label: 'View details', to: `/admin/platform-users/${user.id}`, icon: <UserIcon size={16} /> },
+    ];
+    if (user.deleted_at) {
+      items.push({ kind: 'button', label: 'Restore account', icon: <RotateCcw size={16} />, onSelect: () => restoreMutation.mutate(user.id) });
+      return items;
+    }
+    if (user.is_active) {
+      items.push({
+        kind: 'button',
+        label: 'Suspend',
+        icon: <XCircle size={16} />,
+        onSelect: () =>
+          setModalConfig({
+            title: 'Suspend account',
+            message: `${name} will be signed out and won't be able to sign in until you reactivate the account. Their workspaces and posts stay as they are.`,
+            confirmText: 'Suspend',
+            action: () => statusMutation.mutate({ id: user.id, is_active: false }),
+          }),
       });
     } else {
-      // Industry Standard: Low-risk reactivation fires off cleanly without repetitive confirmations
-      toggleSuspendMutation.mutate({ id: targetUser.id, is_active: true });
+      items.push({ kind: 'button', label: 'Reactivate', icon: <CheckCircle2 size={16} />, onSelect: () => statusMutation.mutate({ id: user.id, is_active: true }) });
     }
+    items.push({
+      kind: 'button',
+      label: 'Delete account',
+      icon: <Trash2 size={16} />,
+      danger: true,
+      onSelect: () =>
+        setModalConfig({
+          title: 'Delete account',
+          message: `${name} will be signed out and lose access immediately.\n\nYou can restore the account from the Deleted tab for ${SOFT_DELETE_RETENTION_DAYS} days. After that it's erased permanently.`,
+          confirmText: 'Delete account',
+          action: () => deleteMutation.mutate(user.id),
+        }),
+    });
+    return items;
   };
 
-  const handleDelete = (e: React.MouseEvent, targetUser: any) => {
-    e.stopPropagation();
-    // Replaced legacy window.confirm with your custom modal[cite: 8, 10]
-    setModalConfig({
-      isOpen: true,
-      title: "Permanently Delete Account",
-      message: `Are you absolutely sure you want to permanently delete ${targetUser.first_name} ${targetUser.last_name}? This process removes them from all multi-tenancy buckets and cannot be undone.`,
-      confirmText: "Delete Account",
-      isDanger: true,
-      action: () => deleteMutation.mutate(targetUser.id)
-    });
-  };
+  const sheetUser = menuFor !== null ? users.find((u) => u.id === menuFor) ?? null : null;
 
-  // Filter users by search term
-  const filteredUsers = useMemo(() => {
-    if (!users) return [];
-    if (!search.trim()) return users;
-    const term = search.toLowerCase();
-    return users.filter(
-      (u: any) =>
-        (u.username && u.username.toLowerCase().includes(term)) ||
-        (u.email && u.email.toLowerCase().includes(term)) ||
-        (u.first_name && u.first_name.toLowerCase().includes(term)) ||
-        (u.last_name && u.last_name.toLowerCase().includes(term))
-    );
-  }, [users, search]);
-
-  // Isolate SuperAdmins cleanly and group regular users by workspace tenant with their context roles
-  const groupedByWorkspace = useMemo(() => {
-    const groups: { [key: string]: any[] } = {};
-
-    filteredUsers.forEach((user: any) => {
-      if (user.is_super_admin || user.platform_role === 'superadmin') {
-        const adminGroupName = "Global System Administrators";
-        if (!groups[adminGroupName]) groups[adminGroupName] = [];
-        groups[adminGroupName].push({ ...user, contextualRole: 'Super Admin' });
-        return;
-      }
-
-      if (user.blog_memberships && user.blog_memberships.length > 0) {
-        user.blog_memberships.forEach((membership: any) => {
-          const workspaceName = membership.blog?.name || "Unknown Workspace";
-          if (!groups[workspaceName]) groups[workspaceName] = [];
-          if (!groups[workspaceName].some((u) => u.id === user.id)) {
-            groups[workspaceName].push({
-              ...user,
-              contextualRole: membership.role
-            });
-          }
-        });
-      } else {
-        const orphanGroupName = "No Assigned Workspace";
-        if (!groups[orphanGroupName]) groups[orphanGroupName] = [];
-        groups[orphanGroupName].push({ ...user, contextualRole: 'Unassigned' });
-      }
-    });
-
-    return groups;
-  }, [filteredUsers]);
-
-  // Sort groups to push Administration and Orphan buckets to the top
-  const sortedWorkspaceEntries = useMemo(() => {
-    return Object.entries(groupedByWorkspace).sort(([nameA], [nameB]) => {
-      if (nameA === "Global System Administrators") return -1;
-      if (nameB === "Global System Administrators") return 1;
-      if (nameA === "No Assigned Workspace") return -1;
-      if (nameB === "No Assigned Workspace") return 1;
-      return nameA.localeCompare(nameB);
-    });
-  }, [groupedByWorkspace]);
-
-  if (isLoading) {
-    return <SuperAdminUsersSkeleton />;
-  }
+  if (isLoading) return <UsersSkeleton />;
 
   // A failed request must not fall through to "no users found".
-  if (isError) {
+  if (isError && !data) {
     return (
       <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto">
         <LoadError title="Couldn't load users" onRetry={() => refetch()} isRetrying={isFetching} />
@@ -231,389 +305,297 @@ export const SuperAdminUsersPage = () => {
     );
   }
 
+  const renderMenuItem = (item: MenuItem, variant: 'popover' | 'sheet') => {
+    const base =
+      variant === 'sheet'
+        ? 'flex w-full min-h-12 items-center gap-3 px-5 text-left text-[15px] font-medium active:bg-zinc-100 dark:active:bg-zinc-800'
+        : 'flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800';
+    if (item.kind === 'link') {
+      return (
+        <Link key={item.label} role="menuitem" to={item.to} onClick={() => setMenuFor(null)} className={`${base} text-zinc-800 dark:text-zinc-200`}>
+          <span className="text-zinc-400">{item.icon}</span> {item.label}
+        </Link>
+      );
+    }
+    return (
+      <button
+        key={item.label}
+        role="menuitem"
+        onClick={() => {
+          setMenuFor(null);
+          item.onSelect();
+        }}
+        className={`${base} ${item.danger ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200'}`}
+      >
+        <span className={item.danger ? '' : 'text-zinc-400'}>{item.icon}</span> {item.label}
+      </button>
+    );
+  };
+
+  const emptyMessage = q
+    ? `No accounts match "${q}"`
+    : status === 'deleted'
+      ? 'No deleted accounts. Deleted accounts stay here for 30 days before they are erased.'
+      : status === 'suspended'
+        ? 'No suspended accounts.'
+        : 'No accounts here yet.';
+
   return (
-    <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-6">
-      {/* Header View */}
+    <div className="p-4 sm:p-6 max-w-full sm:max-w-400 mx-auto space-y-5">
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          User Management
-        </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Monitor infrastructure permissions, manage security multi-tenancy, and handle suspension states.
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Platform users</h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          {counts ? `${counts.all.toLocaleString()} ${counts.all === 1 ? 'account' : 'accounts'}` : ' '}
+          {hasFilters && ' matching your filters'}
         </p>
       </div>
 
-      {/* Control Actions & Searching */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/20 p-4 rounded-xl border border-zinc-200/60 dark:border-zinc-800/50 w-full">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" size={16} />
-          <input
-            type="text"
-            placeholder="Search users by name or email address..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs sm:text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 focus:border-transparent transition-all"
-          />
+      {/* Filters */}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" size={16} />
+            {/* text-base on mobile: iOS zooms into inputs under 16px */}
+            <input
+              type="search"
+              aria-label="Search accounts"
+              placeholder="Name, username or email"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full h-11 sm:h-10 pl-9 pr-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-base sm:text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+          <select
+            aria-label="Filter by workspace"
+            value={workspace}
+            onChange={(e) => updateParams({ workspace: e.target.value })}
+            className="h-11 sm:h-10 w-full sm:w-60 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 text-base sm:text-sm text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">All workspaces</option>
+            {workspaceOptions.map((w) => (
+              <option key={w.blog_id} value={w.blog_id}>{w.name}</option>
+            ))}
+          </select>
         </div>
-        <div className="text-xs font-medium text-zinc-400 dark:text-zinc-500 self-start sm:self-auto">
-          Showing {filteredUsers.length} total user records
+
+        {/* Same tabs as the moderation queue: a 2x2 grid of chips on mobile so
+            every label and count is visible, a segmented control from sm up */}
+        <div>
+          <div role="tablist" aria-label="Account status" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-max sm:items-center sm:gap-1 sm:rounded-xl sm:bg-zinc-100 sm:p-1 sm:dark:bg-zinc-800">
+            {STATUS_TABS.map((tab) => {
+              const selected = tab.key === status;
+              return (
+                <button
+                  key={tab.key}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => updateParams({ status: tab.key })}
+                  // bg-white/100, not bg-white: index.css forces `.dark .bg-white` to the
+                  // panel colour with !important, which would hide the selected tab.
+                  className={`flex h-11 items-center justify-between gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-all sm:h-9 sm:justify-start sm:rounded-lg sm:border-0 ${
+                    selected
+                      ? 'border-zinc-300 bg-white/100 text-zinc-900 shadow-sm dark:border-zinc-600 dark:bg-zinc-700 dark:text-white'
+                      : 'border-zinc-200 text-zinc-500 hover:text-zinc-700 max-sm:bg-zinc-50 dark:border-zinc-700 dark:hover:text-zinc-300 max-sm:dark:bg-zinc-900/40'
+                  }`}
+                >
+                  {tab.label}
+                  {counts && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums ${
+                        selected ? 'bg-accent text-accent-text' : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700'
+                      }`}
+                    >
+                      {counts[tab.key].toLocaleString()}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Empty State Trigger Screen */}
-      {sortedWorkspaceEntries.length === 0 && (
-        <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 p-12 text-center text-sm text-zinc-400 dark:text-zinc-500">
-          No platform users found matching the search query criteria.
+      {users.length === 0 ? (
+        <div className="flex flex-col items-center rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-14 text-center">
+          <Users className="mb-3 text-zinc-300 dark:text-zinc-700" size={40} />
+          <p className="max-w-sm font-medium text-zinc-600 dark:text-zinc-400">{emptyMessage}</p>
+          {hasFilters && (
+            <button
+              onClick={() => updateParams({ q: '', workspace: '' })}
+              className="mt-2 text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline decoration-dotted"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-      )}
+      ) : (
+        <div className={`rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}>
+          <div className={`hidden md:grid ${GRID_COLS} gap-x-4 rounded-t-xl border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400`}>
+            <span>Account</span>
+            <span>Workspaces</span>
+            <span>{status === 'deleted' ? 'Purge' : 'Last login'}</span>
+            <span>Joined</span>
+            <span className="sr-only">Actions</span>
+          </div>
 
-      {/* MOBILE CARD VIEW CONTAINER */}
-      <div className="block md:hidden space-y-4 px-0">
-        {sortedWorkspaceEntries.map(([workspaceName, tenantUsers]) => {
-          const isExpanded = !!expandedWorkspaces[workspaceName];
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {users.map((user) => {
+              const isSelf = currentUser?.id === user.id;
+              const { name, email, username } = identityOf(user);
+              const lastSeen = user.last_login ? `Last seen ${formatSmart(user.last_login)}` : 'Never logged in';
+              const timing = user.deleted_at ? purgeLabel(user.deleted_at, now) : lastSeen;
 
-          return (
-            <div key={`mobile-group-${workspaceName}`} className="space-y-2">
-              <div
-                onClick={() => toggleWorkspaceCollapse(workspaceName)}
-                className="flex items-center justify-between p-3 bg-zinc-50/80 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl cursor-pointer select-none text-xs font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Layers size={13} className="text-zinc-400 shrink-0" />
-                  <span className="truncate">{workspaceName}</span>
-                  <span className="text-zinc-400 dark:text-zinc-500 font-normal shrink-0">({tenantUsers.length})</span>
-                </div>
-                <ChevronDown
-                  size={14}
-                  className={`text-zinc-400 transition-transform duration-200 shrink-0 ${isExpanded ? '' : '-rotate-90'}`}
-                />
-              </div>
-
-              {isExpanded && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {tenantUsers.map((accountRow: any) => {
-                    const isSelf = currentUser?.id === accountRow.id;
-                    const isDeleted = !!accountRow.deleted_at;
-                    const currentUniqueRowKey = `${workspaceName}-${accountRow.id}`;
-                    const targetMobileKey = `mobile-${currentUniqueRowKey}`;
-
-                    const firstInitial = accountRow.first_name ? accountRow.first_name.slice(0, 1) : '';
-                    const lastInitial = accountRow.last_name ? accountRow.last_name.slice(0, 1) : (accountRow.username ? accountRow.username.slice(0, 1) : '?');
-
-                    return (
-                      <div
-                        key={`card-${currentUniqueRowKey}`}
-                        className={`p-4 rounded-xl border bg-white dark:bg-zinc-900 shadow-xs space-y-3 relative ${
-                          isDeleted ? "border-red-200/60 bg-red-50/5 dark:border-red-900/30" : "border-zinc-200/70 dark:border-zinc-800"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-semibold text-xs text-zinc-600 dark:text-zinc-300 uppercase shrink-0">
-                              {firstInitial || lastInitial ? `${firstInitial}${lastInitial}` : "U"}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-medium text-xs text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5 truncate">
-                                {accountRow.first_name || accountRow.last_name
-                                  ? `${accountRow.first_name || ""} ${accountRow.last_name || ""}`.trim()
-                                  : accountRow.username}
-                                {isSelf && (
-                                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.2 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200/50">
-                                    you
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">@{accountRow.username}</span>
-                              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate text-wrap break-all">{accountRow.email}</span>
-                            </div>
-                          </div>
-
-                          <div className="relative" ref={openMenuKey === targetMobileKey ? activeMenuRef : null}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                setOpenMenuKey(openMenuKey === targetMobileKey ? null : targetMobileKey);
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 transition-colors relative z-10"
-                            >
-                              <MoreHorizontal size={15} />
-                            </button>
-
-                            {openMenuKey === targetMobileKey && (
-                              <div className="absolute right-0 mt-1 w-44 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-xs text-left animate-in fade-in slide-in-from-top-1 duration-100">
-                                <Link
-                                  to={isSelf ? "/admin/profile" : `/admin/platform-users/${accountRow.id}`}
-                                  onClick={() => setOpenMenuKey(null)}
-                                  className="flex w-full items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 font-medium text-zinc-700 dark:text-zinc-100"
-                                >
-                                  <Layers size={13} className="text-zinc-400" />
-                                  {isSelf ? "View My Profile" : "View Detailed Info"}
-                                </Link>
-                                <button
-                                  onClick={(e) => handleToggleSuspend(e, accountRow)}
-                                  disabled={isSelf || isDeleted}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 disabled:opacity-50 text-left"
-                                >
-                                  {accountRow.is_active ? <XCircle size={13} className="text-zinc-400" /> : <CheckCircle2 size={13} className="text-zinc-400" />}
-                                  {accountRow.is_active ? "Suspend" : "Reactivate"}
-                                </button>
-                                <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
-                                <button
-                                  onClick={(e) => handleDelete(e, accountRow)}
-                                  disabled={isSelf}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 font-medium text-left"
-                                >
-                                  <Trash2 size={13} /> Delete Account
-                                </button>
-                              </div>
-                            )}
-                          </div>
+              return (
+                <li key={user.id} className={`flex items-center pr-1.5 md:grid ${GRID_COLS} md:gap-x-4 md:pr-3 ${user.deleted_at ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}>
+                  <Link
+                    to={isSelf ? '/admin/profile' : `/admin/platform-users/${user.id}`}
+                    className="flex min-w-0 flex-1 items-center py-3 pl-4 md:col-span-4 md:grid md:grid-cols-subgrid md:pl-5 active:bg-zinc-50 md:hover:bg-zinc-50/60 dark:active:bg-zinc-800/40 dark:md:hover:bg-zinc-800/20"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <Avatar firstName={user.first_name || username || '?'} lastName={user.last_name || ''} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{name}</span>
+                          {isSelf && <Pill className="border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">you</Pill>}
+                          {user.is_super_admin && (
+                            <Pill className="border-primary/20 bg-accent text-accent-text">
+                              <ShieldCheck size={11} /> Super admin
+                            </Pill>
+                          )}
+                          {user.deleted_at ? (
+                            <Pill className="border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400">Deleted</Pill>
+                          ) : (
+                            !user.is_active && <Pill className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">Suspended</Pill>
+                          )}
                         </div>
-
-                        <div className="h-px bg-zinc-100 dark:bg-zinc-800/60" />
-
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-[11px] leading-tight">
-                          <div>
-                            <span className="text-zinc-400 block mb-0.5 uppercase tracking-wide text-[9px]">Workspace Role</span>
-                            <span
-                              className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium border capitalize ${
-                                accountRow.contextualRole === "Super Admin" || accountRow.contextualRole === "owner"
-                                  ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200/60 dark:border-violet-800/50"
-                                  : accountRow.contextualRole === "editor"
-                                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
-                                    : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800"
-                              }`}
-                            >
-                              {accountRow.contextualRole}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-zinc-400 block mb-0.5 uppercase tracking-wide text-[9px]">Account Status</span>
-                            {isDeleted ? (
-                              <span className="text-red-600 dark:text-red-400 font-medium">Soft Deleted</span>
-                            ) : accountRow.is_active ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
-                            ) : (
-                              <span className="text-amber-600 dark:text-amber-400 font-medium">Suspended</span>
-                            )}
-                          </div>
-
-                          <div>
-                            <span className="text-zinc-400 block mb-0.5 uppercase tracking-wide text-[9px]">Last Login</span>
-                            <span className="text-zinc-600 dark:text-zinc-300 font-medium">
-                              {accountRow.last_login ? formatSmart(accountRow.last_login) : <span className="text-zinc-400 italic font-normal">Never</span>}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-zinc-400 block mb-0.5 uppercase tracking-wide text-[9px]">Registration Date</span>
-                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">{formatLocalDate(accountRow.created_at)}</span>
-                          </div>
-                        </div>
+                        <p className="truncate text-[13px] text-zinc-500 dark:text-zinc-400">{email}</p>
+                        <p className="truncate text-[13px] text-zinc-500 dark:text-zinc-400 md:hidden">
+                          {/* Timing first: workspace names can be long and get truncated */}
+                          <span className={user.deleted_at ? 'text-red-600 dark:text-red-400' : ''}>{timing}</span>
+                          <span className="mx-1 text-zinc-300 dark:text-zinc-700">·</span>
+                          {workspaceSummary(user)}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    </div>
 
-      {/* DESKTOP DATA GRID VIEW */}
-      {sortedWorkspaceEntries.length > 0 && (
-        <div className="hidden md:block border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">User Profile</th>
-                  <th className="px-6 py-3">Role</th>
-                  <th className="px-6 py-3">Last Login</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Date Registered</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
-                {sortedWorkspaceEntries.map(([workspaceName, tenantUsers]) => {
-                  const isExpanded = !!expandedWorkspaces[workspaceName];
+                    <div className="hidden min-w-0 flex-wrap gap-1.5 md:flex" title={user.blog_memberships.map((m) => `${m.blog.name} (${m.role})`).join('\n') || undefined}>
+                      {user.blog_memberships.length === 0 && <span className="text-xs text-zinc-400 dark:text-zinc-500">No workspace</span>}
+                      {user.blog_memberships.slice(0, 2).map((m) => (
+                        <span key={m.id} className="inline-flex max-w-full items-center gap-1 rounded-md border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 text-xs text-zinc-700 dark:text-zinc-300">
+                          <span className="truncate">{m.blog.name}</span>
+                          <span className={`rounded px-1 text-[10px] font-semibold ${ROLE_META[m.role].color}`}>{ROLE_META[m.role].label}</span>
+                        </span>
+                      ))}
+                      {user.blog_memberships.length > 2 && (
+                        <span className="rounded-md px-1 py-0.5 text-xs text-zinc-500 dark:text-zinc-400">+{user.blog_memberships.length - 2}</span>
+                      )}
+                    </div>
 
-                  return (
-                    <Fragment key={`desktop-${workspaceName}`}>
-                      <tr 
-                        onClick={() => toggleWorkspaceCollapse(workspaceName)}
-                        className="bg-zinc-50/40 dark:bg-zinc-800/20 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer select-none transition-colors border-y border-zinc-100 dark:border-zinc-800/60"
+                    <div className="hidden text-xs md:block">
+                      {user.deleted_at ? (
+                        <span className="font-medium text-red-600 dark:text-red-400" title={`Deleted ${formatLocalDateTime(user.deleted_at)}`}>
+                          {purgeLabel(user.deleted_at, now)}
+                        </span>
+                      ) : user.last_login ? (
+                        <span className="text-zinc-600 dark:text-zinc-400" title={formatLocalDateTime(user.last_login)}>{formatSmart(user.last_login)}</span>
+                      ) : (
+                        <span className="italic text-zinc-400 dark:text-zinc-500">Never</span>
+                      )}
+                    </div>
+
+                    <div className="hidden text-xs text-zinc-500 dark:text-zinc-400 md:block">{formatLocalDate(user.created_at)}</div>
+                  </Link>
+
+                  {isSelf ? (
+                    <span className="w-11 flex-shrink-0" aria-hidden />
+                  ) : (
+                    <div className="relative flex-shrink-0 md:justify-self-end" ref={menuFor === user.id ? menuRef : null}>
+                      <button
+                        onClick={() => setMenuFor(menuFor === user.id ? null : user.id)}
+                        aria-label={`Actions for ${name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={menuFor === user.id}
+                        className="flex h-11 w-11 md:h-8 md:w-8 items-center justify-center rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                       >
-                        <td colSpan={6} className="px-6 py-3 font-medium text-zinc-700 dark:text-zinc-300 text-xs">
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <Layers size={13} className="text-zinc-400 dark:text-zinc-500" />
-                              <span>{workspaceName}</span>
-                              <span className="text-zinc-400 dark:text-zinc-500 font-normal">({tenantUsers.length} members)</span>
-                            </div>
-                            <ChevronDown 
-                              size={14} 
-                              className={`text-zinc-400 dark:text-zinc-500 transition-transform duration-200 ${!isExpanded ? '-rotate-90' : ''}`} 
-                            />
-                          </div>
-                        </td>
-                      </tr>
+                        {(statusMutation.isPending && statusMutation.variables?.id === user.id) ||
+                        (restoreMutation.isPending && restoreMutation.variables === user.id) ? (
+                          <Spinner size={14} className="text-zinc-400" />
+                        ) : (
+                          <MoreHorizontal size={18} />
+                        )}
+                      </button>
+                      {menuFor === user.id && (
+                        <div role="menu" className="absolute right-0 top-full z-30 mt-1 hidden w-52 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 md:block">
+                          {menuItemsFor(user).map((item) => renderMenuItem(item, 'popover'))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
 
-                      {isExpanded && tenantUsers.map((accountRow: any) => {
-                        const isSelf = currentUser?.id === accountRow.id;
-                        const isDeleted = !!accountRow.deleted_at;
-                        const currentUniqueRowKey = `${workspaceName}-${accountRow.id}`;
-
-                        const firstInitial = accountRow.first_name ? accountRow.first_name.slice(0, 1) : '';
-                        const lastInitial = accountRow.last_name ? accountRow.last_name.slice(0, 1) : (accountRow.username ? accountRow.username.slice(0, 1) : '?');
-
-                        return (
-                          <tr
-                            key={`row-${currentUniqueRowKey}`}
-                            className={`group border-b border-zinc-100 dark:border-zinc-800/40 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors ${isDeleted ? "bg-red-50/10 dark:bg-red-950/5" : ""}`}
-                          >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-medium text-zinc-600 dark:text-zinc-300 uppercase shadow-sm shrink-0">
-                                  {firstInitial || lastInitial ? `${firstInitial}${lastInitial}` : "U"}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
-                                    {accountRow.first_name || accountRow.last_name
-                                      ? `${accountRow.first_name || ""} ${accountRow.last_name || ""}`.trim()
-                                      : accountRow.username}
-                                    {isSelf && (
-                                      <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[12px] font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700">
-                                        you
-                                      </span>
-                                    )}
-                                  </span>
-                                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                                    @{accountRow.username}{" "}
-                                    <span className="text-zinc-300 dark:text-zinc-700 mx-1">•</span>{" "}
-                                    {accountRow.email}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span
-                                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border shadow-2xs capitalize ${
-                                  accountRow.contextualRole === "Super Admin" || accountRow.contextualRole === "owner"
-                                    ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border-violet-200/60 dark:border-violet-800/50"
-                                    : accountRow.contextualRole === "editor"
-                                      ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/50"
-                                      : "bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"
-                                }`}
-                              >
-                                {accountRow.contextualRole}
-                              </span>
-                            </td>
-
-                            <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                              {accountRow.last_login ? (
-                                <span
-                                  title={formatLocalDateTime(accountRow.last_login)}
-                                  className="cursor-help border-b border-dotted border-zinc-300 dark:border-zinc-700 pb-0.5"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {formatSmart(accountRow.last_login)}
-                                </span>
-                              ) : (
-                                <span className="text-zinc-400 dark:text-zinc-600 italic">Never logged in</span>
-                              )}
-                            </td>
-
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {isDeleted ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-950/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 border border-red-200/40 dark:border-red-900/30">
-                                  Soft Deleted
-                                </span>
-                              ) : accountRow.is_active ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-900/30">
-                                  Active
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 border border-amber-200/40 dark:border-amber-900/30">
-                                  Suspended
-                                </span>
-                              )}
-                            </td>
-
-                            <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500">
-                              {formatLocalDate(accountRow.created_at)}
-                            </td>
-
-                            <td className="px-6 py-4 text-right whitespace-nowrap">
-                              <div className="relative inline-block text-left" ref={openMenuKey === currentUniqueRowKey ? activeMenuRef : null}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuKey(openMenuKey === currentUniqueRowKey ? null : currentUniqueRowKey);
-                                  }}
-                                  className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-                                >
-                                  <MoreHorizontal size={16} />
-                                </button>
-
-                                {openMenuKey === currentUniqueRowKey && (
-                                  <div className="absolute right-0 mt-1 w-48 origin-top-right z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg py-1 text-sm text-left animate-in fade-in slide-in-from-top-1 duration-100">
-                                    <Link
-                                      to={isSelf ? "/admin/profile" : `/admin/platform-users/${accountRow.id}`}
-                                      onClick={() => setOpenMenuKey(null)}
-                                      className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 font-medium text-zinc-700 dark:text-zinc-100"
-                                    >
-                                      <Layers size={14} className="text-zinc-400" />{' '}
-                                      {isSelf ? "View My Profile" : "View Detailed Info"}
-                                    </Link>
-                                    <button
-                                      onClick={(e) => handleToggleSuspend(e, accountRow)}
-                                      disabled={isSelf || isDeleted}
-                                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 disabled:opacity-50 text-left"
-                                    >
-                                      {accountRow.is_active ? <XCircle size={14} className="text-zinc-400" /> : <CheckCircle2 size={14} className="text-zinc-400" />}
-                                      {accountRow.is_active ? "Suspend" : "Reactivate"}
-                                    </button>
-
-                                    <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
-
-                                    <button
-                                      onClick={(e) => handleDelete(e, accountRow)}
-                                      disabled={isSelf}
-                                      className="flex w-full items-center gap-2 px-3.5 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 font-medium text-left"
-                                    >
-                                      <Trash2 size={14} /> Delete Account
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="flex flex-col items-center gap-2 border-t border-zinc-100 dark:border-zinc-800 px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 sm:flex-row sm:justify-between">
+            <span>
+              Showing {users.length.toLocaleString()} of {total.toLocaleString()}
+            </span>
+            {hasNextPage && (
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="inline-flex h-10 sm:h-8 items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 px-4 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {isFetchingNextPage && <Spinner size={14} />} Load more
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Global Confirmation Portal Insertion */}
+      {/* Mobile action sheet (the desktop popover lives in the row) */}
+      {sheetUser && (
+        <div className="fixed inset-0 z-60 flex items-end bg-zinc-950/45 backdrop-blur-sm md:hidden">
+          <div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Actions for ${identityOf(sheetUser).name}`}
+            className="w-full rounded-t-2xl border-t border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+              <Avatar firstName={sheetUser.first_name || identityOf(sheetUser).username || '?'} lastName={sheetUser.last_name || ''} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-zinc-900 dark:text-zinc-100">{identityOf(sheetUser).name}</p>
+                <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{identityOf(sheetUser).email}</p>
+              </div>
+            </div>
+            <div role="menu" className="border-t border-zinc-100 pt-2 dark:border-zinc-800">
+              {menuItemsFor(sheetUser).map((item) => renderMenuItem(item, 'sheet'))}
+            </div>
+            <div className="px-4 pt-2">
+              <button
+                onClick={() => setMenuFor(null)}
+                className="h-12 w-full rounded-xl bg-zinc-100 text-[15px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Modal
-        isOpen={!!modalConfig?.isOpen}
-        title={modalConfig?.title || ""}
-        message={modalConfig?.message || ""}
+        isOpen={!!modalConfig}
+        title={modalConfig?.title ?? ''}
+        message={modalConfig?.message ?? ''}
         confirmText={modalConfig?.confirmText}
-        isDanger={modalConfig?.isDanger ?? true}
+        isDanger
         onClose={() => setModalConfig(null)}
         onConfirm={() => {
-          if (modalConfig?.action) modalConfig.action();
+          modalConfig?.action();
           setModalConfig(null);
         }}
       />
