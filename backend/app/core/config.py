@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     # Shared secret Vercel Cron sends as "Authorization: Bearer <secret>" to
     # /internal/cron/*. Unset = those endpoints are disabled (404).
     CRON_SECRET: Optional[str] = None
+    # Run the deleted-account purge in-process (nightly + once at startup).
+    # Off by default: production purges via Vercel Cron, and a dev server on
+    # a shared database must not erase accounts in it. Ignored on Vercel.
+    PURGE_ON_STARTUP: bool = False
 
     # ── Observability ──
     LOG_LEVEL: str = "INFO"

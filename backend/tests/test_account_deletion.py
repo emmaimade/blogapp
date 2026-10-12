@@ -159,3 +159,27 @@ def test_cron_endpoint_requires_the_secret(client, monkeypatch):
     res = client.get(path, headers={"Authorization": "Bearer s3cret"})
     assert res.status_code == 200
     assert set(res.json()) == {"purged", "skipped", "failed"}
+
+
+def test_in_process_purge_is_opt_in(monkeypatch):
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from app.core.scheduler import _register_purge_jobs
+
+    monkeypatch.delenv("VERCEL", raising=False)
+
+    # Default: a dev server on a shared database never purges.
+    scheduler = AsyncIOScheduler()
+    monkeypatch.setattr(settings, "PURGE_ON_STARTUP", False)
+    _register_purge_jobs(scheduler)
+    assert scheduler.get_jobs() == []
+
+    monkeypatch.setattr(settings, "PURGE_ON_STARTUP", True)
+    _register_purge_jobs(scheduler)
+    assert {job.id for job in scheduler.get_jobs()} == {"user_retention_purge", "user_retention_purge_catchup"}
+
+    # Vercel purges through Vercel Cron, whatever the setting says.
+    vercel = AsyncIOScheduler()
+    monkeypatch.setenv("VERCEL", "1")
+    _register_purge_jobs(vercel)
+    assert vercel.get_jobs() == []
