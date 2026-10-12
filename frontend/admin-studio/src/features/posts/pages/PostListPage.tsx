@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Search,
   Eye, Tag as TagIcon, Feather, Clock, ChevronLeft, ChevronRight, Star,
@@ -145,7 +145,7 @@ export const PostList = () => {
 
   const postsQueryKey = ['adminPosts', activeBlog?.id, filter, debouncedSearch, page] as const;
 
-  const { data, isLoading, isFetching } = useQuery<PaginatedPosts>({
+  const { data, isLoading, isFetching, isPlaceholderData } = useQuery<PaginatedPosts>({
     queryKey: postsQueryKey,
     queryFn: async () =>
       (await api.get(`/blogs/${activeBlog!.id}/posts`, {
@@ -157,7 +157,11 @@ export const PostList = () => {
         },
       })).data,
     enabled: !!activeBlog?.id,
-    placeholderData: keepPreviousData,
+    // Keep the old rows on screen only while paging through the same list.
+    // A new tab or search must never show the previous one's posts — Drafts
+    // selected over a list of Live posts — so it loads from a skeleton.
+    placeholderData: (prev, prevQuery) =>
+      prevQuery && prevQuery.queryKey[2] === filter && prevQuery.queryKey[3] === debouncedSearch ? prev : undefined,
   });
 
   const posts = data?.items ?? [];
@@ -257,6 +261,23 @@ export const PostList = () => {
     },
   }[pending.kind];
 
+  // On the narrowest phones the tabs scroll inside their bar (never the
+  // page); keep the selected one in view. Counts arriving widen the tabs,
+  // so this re-runs then too.
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const bar = tabBarRef.current;
+    const selected = bar?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!bar || !selected) return;
+    const barBox = bar.getBoundingClientRect();
+    const tabBox = selected.getBoundingClientRect();
+    if (tabBox.left < barBox.left) {
+      bar.scrollBy({ left: tabBox.left - barBox.left - 6, behavior: 'smooth' });
+    } else if (tabBox.right > barBox.right) {
+      bar.scrollBy({ left: tabBox.right - barBox.right + 6, behavior: 'smooth' });
+    }
+  }, [filter, counts]);
+
   const TABS: { key: FilterTab; label: string }[] = [
     { key: 'all',       label: 'All' },
     { key: 'published', label: 'Live' },
@@ -264,36 +285,29 @@ export const PostList = () => {
     { key: 'draft',     label: 'Drafts' },
   ];
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
-  if (isLoading) return (
-    <div className="space-y-6 animate-pulse">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="flex w-full gap-2 rounded-2xl bg-white p-1.5 shadow-sm dark:bg-zinc-900 md:w-fit border border-zinc-200 dark:border-zinc-800">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-9 w-24 rounded-xl bg-zinc-200 dark:bg-zinc-800" />)}
-        </div>
-        <div className="flex gap-3">
-          <div className="h-9 w-64 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-          <div className="h-9 w-28 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-        </div>
-      </div>
-      <div className="admin-card overflow-hidden">
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center justify-between p-4">
-              <div className="flex w-5/12 flex-col gap-2">
-                <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                <div className="h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-              </div>
-              <div className="h-6 w-16 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-              <div className="h-4 w-12 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-8 w-16 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            </div>
-          ))}
-        </div>
-      </div>
+  // ── Loading skeletons (the list only — tabs and search stay put) ─────────
+  const cardSkeleton = [...Array(3)].map((_, i) => (
+    <div key={i} className="admin-card animate-pulse space-y-4 rounded-[1.7rem] p-5">
+      <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-6 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />
     </div>
-  );
+  ));
+  const rowSkeleton = [...Array(5)].map((_, i) => (
+    <tr key={i} className="animate-pulse">
+      <td className="p-4">
+        <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-2 h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
+      </td>
+      <td className="p-4"><div className="h-6 w-16 rounded-full bg-zinc-200 dark:bg-zinc-800" /></td>
+      <td className="p-4"><div className="h-4 w-20 rounded-md bg-zinc-100 dark:bg-zinc-800/50" /></td>
+      <td className="p-4"><div className="ml-auto h-4 w-10 rounded-md bg-zinc-200 dark:bg-zinc-800" /></td>
+      <td className="p-4"><div className="ml-auto h-8 w-8 rounded-lg bg-zinc-200 dark:bg-zinc-800" /></td>
+    </tr>
+  ));
+  // While paging, the old rows stay but are dimmed until the new page lands.
+  const listStateClass = `transition-opacity ${isPlaceholderData ? 'opacity-50' : 'opacity-100'}`;
+  const showEmpty = !isLoading && posts.length === 0;
 
   return (
     <div className="space-y-6">
@@ -301,21 +315,28 @@ export const PostList = () => {
       {/* ─── Toolbar ─── */}
       <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         {/* Filter tabs */}
-        <div className="flex w-full rounded-2xl bg-white p-1.5 shadow-sm dark:bg-zinc-900 md:w-fit border border-zinc-200 dark:border-zinc-800">
+        <div
+          ref={tabBarRef}
+          role="group"
+          aria-label="Show posts"
+          className="flex w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm [scrollbar-width:none] dark:border-zinc-800 dark:bg-zinc-900 md:w-fit [&::-webkit-scrollbar]:hidden"
+        >
           {TABS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all md:flex-none ${
+              aria-pressed={filter === key}
+              className={`flex-1 shrink-0 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition-all sm:px-4 md:flex-none ${
                 filter === key
                   ? 'bg-violet-100 text-violet-900 shadow-sm dark:bg-violet-900/40 dark:text-violet-100'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               {label}
+              {/* A plain number on phones, so all four tabs fit; a pill from sm up. */}
               {counts[key] > 0 && (
-                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                  filter === key ? 'bg-violet-200 text-violet-800 dark:bg-violet-800 dark:text-violet-200' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
+                <span className={`ml-1 text-[11px] font-bold sm:ml-1.5 sm:rounded-full sm:px-1.5 sm:py-0.5 sm:text-[10px] ${
+                  filter === key ? 'text-violet-700 sm:bg-violet-200 sm:text-violet-800 dark:text-violet-300 dark:sm:bg-violet-800 dark:sm:text-violet-200' : 'text-zinc-400 sm:bg-zinc-100 sm:text-zinc-500 dark:sm:bg-zinc-800'
                 }`}>
                   {counts[key]}
                 </span>
@@ -356,8 +377,9 @@ export const PostList = () => {
       )}
 
       {/* ─── Cards: phones and tablets ─── */}
-      <div className="space-y-4 lg:hidden">
-        {posts?.map((post) => (
+      <div className={`space-y-4 lg:hidden ${listStateClass}`} aria-busy={isLoading || isPlaceholderData}>
+        {isLoading && cardSkeleton}
+        {posts.map((post) => (
           <article key={post.id} className="admin-card space-y-4 rounded-[1.7rem] p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1 min-w-0">
@@ -404,7 +426,7 @@ export const PostList = () => {
           </article>
         ))}
 
-        {posts?.length === 0 && (
+        {showEmpty && (
           <div className="admin-card flex flex-col items-center gap-4 p-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
               <Feather size={24} className="text-zinc-400" />
@@ -423,7 +445,7 @@ export const PostList = () => {
       </div>
 
       {/* ─── Table: wide screens ─── */}
-      <div className="hidden lg:block">
+      <div className={`hidden lg:block ${listStateClass}`} aria-busy={isLoading || isPlaceholderData}>
         <div className="admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-170 border-collapse text-left text-sm">
@@ -437,7 +459,8 @@ export const PostList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {posts?.map((post) => {
+                {isLoading && rowSkeleton}
+                {posts.map((post) => {
                   const postStatus = statusOf(post);
                   return (
                     <tr key={post.id} className="group transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
@@ -510,7 +533,7 @@ export const PostList = () => {
             </table>
           </div>
 
-          {posts?.length === 0 && (
+          {showEmpty && (
             <div className="flex flex-col items-center gap-4 p-16 text-center bg-zinc-50/30 dark:bg-zinc-900/30">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700">
                 <Feather size={24} className="text-zinc-400" />
