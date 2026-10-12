@@ -39,6 +39,9 @@ class ErrorCode(str, Enum):
     INVALID_TOKEN = "INVALID_TOKEN"
     ACCOUNT_INACTIVE = "ACCOUNT_INACTIVE"
     EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED"
+    VERIFICATION_CODE_INVALID = "VERIFICATION_CODE_INVALID"
+    VERIFICATION_CODE_EXPIRED = "VERIFICATION_CODE_EXPIRED"
+    VERIFICATION_CODE_LOCKED = "VERIFICATION_CODE_LOCKED"
     PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
     INCORRECT_PASSWORD = "INCORRECT_PASSWORD"
     CSRF_TOKEN_INVALID = "CSRF_TOKEN_INVALID"
@@ -146,6 +149,18 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.EMAIL_NOT_VERIFIED: ErrorSpec(
         status.HTTP_403_FORBIDDEN,
         "Please verify your email address to continue.",
+    ),
+    ErrorCode.VERIFICATION_CODE_INVALID: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "That code isn't right. Check the email and try again.",
+    ),
+    ErrorCode.VERIFICATION_CODE_EXPIRED: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "This code has expired. Send a new one to continue.",
+    ),
+    ErrorCode.VERIFICATION_CODE_LOCKED: ErrorSpec(
+        status.HTTP_400_BAD_REQUEST,
+        "Too many wrong codes. Send a new one to continue.",
     ),
     ErrorCode.PASSWORD_CHANGE_REQUIRED: ErrorSpec(
         status.HTTP_403_FORBIDDEN,

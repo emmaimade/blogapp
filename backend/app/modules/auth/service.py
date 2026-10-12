@@ -1,11 +1,13 @@
 import secrets
 
-from fastapi import Response
+from fastapi import BackgroundTasks, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.core.config import settings
+from app.core.email import dispatch_email
+from app.core.email_templates import BRAND_NAME, get_verification_template, get_verification_template_text
 from app.core.security import (
     ACCESS_TOKEN_COOKIE_NAME,
     CSRF_COOKIE_NAME,
@@ -16,7 +18,7 @@ from app.core.security import (
 from app.core.plans import get_effective_plan
 from app.models import BlogMember, BlogRole, BlogSubscription, User
 from app.schemas import UserRead
-from app.services.auth_tokens import create_refresh_token
+from app.services.auth_tokens import create_refresh_token, create_verification_token
 
 
 # A bcrypt hash of an unguessable constant, verified against when no user
@@ -117,3 +119,19 @@ def build_login_response(user: User, session: Session, response: Response) -> di
         "message": "Login successful",
         "user": user_payload.model_dump(mode="json"),
     }
+
+
+def send_verification_code_email(session: Session, background_tasks: BackgroundTasks, user: User) -> None:
+    """
+    Emails a fresh verification code and link (one email carries both).
+    Raises TokenCooldownError if one was sent too recently.
+    """
+    raw_token, code = create_verification_token(session, user.id)
+    full_name = f"{user.first_name} {user.last_name}"
+    dispatch_email(
+        background_tasks,
+        user.email,
+        f"Your {BRAND_NAME} verification code: {code}",
+        get_verification_template(full_name, raw_token, code),
+        get_verification_template_text(full_name, raw_token, code),
+    )

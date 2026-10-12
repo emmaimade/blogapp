@@ -38,6 +38,7 @@ ACTIONS: dict[str, ActionInfo] = {
     "user.login": ActionInfo("Signed in", "auth", "info"),
     "user.email_verified": ActionInfo("Verified email", "auth", "info"),
     "user.verification_email_requested": ActionInfo("Requested a verification email", "auth", "info"),
+    "user.email_changed": ActionInfo("Changed unverified email", "auth", "warning"),
     "user.forgot_password_requested": ActionInfo("Requested a password reset", "auth", "info"),
     "user.password_reset_completed": ActionInfo("Reset password", "auth", "warning"),
     "user.change_password": ActionInfo("Changed password", "auth", "warning"),

@@ -1,7 +1,8 @@
 import hashlib
 from fastapi import APIRouter, Depends, Query, Request, Response, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func
 from sqlmodel import Session, select
 from datetime import datetime, timezone
 
@@ -26,7 +27,7 @@ from app.core.security import (
 from app.models import User, Blog
 from app.models.auth_tokens import EmailVerification, PasswordResetToken
 from app.services.auth_tokens import (
-    create_verification_token,
+    check_verification_code,
     create_password_reset_token,
     revoke_refresh_token,
     verify_and_rotate_refresh_token,
@@ -34,8 +35,6 @@ from app.services.auth_tokens import (
 from app.services.login_throttle import check_login_allowed, record_failed_login
 from app.core.email import dispatch_email
 from app.core.email_templates import (
-    get_verification_template,
-    get_verification_template_text,
     get_password_reset_template,
     get_password_reset_template_text,
     get_email_verified_template,
@@ -45,12 +44,25 @@ from app.core.email_templates import (
 )
 from app.schemas import UserRead
 
-from .service import authenticate_user, build_login_response, build_user_payload, clear_auth_cookies, set_auth_cookies
+from .service import (
+    authenticate_user,
+    build_login_response,
+    build_user_payload,
+    clear_auth_cookies,
+    send_verification_code_email,
+    set_auth_cookies,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # Pydantic Schemas for handling incoming requests cleanly
 class ResendVerificationSchema(BaseModel):
+    email: EmailStr
+
+class VerifyEmailCodeSchema(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+
+class ChangeUnverifiedEmailSchema(BaseModel):
     email: EmailStr
 
 class ForgotPasswordSchema(BaseModel):
@@ -158,6 +170,23 @@ def check_slug_availability(slug: str, session: Session = Depends(get_session)):
 
 
 
+def _mark_email_verified(session: Session, user: User, record: EmailVerification, request: Request) -> None:
+    user.email_verified = True
+    record.used_at = datetime.now(timezone.utc)
+    session.add(user)
+    session.add(record)
+    add_audit_log(
+        session,
+        action="user.email_verified",
+        resource_type="user",
+        resource_id=user.id,
+        blog_id=resolve_primary_blog_id(session, user),
+        actor=user,
+        request=request,
+    )
+    session.commit()
+
+
 @router.get("/verify-email")
 def verify_email(
     background_tasks: BackgroundTasks,
@@ -193,21 +222,7 @@ def verify_email(
             "This verification link has expired. Request a new one to continue.",
         )
 
-    user.email_verified = True
-    db_token.used_at = datetime.now(timezone.utc)
-    session.add(user)
-    session.add(db_token)
-
-    add_audit_log(
-        session,
-        action="user.email_verified",
-        resource_type="user",
-        resource_id=user.id,
-        blog_id=resolve_primary_blog_id(session, user),
-        actor=user,
-        request=request,
-    )
-    session.commit()
+    _mark_email_verified(session, user, db_token, request)
 
     full_name = f"{user.first_name} {user.last_name}"
     email_html = get_email_verified_template(full_name)
@@ -233,11 +248,7 @@ def send_verification_email(
     if user.email_verified:
         raise ConflictError(ErrorCode.EMAIL_ALREADY_VERIFIED)
         
-    raw_token = create_verification_token(session, user.id)
-    full_name = f"{user.first_name} {user.last_name}"
-    email_html = get_verification_template(full_name, raw_token)
-    email_text = get_verification_template_text(full_name, raw_token)
-    dispatch_email(background_tasks, user.email, "Verify your email address", email_html, email_text)
+    send_verification_code_email(session, background_tasks, user)
 
     add_audit_log(
         session,
@@ -251,6 +262,69 @@ def send_verification_email(
     session.commit()
 
     return {"message": "If the account exists, a verification link has been sent."}
+
+
+@router.post("/verify-email-code")
+def verify_email_code(
+    payload: VerifyEmailCodeSchema,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Checks the 6-digit code from the verification email for the signed-in
+    user. No "you're verified" email follows — they're looking at the page.
+    """
+    if current_user.email_verified:
+        return {"message": "Your email is already verified.", "already_verified": True}
+
+    record = check_verification_code(session, current_user.id, payload.code)
+    _mark_email_verified(session, current_user, record, request)
+    return {"message": "Email verified.", "already_verified": False}
+
+
+@router.put("/email")
+def change_unverified_email(
+    payload: ChangeUnverifiedEmailSchema,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Fixes a mistyped signup email: only while the address is unverified, so
+    it can't be used to move a confirmed account to someone else's inbox.
+    Sends a fresh code to the new address, behind the usual resend cooldown.
+    """
+    if current_user.email_verified:
+        raise ConflictError(ErrorCode.EMAIL_ALREADY_VERIFIED)
+
+    new_email = payload.email.strip()
+    taken = session.exec(
+        select(User).where(func.lower(User.email) == new_email.lower(), User.id != current_user.id)
+    ).first()
+    if taken:
+        raise ConflictError(ErrorCode.EMAIL_ALREADY_EXISTS)
+
+    old_email = current_user.email
+    current_user.email = new_email
+    session.add(current_user)
+    # Commits the new address together with the new code — or raises on the
+    # cooldown first, leaving the old address in place.
+    send_verification_code_email(session, background_tasks, current_user)
+
+    add_audit_log(
+        session,
+        action="user.email_changed",
+        resource_type="user",
+        resource_id=current_user.id,
+        blog_id=resolve_primary_blog_id(session, current_user),
+        actor=current_user,
+        request=request,
+        details={"from": old_email, "to": new_email},
+    )
+    session.commit()
+    return {"message": "We sent a new code to your new address.", "email": new_email}
 
 
 @router.post("/forgot-password")

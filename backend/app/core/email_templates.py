@@ -48,20 +48,25 @@ def _base_email(preheader: str, heading: str, body_html: str, cta_label: str, ct
 </html>"""
 
 
-def get_verification_template(user_name: str, raw_token: str) -> str:
+def get_verification_template(user_name: str, raw_token: str, code: str) -> str:
     public_site_url = getattr(settings, "PUBLIC_SITE_URL", None) or getattr(settings, "FRONTEND_URL", "")
     verification_url = f"{public_site_url}/verify-email?token={raw_token}"
-    body = f"""<p style="margin:0 0 24px 0; color:#4b5563;">
-        Before you can begin setting up your new blog workspace, please verify your email address.
-    </p>"""
+    body = f"""<p style="margin:0 0 16px 0; color:#4b5563;">
+        Enter this code in {BRAND_NAME} to verify your email and start setting up your workspace:
+    </p>
+    <div style="margin:0 0 8px 0; text-align:center;">
+        <span style="display:inline-block; font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:32px; font-weight:700; letter-spacing:8px; color:#111827; background-color:#f3f4f6; border-radius:8px; padding:12px 20px;">{code}</span>
+    </div>
+    <p style="margin:0 0 8px 0; font-size:13px; color:#6b7280; text-align:center;">The code expires in 15 minutes.</p>
+    <p style="margin:16px 0 0 0; color:#4b5563;">Or verify with one click:</p>"""
     return _base_email(
-        preheader=f"Verify your email to finish setting up your {BRAND_NAME} workspace.",
+        preheader=f"Your {BRAND_NAME} verification code is {code}.",
         heading=f"Welcome, {user_name}!",
         body_html=body,
         cta_label="Verify Email Address",
         cta_url=verification_url,
         cta_color="#2563eb",
-        footer_note="This verification link will expire in 24 hours. If you did not create this account, you can safely ignore this message.",
+        footer_note="The code expires in 15 minutes and the link in 24 hours. If you did not create this account, you can safely ignore this message.",
     )
 
 
@@ -81,14 +86,16 @@ def get_password_reset_template(user_name: str, raw_token: str) -> str:
         footer_note="If you did not request a password update, no action is required — your current credentials remain secure.",
     )
 
-def get_verification_template_text(user_name: str, raw_token: str) -> str:
+def get_verification_template_text(user_name: str, raw_token: str, code: str) -> str:
     public_site_url = getattr(settings, "PUBLIC_SITE_URL", None) or getattr(settings, "FRONTEND_URL", "")
     verification_url = f"{public_site_url}/verify-email?token={raw_token}"
     return (
         f"Welcome, {user_name}!\n\n"
-        f"Before you can begin setting up your new blog workspace, please verify your email address:\n"
+        f"Your {BRAND_NAME} verification code is: {code}\n"
+        f"Enter it in {BRAND_NAME} to verify your email. It expires in 15 minutes.\n\n"
+        f"Or verify with this link (valid for 24 hours):\n"
         f"{verification_url}\n\n"
-        f"This link expires in 24 hours. If you did not create this account, you can safely ignore this message."
+        f"If you did not create this account, you can safely ignore this message."
     )
 
 

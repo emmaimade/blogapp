@@ -11,6 +11,10 @@ class EmailVerification(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", ondelete="CASCADE", nullable=False)
     token: str = Field(index=True, unique=True, nullable=False)  # Cryptographic SHA-256 hash
+    # The 6-digit code sent alongside the link (HMAC, keyed per user). It
+    # expires well before the link does; see app.services.auth_tokens.
+    code_hash: Optional[str] = Field(default=None, nullable=True)
+    code_attempts: int = Field(default=0, nullable=False)
 
     expires_at: datetime = Field(sa_column=Column(SQLDateTime(timezone=True), nullable=False))
     used_at: Optional[datetime] = Field(default=None, sa_column=Column(SQLDateTime(timezone=True), nullable=True))

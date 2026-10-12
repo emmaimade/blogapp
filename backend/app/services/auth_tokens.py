@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
@@ -11,6 +12,12 @@ from app.models.user import User
 
 TOKEN_EXPIRATION_HOURS = 24
 TOKEN_COOLDOWN_SECONDS = 60
+
+# The code in the verification email: short-lived, and a few wrong guesses
+# kill it. The link in the same email keeps the 24-hour lifetime above.
+VERIFICATION_CODE_LENGTH = 6
+VERIFICATION_CODE_TTL_MINUTES = 15
+VERIFICATION_CODE_MAX_ATTEMPTS = 5
 
 
 class TokenCooldownError(RateLimitError):
@@ -61,14 +68,30 @@ def _check_cooldown(db: Session, model, user_id: int) -> None:
             raise TokenCooldownError(retry_after_seconds=int(TOKEN_COOLDOWN_SECONDS - elapsed))
 
 
-def create_verification_token(db: Session, user_id: int) -> str:
+def generate_verification_code() -> str:
+    return f"{secrets.randbelow(10 ** VERIFICATION_CODE_LENGTH):0{VERIFICATION_CODE_LENGTH}d}"
+
+
+def hash_verification_code(user_id: int, code: str) -> str:
     """
-    Generates an email verification token, purges any existing unused 
-    verification records for this user, and commits the hashed variant.
+    HMAC rather than a bare SHA-256: a million possible codes would fall to a
+    lookup table if the table leaked. Keying it with the user's id too means a
+    code is only ever valid for the account it was sent to.
+    """
+    message = f"{user_id}:{code}".encode("utf-8")
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def create_verification_token(db: Session, user_id: int) -> tuple[str, str]:
+    """
+    Generates an email verification link token and a 6-digit code (one email
+    carries both), purges any existing unused verification records for this
+    user, and commits the hashed variants. Returns (raw_token, code).
     """
     _check_cooldown(db, EmailVerification, user_id)
 
     raw_token, hashed_token = generate_secure_token()
+    code = generate_verification_code()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRATION_HOURS)
     
     # Clean up any lingering active records for this user
@@ -84,11 +107,55 @@ def create_verification_token(db: Session, user_id: int) -> str:
     db_token = EmailVerification(
         user_id=user_id,
         token=hashed_token,
+        code_hash=hash_verification_code(user_id, code),
         expires_at=expires_at
     )
     db.add(db_token)
     db.commit()
-    return raw_token
+    return raw_token, code
+
+
+def check_verification_code(db: Session, user_id: int, code: str) -> EmailVerification:
+    """
+    Returns the verification record if `code` matches the user's live code;
+    otherwise raises, counting the wrong guess. After VERIFICATION_CODE_MAX_ATTEMPTS
+    the code is dead and only a fresh one (behind the resend cooldown) will do —
+    which caps guessing at a handful of tries a minute against a million codes.
+    """
+    record = db.exec(
+        select(EmailVerification)
+        .where(
+            EmailVerification.user_id == user_id,
+            EmailVerification.used_at == None,  # noqa: E711
+            EmailVerification.code_hash != None,  # noqa: E711
+        )
+        .order_by(EmailVerification.created_at.desc())
+    ).first()
+
+    if record is None:
+        raise BadRequestError(
+            ErrorCode.VERIFICATION_CODE_INVALID,
+            "There's no code waiting for this account. Send a new one.",
+        )
+    if record.code_attempts >= VERIFICATION_CODE_MAX_ATTEMPTS:
+        raise BadRequestError(ErrorCode.VERIFICATION_CODE_LOCKED)
+    if utc_now() - as_utc(record.created_at) > timedelta(minutes=VERIFICATION_CODE_TTL_MINUTES):
+        raise BadRequestError(ErrorCode.VERIFICATION_CODE_EXPIRED)
+
+    if not hmac.compare_digest(hash_verification_code(user_id, code), record.code_hash):
+        record.code_attempts += 1
+        db.add(record)
+        db.commit()
+        remaining = VERIFICATION_CODE_MAX_ATTEMPTS - record.code_attempts
+        if remaining <= 0:
+            raise BadRequestError(ErrorCode.VERIFICATION_CODE_LOCKED)
+        tries = "1 try" if remaining == 1 else f"{remaining} tries"
+        raise BadRequestError(
+            ErrorCode.VERIFICATION_CODE_INVALID,
+            f"That code isn't right. Check the email and try again ({tries} left).",
+        )
+
+    return record
 
 def create_password_reset_token(db: Session, user_id: int) -> str:
     """
