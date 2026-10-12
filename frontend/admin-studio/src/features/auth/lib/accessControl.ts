@@ -119,9 +119,23 @@ export const getAccessSummary = (
   };
 };
 
+export const VERIFY_EMAIL_PATH = '/admin/verify-email';
+
+/**
+ * Self-signup accounts confirm their email (the code we send) before anything
+ * else in the studio. Invite signups arrive verified — the invite itself went
+ * to that inbox. Superadmins are exempt; a forced password change goes first.
+ */
+export const needsEmailVerification = (user: AuthUser): boolean =>
+  !user.email_verified && !isSuperAdmin(user) && !user.must_change_password;
+
 export const getPostLoginPath = (user: AuthUser): string => {
   if (user.must_change_password) {
     return '/admin/force-password-change';
+  }
+
+  if (needsEmailVerification(user)) {
+    return VERIFY_EMAIL_PATH;
   }
 
   if (isSuperAdmin(user)) {

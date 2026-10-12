@@ -203,7 +203,7 @@ useEffect(() => {
   // An unfinished workspace doesn't stop the user creating another one.
   const onNewWorkspace = location.pathname === NEW_WORKSPACE_PATH;
   const needsGate =
-    ((requiresOnboarding && !onNewWorkspace) || !user?.email_verified) && !userIsSuperAdmin && !!activeBlog;
+    requiresOnboarding && !onNewWorkspace && !userIsSuperAdmin && !!activeBlog;
   if (needsGate) {
     navigate(toWorkspace("/onboarding"), { replace: true });
   }
@@ -340,8 +340,7 @@ useEffect(() => {
   // Suspended by a superadmin: readable, but the backend refuses changes.
   const isSuspended = !!routeSlug && !!activeBlog && activeBlog.is_active === false;
   const showOnboardingLock =
-    ((requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH) || !user?.email_verified) &&
-    !userIsSuperAdmin;
+    requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH && !userIsSuperAdmin;
   const onboardingStepOrder = ["about", "profile", "publication", "plan"];
   const onboardingStepsTotal = onboardingStepOrder.length;
   const onboardingCompleted =

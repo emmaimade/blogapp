@@ -7,13 +7,11 @@ import {
   CheckCircle2, Globe, FileText, BarChart3, Building2, HelpCircle, UserPlus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useAuth } from '../../auth/context/AuthContext';
 import { InkoLogo } from '../../../assets/inko';
-import { EmailVerificationBanner, EmailVerificationCard } from '../../auth/components/EmailVerificationBanner';
 import { SupportModal } from '../../support/components/SupportModal';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { toastApiError } from '../../../shared/lib/apiErrors';
@@ -147,14 +145,12 @@ export const OnboardingPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeBlog, requiresOnboarding } = useBlog();
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
 
-  const [checkingVerification, setCheckingVerification] = useState(false);
   const [currentStep, setCurrentStep] = useState<OnboardingStepKey>('about');
   const [done, setDone] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
 
-  const hasInitialized = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(currentStep);
@@ -190,9 +186,17 @@ export const OnboardingPage = () => {
     enabled: !!activeBlog,
   });
 
-  useEffect(() => {
-    if (!onboardingQuery.data) return;
+  // Seed the forms whenever fresh server state arrives (first load, and the
+  // refetch after each save). Done during render rather than in an effect —
+  // React's "adjust state when a prop changes" pattern — so the forms never
+  // render a pass with stale values.
+  const [seededFrom, setSeededFrom] = useState<OnboardingState>();
+  if (onboardingQuery.data && onboardingQuery.data !== seededFrom) {
     const { blog, subscription, summary } = onboardingQuery.data;
+    if (seededFrom === undefined) {
+      setCurrentStep(STEP_ORDER.includes(summary.current_step) ? summary.current_step : 'plan');
+    }
+    setSeededFrom(onboardingQuery.data);
 
     setAboutForm({ owner_role: blog.owner_role ?? 'blogger', workspace_type: blog.workspace_type ?? 'personal_blog', team_size: blog.team_size ?? 'solo' });
     setProfileForm({ name: blog.name ?? '', tagline: blog.tagline ?? '', description: blog.description ?? '', category: blog.category ?? 'Tech', primary_language: blog.primary_language ?? 'en', logo_url: blog.logo_url ?? '', favicon_url: blog.favicon_url ?? '' });
@@ -201,12 +205,7 @@ export const OnboardingPage = () => {
     const timezone = summary.checklist.publication ? blog.timezone ?? 'UTC' : detectUserTimezone();
     setPublicationForm({ default_post_visibility: blog.default_post_visibility ?? 'public', comments_enabled: blog.comments_enabled, posts_per_page: blog.posts_per_page ?? 10, timezone });
     setSelectedPlan(subscription?.plan ?? 'free');
-
-    if (!hasInitialized.current) {
-      setCurrentStep(STEP_ORDER.includes(summary.current_step) ? summary.current_step : 'plan');
-      hasInitialized.current = true;
-    }
-  }, [onboardingQuery.data]);
+  }
 
   useEffect(() => {
     if (activeBlog && !requiresOnboarding && !done) navigate(toWorkspace('/dashboard'), { replace: true });
@@ -267,25 +266,6 @@ export const OnboardingPage = () => {
     },
   });
 
-  const emailVerified = !!user?.email_verified;
-
-  const handleLaunch = async () => {
-    setCheckingVerification(true);
-    try {
-      // The verification link may have been opened in another tab since
-      // this page loaded — ask the server rather than trust local state.
-      const freshUser = await refreshUser();
-      if (!freshUser?.email_verified) {
-        toast.error('Please verify your email before launching your blog.');
-        return;
-      }
-      savePlan.mutate();
-    } catch {
-      toast.error('Could not confirm verification status. Please try again.');
-    } finally {
-      setCheckingVerification(false);
-    }
-  };
 
   const progress = onboardingQuery.data?.summary;
   const currentIndex = STEP_ORDER.indexOf(currentStep);
@@ -404,8 +384,6 @@ export const OnboardingPage = () => {
       </header>
 
       <SupportModal open={showSupportModal} onClose={() => setShowSupportModal(false)} />
-
-      <EmailVerificationBanner />
 
       <div className="flex-1 min-h-0 flex">
         <nav aria-label="Setup steps" className="hidden md:flex flex-col w-56 flex-shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-8">
@@ -795,9 +773,7 @@ export const OnboardingPage = () => {
 
             {/* ── STEP: PLAN ─────────────────────────────────────── */}
             {currentStep === "plan" && (
-              <form className="space-y-5" onSubmit={submitWith(handleLaunch)}>
-                <EmailVerificationCard />
-
+              <form className="space-y-5" onSubmit={submitWith(() => savePlan.mutate())}>
                 <div className="flex items-start gap-3 rounded-lg border border-accent-border bg-accent/40 dark:bg-violet-950/30 dark:border-violet-800/50 px-4 py-3">
                   <CheckCircle2
                     size={16}
@@ -896,10 +872,10 @@ export const OnboardingPage = () => {
                   <BackButton onClick={goBack} />
                   <button
                     type="submit"
-                    disabled={!emailVerified || savePlan.isPending || checkingVerification}
+                    disabled={savePlan.isPending}
                     className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-primary/20 hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {savePlan.isPending || checkingVerification ? (
+                    {savePlan.isPending ? (
                       <>
                         <Loader2 className="animate-spin" size={15} /> Launching
                         your blog…

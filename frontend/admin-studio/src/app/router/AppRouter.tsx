@@ -35,6 +35,8 @@ import { SuperAdminPlatformSettingsPage } from '../../features/superadmin/pages/
 import UserInfoPage from '../../features/users/pages/UserInfoPage';
 import { ResetPasswordPage } from '../../features/auth/pages/ResetPasswordPage';
 import { ForcePasswordChangePage } from '../../features/auth/pages/ForcePasswordChangePage';
+import { VerifyEmailPage } from '../../features/auth/pages/VerifyEmailPage';
+import { VERIFY_EMAIL_PATH } from '../../features/auth/lib/accessControl';
 import { MyTicketsPage } from '../../features/support/pages/MyTicketsPage';
 import { SuperAdminSupportPage } from '../../features/superadmin/pages/SuperAdminSupportPage';
 import { SuperAdminBlogDetailPage } from '../../features/superadmin/pages/SuperAdminBlogDetailPage';
@@ -81,6 +83,7 @@ const router = createBrowserRouter(
           workspace itself instead of showing "access denied". */}
       <Route element={<ProtectedRoute requiredCapability={null} />}>
         <Route path="/admin" element={<DefaultAdminRedirect />} />
+        <Route path={VERIFY_EMAIL_PATH} element={<VerifyEmailPage />} />
         {/* Reachable with no workspace at all, so it sits outside the capability checks. */}
         <Route element={<AdminLayout />}>
           <Route path="/admin/workspaces/new" element={<NewWorkspacePage />} />

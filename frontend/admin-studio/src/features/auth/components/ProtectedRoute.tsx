@@ -1,7 +1,13 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
-import { canAccess, getAccessSummary, type AdminCapability } from '../lib/accessControl';
+import {
+  VERIFY_EMAIL_PATH,
+  canAccess,
+  getAccessSummary,
+  needsEmailVerification,
+  type AdminCapability,
+} from '../lib/accessControl';
 import { AdminShellSkeleton } from '../../../shared/ui/AdminShellSkeleton';
 import { useStoredTheme } from '../../../shared/lib/theme';
 
@@ -13,6 +19,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: ProtectedRouteProps) => {
   const { user, isLoading, logout } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
+  const location = useLocation();
   // The access-denied screen below renders outside AdminLayout, which owns the theme.
   useStoredTheme();
 
@@ -28,7 +35,12 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
     return <Navigate to="/admin/login" replace />;
   }
 
-  // 2. Standard capability and access controls proceed normally
+  // 2. Nothing in the studio opens until the signup email is confirmed.
+  if (needsEmailVerification(user) && location.pathname !== VERIFY_EMAIL_PATH) {
+    return <Navigate to={VERIFY_EMAIL_PATH} replace />;
+  }
+
+  // 3. Standard capability and access controls proceed normally
   const isAllowed =
     requiredCapability === null || canAccess(user, activeMembership, requiredCapability);
   const accessSummary = getAccessSummary(user, memberships, activeMembership);
