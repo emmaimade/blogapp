@@ -71,6 +71,8 @@ class BlogMemberRead(UTCDatetimeMixin, BaseModel):
     role: BlogRole
     invited_at: datetime
     user: UserRead
+    # Over the plan's seat limit, so read-only until the owner upgrades.
+    access_paused: bool = False
 
     class Config:
         from_attributes = True
@@ -178,7 +180,6 @@ class OnboardingChecklist(BaseModel):
     about: bool
     profile: bool
     publication: bool
-    team: bool
     plan: bool
 
 
@@ -186,7 +187,7 @@ class OnboardingSummary(UTCDatetimeMixin, BaseModel):
     status: OnboardingStatus
     current_step: OnboardingStep
     completed_steps: int
-    total_steps: int = 5
+    total_steps: int
     percent_complete: int
     checklist: OnboardingChecklist
     completed_at: Optional[datetime] = None
@@ -217,10 +218,6 @@ class OnboardingPublicationUpdate(BaseModel):
 
 class OnboardingPlanUpdate(BaseModel):
     plan: SubscriptionPlan
-
-
-class OnboardingTeamComplete(BaseModel):
-    skipped: bool = False
 
 
 class OnboardingState(BaseModel):

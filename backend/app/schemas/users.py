@@ -58,6 +58,8 @@ class UserBlogMembershipRead(UTCDatetimeMixin, BaseModel):
     # The workspace's effective plan — filled in only on memberships the user
     # owns (see build_user_payload); billing isn't an editor's or author's business.
     plan: Optional[SubscriptionPlan] = None
+    # This user is over the workspace's seat limit, so it's read-only for them.
+    access_paused: bool = False
 
     model_config = {"from_attributes": True}
 

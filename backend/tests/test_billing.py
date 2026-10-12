@@ -194,6 +194,10 @@ def test_checkout_is_owner_only(client):
     editor_headers, _, editor_id = _register(client)
     with Session(engine) as session:
         session.add(BlogMember(user_id=editor_id, blog_id=blog_id, role=BlogRole.EDITOR))
+        # A seat for the editor, or they'd be paused (read-only) before the owner check.
+        subscription = session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
+        subscription.plan = SubscriptionPlan.TEAM
+        session.add(subscription)
         session.commit()
 
     resp = _checkout(client, editor_headers, blog_id)

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect } from 'react';
-import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
+import { Outlet, ScrollRestoration, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { lastWorkspace } from '../../shared/lib/blogSession';
 import { pickLandingMembership, workspacePath, WORKSPACE_ROUTE_PATTERN } from '../../shared/lib/workspacePaths';
 import { useAuth } from '../../features/auth/context/AuthContext';
@@ -83,10 +83,15 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Root route element: BlogProvider has to sit inside the router to read the URL. */
+/**
+ * Root route element: BlogProvider has to sit inside the router to read the URL.
+ * ScrollRestoration lives here too, so a new page starts at the top instead of
+ * inheriting the last page's scroll (back/forward still restores it).
+ */
 export function BlogProviderOutlet() {
   return (
     <BlogProvider>
+      <ScrollRestoration />
       <Outlet />
     </BlogProvider>
   );

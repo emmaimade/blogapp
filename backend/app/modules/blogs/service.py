@@ -79,7 +79,6 @@ from app.schemas import (
     OnboardingPublicationUpdate,
     OnboardingState,
     OnboardingSummary,
-    OnboardingTeamComplete,
     PageMeta,
     PageMetaPost,
     SEOSettings,
@@ -118,7 +117,7 @@ def _set_site_setting(session: Session, blog_id: int, key: str, payload: dict) -
     )
 
 
-def _step_completion(session: Session, blog: Blog, subscription: BlogSubscription | None, member_count: int) -> dict[str, bool]:
+def _step_completion(session: Session, blog: Blog) -> dict[str, bool]:
     publication_setting = session.exec(
         select(SiteSettings).where(SiteSettings.blog_id == blog.id, SiteSettings.setting_key == "publication")
     ).first()
@@ -131,21 +130,20 @@ def _step_completion(session: Session, blog: Blog, subscription: BlogSubscriptio
             and (blog.primary_language or "").strip()
         ),
         "publication": publication_setting is not None,
-        "team": member_count > 1,
         "plan": blog.onboarding_status == OnboardingStatus.COMPLETED,
     }
 
 
-def _build_onboarding_summary(session: Session, blog: Blog, subscription: BlogSubscription | None, member_count: int, team_skipped: bool = False) -> OnboardingSummary:
-    checklist = _step_completion(session, blog, subscription, member_count)
-    checklist["team"] = checklist["team"] or team_skipped
+def _build_onboarding_summary(session: Session, blog: Blog) -> OnboardingSummary:
+    checklist = _step_completion(session, blog)
     if blog.onboarding_status == OnboardingStatus.COMPLETED:
         checklist = {key: True for key in checklist}
     completed_steps = sum(1 for done in checklist.values() if done)
-    percent_complete = int((completed_steps / 5) * 100)
+    total_steps = len(checklist)
+    percent_complete = int((completed_steps / total_steps) * 100)
     status = blog.onboarding_status
 
-    if completed_steps == 5 and status != OnboardingStatus.COMPLETED:
+    if completed_steps == total_steps and status != OnboardingStatus.COMPLETED:
         status = OnboardingStatus.COMPLETED
     elif completed_steps > 0 and status == OnboardingStatus.NOT_STARTED:
         status = OnboardingStatus.IN_PROGRESS
@@ -154,6 +152,7 @@ def _build_onboarding_summary(session: Session, blog: Blog, subscription: BlogSu
         status=status,
         current_step=blog.onboarding_step,
         completed_steps=completed_steps,
+        total_steps=total_steps,
         percent_complete=percent_complete,
         completed_at=blog.onboarding_completed_at,
         checklist=checklist,
@@ -175,28 +174,9 @@ def _to_subscription_read(subscription: BlogSubscription, blog_name: str) -> Sub
     )
 
 
-def _load_team_step_skipped(session: Session, blog_id: int) -> bool:
-    setting = session.exec(
-        select(SiteSettings).where(SiteSettings.blog_id == blog_id, SiteSettings.setting_key == "onboarding_meta")
-    ).first()
-    if not setting:
-        return False
-    try:
-        payload = json.loads(setting.setting_value)
-    except (TypeError, json.JSONDecodeError):
-        return False
-    return bool(payload.get("team_skipped"))
-
-
-def _save_team_step_skipped(session: Session, blog_id: int, skipped: bool) -> None:
-    _set_site_setting(session, blog_id, "onboarding_meta", {"team_skipped": skipped})
-
-
 def _sync_onboarding_state(session: Session, blog: Blog) -> tuple[OnboardingSummary, BlogSubscription | None]:
     subscription = _load_subscription(session, blog.id)
-    member_count = session.exec(select(func.count(BlogMember.id)).where(BlogMember.blog_id == blog.id)).first() or 0
-    team_skipped = _load_team_step_skipped(session, blog.id)
-    summary = _build_onboarding_summary(session, blog, subscription, member_count, team_skipped=team_skipped)
+    summary = _build_onboarding_summary(session, blog)
 
     blog.onboarding_status = summary.status
 
@@ -212,13 +192,13 @@ def _sync_onboarding_state(session: Session, blog: Blog) -> tuple[OnboardingSumm
     elif not summary.checklist.publication:
         blog.onboarding_step = OnboardingStep.PUBLICATION
         blog.onboarding_completed_at = None
-    elif not summary.checklist.team:
-        blog.onboarding_step = OnboardingStep.TEAM
-        blog.onboarding_completed_at = None
     elif not summary.checklist.plan:
         blog.onboarding_step = OnboardingStep.PLAN
         blog.onboarding_completed_at = None
 
+    # The summary was built before the step was settled; report where the blog
+    # actually is, not where it was (e.g. a workspace left on the old team step).
+    summary.current_step = blog.onboarding_step
     session.add(blog)
     return summary, subscription
 
@@ -732,7 +712,7 @@ def update_onboarding_publication(blog_id: int, payload: OnboardingPublicationUp
     blog.posts_per_page = payload.posts_per_page
     blog.timezone = payload.timezone
     blog.onboarding_status = OnboardingStatus.IN_PROGRESS
-    blog.onboarding_step = OnboardingStep.TEAM
+    blog.onboarding_step = OnboardingStep.PLAN
     session.add(blog)
 
     _set_site_setting(
@@ -759,25 +739,6 @@ def update_onboarding_publication(blog_id: int, payload: OnboardingPublicationUp
             "timezone": payload.timezone,
         },
     )
-    summary, subscription = _sync_onboarding_state(session, blog)
-    session.commit()
-    session.refresh(blog)
-    return OnboardingState(
-        blog=BlogRead.model_validate(blog),
-        subscription=_to_subscription_read(subscription, blog.name) if subscription else None,
-        summary=summary,
-    )
-
-
-def complete_onboarding_team_step(blog_id: int, payload: OnboardingTeamComplete, session: Session) -> OnboardingState:
-    blog = session.get(Blog, blog_id)
-    if not blog:
-        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
-
-    _save_team_step_skipped(session, blog_id, payload.skipped)
-    blog.onboarding_status = OnboardingStatus.IN_PROGRESS
-    blog.onboarding_step = OnboardingStep.PLAN
-    session.add(blog)
     summary, subscription = _sync_onboarding_state(session, blog)
     session.commit()
     session.refresh(blog)

@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlmodel import Session
 
 from app.core.db import get_session
+from app.core.plans import paused_member_user_ids
 from app.core.permissions import (
     get_current_blog,
     get_public_blog,
@@ -27,7 +28,6 @@ from app.schemas import (
     OnboardingProfileUpdate,
     OnboardingPublicationUpdate,
     OnboardingState,
-    OnboardingTeamComplete,
     PageMeta,
     SubscriptionRead,
 )
@@ -153,16 +153,6 @@ def update_onboarding_publication(
     return blog_service.update_onboarding_publication(blog_id, payload, session)
 
 
-@router.post("/{blog_id}/onboarding/team/complete", response_model=OnboardingState)
-def complete_onboarding_team_step(
-    blog_id: int,
-    payload: OnboardingTeamComplete,
-    session: Session = Depends(get_session),
-    _: None = Depends(require_blog_owner),
-):
-    return blog_service.complete_onboarding_team_step(blog_id, payload, session)
-
-
 @router.put("/{blog_id}/onboarding/plan", response_model=OnboardingState)
 def update_onboarding_plan(
     blog_id: int,
@@ -183,7 +173,11 @@ def read_blog_members(
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_owner),
 ):
-    return blog_service.read_blog_members(blog_id, session)
+    paused = paused_member_user_ids(session, blog_id)
+    return [
+        BlogMemberRead.model_validate(member).model_copy(update={"access_paused": member.user_id in paused})
+        for member in blog_service.read_blog_members(blog_id, session)
+    ]
 
 
 @router.post("/{blog_id}/members/{member_id}/trigger-reset-email")

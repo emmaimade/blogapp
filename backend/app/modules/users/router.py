@@ -27,11 +27,9 @@ from app.core.security import (
     get_password_hash,
     require_password_changed,
 )
-from app.services.auth_tokens import create_verification_token, TokenCooldownError
+from app.services.auth_tokens import TokenCooldownError
 from app.core.email import dispatch_email
 from app.core.email_templates import (
-    get_verification_template, 
-    get_verification_template_text,
     get_account_deleted_template, 
     get_account_deleted_template_text
 )
@@ -46,7 +44,7 @@ from app.models import (
     User,
 )
 from app.schemas import MyAuditLogRead, UserCreate, UserRead, UserUpdate
-from app.modules.auth.service import authenticate_user, build_login_response, build_user_payload
+from app.modules.auth.service import authenticate_user, build_login_response, build_user_payload, send_verification_code_email
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -162,10 +160,7 @@ def register(
     session.refresh(new_user)
 
     try:
-        raw_token = create_verification_token(session, new_user.id)
-        email_content = get_verification_template(f"{new_user.first_name} {new_user.last_name}", raw_token)
-        email_text = get_verification_template_text(f"{new_user.first_name} {new_user.last_name}", raw_token)
-        dispatch_email(background_tasks, new_user.email, "Verify your email address", email_content, email_text)
+        send_verification_code_email(session, background_tasks, new_user)
     except TokenCooldownError:
         # Extremely unlikely for a brand-new user (no prior token could exist yet),
         # but if it somehow fires, don't fail a successful registration over an

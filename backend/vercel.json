@@ -16,6 +16,10 @@
     {
       "path": "/internal/cron/purge-deleted-accounts",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/internal/cron/trial-notices",
+      "schedule": "0 8 * * *"
     }
   ]
 }

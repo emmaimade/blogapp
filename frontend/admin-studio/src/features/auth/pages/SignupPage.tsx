@@ -5,6 +5,16 @@ import { Eye, EyeOff } from "lucide-react";
 import api from "../../../shared/api/client";
 import { useAuth } from "../context/AuthContext";
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { VERIFY_EMAIL_PATH } from "../lib/accessControl";
+
+// Fields collected on step 1, as the backend names them in `errors`.
+const STEP_ONE_FIELDS = ["first_name", "last_name", "email", "password"];
+
+type SignupErrorBody = {
+  code?: string;
+  detail?: string | { msg?: string }[];
+  errors?: Record<string, string>;
+};
 
 // Creates a brand-new workspace + owner account. Runs on this origin (not
 // the marketing site's) specifically so the session cookie the backend sets
@@ -128,11 +138,19 @@ export const SignupPage = () => {
       });
 
       login(res.data.user);
-      // /admin lands on the new workspace's onboarding.
-      navigate("/admin");
-    } catch (err: any) {
-      const backendDetail = err.response?.data?.detail;
-      if (Array.isArray(backendDetail)) {
+      // The code is already on its way; onboarding comes after it's entered.
+      navigate(VERIFY_EMAIL_PATH, { state: { codeSent: true } });
+    } catch (err) {
+      const data = (err as { response?: { data?: SignupErrorBody } }).response?.data;
+      const fieldErrors = data?.errors ?? {};
+      const stepOneField = STEP_ONE_FIELDS.find((field) => fieldErrors[field]);
+      const backendDetail = data?.detail;
+      // A problem with the email, name or password belongs on step 1 — showing
+      // it on step 2, where none of those fields are, leaves nothing to fix.
+      if (stepOneField || data?.code === "EMAIL_ALREADY_EXISTS") {
+        setStep(1);
+        setError(stepOneField ? fieldErrors[stepOneField] : String(backendDetail ?? ""));
+      } else if (Array.isArray(backendDetail)) {
         setError(backendDetail[0]?.msg || "Validation error occurred.");
       } else if (typeof backendDetail === "string") {
         setError(backendDetail);

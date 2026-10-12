@@ -27,7 +27,8 @@ export const WorkspaceRoute = () => {
     );
   }
 
-  const needsSetup = (requiresOnboarding || !user?.email_verified) && !isSuperAdmin(user);
+  // An unverified email never gets this far: ProtectedRoute holds it on the verify page.
+  const needsSetup = requiresOnboarding && !isSuperAdmin(user);
   if (needsSetup && !onOnboarding) {
     return <Navigate to={workspacePath(activeMembership.blog.slug, '/onboarding')} replace />;
   }
