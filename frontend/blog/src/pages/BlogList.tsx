@@ -7,7 +7,6 @@ import { PostList, PostListSkeleton } from '../components/PostList';
 import { Pagination } from '../components/Pagination';
 import { usePagedPosts } from '../hooks/usePagedPosts';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { useBlogStats } from '../hooks/useBlogStats';
 import { usePostLayouts } from '../hooks/useSiteSettings';
 
 export const BlogList = () => {
@@ -19,11 +18,6 @@ export const BlogList = () => {
   // selected tag gets its own title — matching middleware.ts.
   usePageMeta(tagParam ? `Posts tagged “${tagParam}”` : 'Blog');
 
-  // A blog with no projects has no Projects toggle, so a stale
-  // `?filter=projects` link just shows the normal list.
-  const { hasProjects } = useBlogStats();
-  const requestedFilter = searchParams.get('filter') || 'all';
-  const filterParam = hasProjects === false ? 'all' : requestedFilter;
   const sortBy = (searchParams.get('sort') === 'popular' ? 'popular' : 'latest') as 'latest' | 'popular';
   const { archiveLayout } = usePostLayouts();
   // Cards need room for three per row; the row layouts keep a reading width.
@@ -38,10 +32,9 @@ export const BlogList = () => {
     isLoading,
     isFetching,
   } = usePagedPosts(
-    ['posts', filterParam, tagParam, sortBy],
+    ['posts', tagParam, sortBy],
     '/posts/',
     {
-      filter: filterParam !== 'all' ? filterParam : undefined,
       tag: tagParam || undefined,
       sort: sortBy,
     },
@@ -74,15 +67,8 @@ export const BlogList = () => {
   );
   const overflowTagCount = popularTagNames.length > 0 ? Math.max(tags.length - popularTagNames.length, 0) : 0;
 
-  // Changing filter, tag, or sort restarts pagination — page 3 of the old
+  // Changing tag or sort restarts pagination — page 3 of the old
   // result set has no guaranteed meaning against a new one.
-  const setFilter = (f: string) => {
-    const next = new URLSearchParams(searchParams.toString());
-    next.set('filter', f);
-    next.delete('page');
-    setSearchParams(next);
-  };
-
   const setTag = (t: string) => {
     const next = new URLSearchParams(searchParams.toString());
     if (!t) next.delete('tag');
@@ -110,7 +96,7 @@ export const BlogList = () => {
     setSearchParams({});
   };
 
-  const hasActiveFilters = filterParam !== 'all' || tagParam;
+  const hasActiveFilters = !!tagParam;
   const toggleClass = (active: boolean) => (active ? 'px-4 py-2 rounded-lg font-bold text-sm transition-colors bg-primary text-white' : 'px-4 py-2 rounded-lg font-bold text-sm transition-colors text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50');
   const activeFilterChipClass =
     'inline-flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-semibold border border-primary/20 hover:bg-primary/15 transition-colors dark:bg-primary/20 dark:text-zinc-100';
@@ -140,7 +126,7 @@ export const BlogList = () => {
             </>
           ) : (
             <h1 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-zinc-50">
-              {filterParam === 'projects' ? 'Projects' : 'All posts'}
+              All posts
             </h1>
           )}
           {/* A count only helps when filtering — it says how much there is on a
@@ -156,24 +142,8 @@ export const BlogList = () => {
         <div className="mb-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
-            {/* Left: Type & Sorting */}
+            {/* Left: Sorting */}
             <div className="flex gap-3 flex-wrap">
-              {/* Type Toggle — only for blogs that publish projects */}
-              {hasProjects && (
-                <div className="inline-grid grid-cols-2 gap-1 bg-white rounded-xl p-1 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
-                  {(['all', 'projects'] as const).map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => setFilter(value)}
-                      aria-pressed={filterParam === value}
-                      className={toggleClass(filterParam === value)}
-                    >
-                      {value === 'all' ? 'All posts' : 'Projects'}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {/* Sort — a visible toggle, since it's how readers find popular posts here */}
               <div
                 role="group"
@@ -294,23 +264,6 @@ export const BlogList = () => {
                   Tag: {tagParam} <X size={14} aria-hidden="true" />
                 </button>
               )}
-              {filterParam === 'projects' && (
-                <button
-                  onClick={() => setFilter('all')}
-                  aria-label="Remove projects filter"
-                  className={activeFilterChipClass}
-                >
-                  Projects only <X size={14} aria-hidden="true" />
-                </button>
-              )}
-              {tagParam && filterParam === 'projects' && (
-                <button
-                  onClick={clearFilters}
-                  className="text-sm text-zinc-600 hover:text-zinc-900 font-medium underline transition-colors dark:text-zinc-400 dark:hover:text-zinc-50"
-                >
-                  Clear all
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -345,9 +298,7 @@ export const BlogList = () => {
                 <p className="text-zinc-600 dark:text-zinc-400 mb-8 max-w-md mx-auto">
                   {tagParam
                     ? `We couldn't find any posts tagged with "${tagParam}". Try a different tag or view all posts.`
-                    : filterParam === 'projects'
-                      ? 'No projects have been published yet. Check back soon!'
-                      : 'No posts available yet. Check back for new content!'
+                    : 'No posts available yet. Check back for new content!'
                   }
                 </p>
                 {hasActiveFilters && (

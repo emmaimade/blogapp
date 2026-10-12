@@ -31,7 +31,7 @@ def test_listing_posts_for_an_unknown_workspace_is_a_typed_404(client):
 
 
 def test_posts_filter_param_is_accepted(client):
-    """`?filter=projects` must not change the failure mode of the route."""
+    """Old `?filter=projects` links (the removed Projects tab) are ignored, not rejected."""
     without = client.get("/blogs/98765432/posts/")
     with_filter = client.get("/blogs/98765432/posts/?filter=projects")
     assert with_filter.status_code == without.status_code

@@ -9,7 +9,7 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import Request, UploadFile
-from sqlalchemy import case, func, or_, update
+from sqlalchemy import func, or_, update
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -341,7 +341,6 @@ def read_posts(
     blog_id: int,
     session: Session,
     current_user: Optional[User],
-    filter_value: Optional[str] = None,
     tag: Optional[str] = None,
     sort: Literal["latest", "popular"] = "latest",
     skip: int = 0,
@@ -361,9 +360,6 @@ def read_posts(
         query = _scope_posts_to_viewer(blog_id, session, current_user)
         if status and status.lower() in (PostStatus.PUBLISHED, PostStatus.SCHEDULED, PostStatus.DRAFT):
             query = query.where(Post.status == status.lower())
-
-    if filter_value and filter_value.lower() == "projects":
-        query = query.where(Post.is_project == True)
 
     if q:
         query = query.where(or_(Post.title.ilike(f"%{q}%"), Post.content.ilike(f"%{q}%")))
@@ -443,14 +439,13 @@ def _public_posts(blog_id: int):
 def get_public_post_stats(blog_id: int, session: Session) -> dict:
     """Blog-wide totals for the public About page — across every post, not one page of them."""
     public = _public_posts(blog_id).subquery()
-    articles, projects, views = session.exec(
+    articles, views = session.exec(
         select(
             func.count(),
-            func.coalesce(func.sum(case((public.c.is_project == True, 1), else_=0)), 0),
             func.coalesce(func.sum(public.c.views), 0),
         ).select_from(public)
     ).one()
-    return {"articles": articles, "projects": projects, "views": views}
+    return {"articles": articles, "views": views}
 
 
 def get_related_posts(blog_id: int, slug: str, session: Session, limit: int = 3) -> List[Post]:

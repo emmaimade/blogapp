@@ -1,15 +1,20 @@
 """
 Coverage for the public-blog read paths: the opt-in reader view
 (`public_view`) on list/search — published, non-sample posts whoever is
-signed in — plus GET /posts/stats and GET /posts/slug/{slug}/related.
+signed in — plus GET /posts/stats and GET /posts/slug/{slug}/related, and
+the migration that turns old "Showcase Project" posts into a Projects tag.
 """
 
+import importlib.util
+from datetime import timedelta
 import uuid
+from pathlib import Path
 
 from sqlmodel import Session, select
 
 from app.core.db import engine
-from app.core.security import ACCESS_TOKEN_COOKIE_NAME
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME, create_access_token
+from app.models import User
 from app.models import BlogMember, Post, Tag
 from app.models.blog import BlogRole
 from app.models.post import PostStatus
@@ -131,6 +136,86 @@ def _list_slugs(client, blog_id: int, headers: dict | None = None, **params) -> 
     return {p["slug"] for p in res.json()["items"]}
 
 
+def _token_for(user_id: int, minutes: int) -> str:
+    with Session(engine) as session:
+        username = session.get(User, user_id).username
+    return create_access_token({"sub": username}, expires_delta=timedelta(minutes=minutes))
+
+
+def test_lapsed_session_on_the_admin_list_is_a_401_not_the_reader_view(client):
+    """An expired token used to be treated as no token: the owner quietly got
+    live posts only, and never the 401 that makes the studio refresh."""
+    blog_id, owner_id, _ = _register(client)
+    _create_post(blog_id, owner_id)
+    _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    expired = {"Authorization": f"Bearer {_token_for(owner_id, -5)}"}
+
+    res = client.get(f"/blogs/{blog_id}/posts/", headers=expired)
+
+    assert res.status_code == 401, res.text
+    assert res.json()["code"] == "SESSION_EXPIRED"
+
+
+def test_malformed_token_on_the_admin_list_is_a_401(client):
+    blog_id, _, _ = _register(client)
+
+    res = client.get(f"/blogs/{blog_id}/posts/", headers={"Authorization": "Bearer not-a-token"})
+
+    assert res.status_code == 401, res.text
+
+
+def test_valid_session_on_the_admin_list_includes_drafts(client):
+    blog_id, owner_id, _ = _register(client)
+    published = _create_post(blog_id, owner_id)
+    draft = _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    valid = {"Authorization": f"Bearer {_token_for(owner_id, 5)}"}
+
+    assert {published, draft} <= _list_slugs(client, blog_id, valid)
+
+
+def test_lapsed_session_still_reads_the_public_view_and_anonymous_still_works(client):
+    """Readers are unaffected: the public blog always asks for public_view,
+    and a request with no token at all is still the reader's list."""
+    blog_id, owner_id, _ = _register(client)
+    published = _create_post(blog_id, owner_id)
+    draft = _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    expired = {"Authorization": f"Bearer {_token_for(owner_id, -5)}"}
+
+    public = _list_slugs(client, blog_id, expired, public_view="true")
+    anonymous = _list_slugs(client, blog_id)
+
+    assert published in public and draft not in public
+    assert published in anonymous and draft not in anonymous
+
+
+def _post_id(slug: str) -> int:
+    with Session(engine) as session:
+        return session.exec(select(Post.id).where(Post.slug == slug)).one()
+
+
+def test_lapsed_session_opening_a_draft_by_id_is_a_401_not_a_404(client):
+    """The editor loads posts by id: an expired session used to make a draft
+    look deleted ("post not found") instead of refreshing."""
+    blog_id, owner_id, _ = _register(client)
+    draft_id = _post_id(_create_post(blog_id, owner_id, status=PostStatus.DRAFT))
+
+    expired = client.get(f"/blogs/{blog_id}/posts/{draft_id}",
+                         headers={"Authorization": f"Bearer {_token_for(owner_id, -5)}"})
+    valid = client.get(f"/blogs/{blog_id}/posts/{draft_id}",
+                       headers={"Authorization": f"Bearer {_token_for(owner_id, 5)}"})
+
+    assert expired.status_code == 401, expired.text
+    assert expired.json()["code"] == "SESSION_EXPIRED"
+    assert valid.status_code == 200, valid.text
+
+
+def test_signed_out_visitor_opening_a_draft_by_id_still_gets_not_found(client):
+    blog_id, owner_id, _ = _register(client)
+    draft_id = _post_id(_create_post(blog_id, owner_id, status=PostStatus.DRAFT))
+
+    assert client.get(f"/blogs/{blog_id}/posts/{draft_id}").status_code == 404
+
+
 def test_owner_sees_drafts_only_outside_the_public_view(client):
     blog_id, owner_id, owner_token = _register(client)
     owner = {"Authorization": f"Bearer {owner_token}"}
@@ -188,13 +273,76 @@ def test_public_view_ignores_a_status_filter(client):
 def test_stats_count_only_public_non_sample_posts(client):
     blog_id, user_id = _register_owner(client)
     _create_post(blog_id, user_id, views=10)
-    _create_post(blog_id, user_id, views=5, is_project=True)
+    _create_post(blog_id, user_id, views=5)
     _create_post(blog_id, user_id, views=100, is_sample=True)
     _create_post(blog_id, user_id, views=1000, status=PostStatus.DRAFT)
 
     res = client.get(f"/blogs/{blog_id}/posts/stats")
     assert res.status_code == 200, res.text
-    assert res.json() == {"articles": 2, "projects": 1, "views": 15}
+    assert res.json() == {"articles": 2, "views": 15}
+
+
+# ── project posts become a tag ───────────────────────────────────────────────
+
+_TAG_PROJECTS_MIGRATION = (
+    Path(__file__).resolve().parent.parent
+    / "alembic" / "versions" / "a4d7e2c9f1b3_tag_project_posts.py"
+)
+
+
+def _tag_project_posts() -> None:
+    spec = importlib.util.spec_from_file_location("tag_project_posts", _TAG_PROJECTS_MIGRATION)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with engine.begin() as connection:
+        module.tag_project_posts(connection)
+
+
+def _tag_names(slug: str) -> set[str]:
+    with Session(engine) as session:
+        post = session.exec(select(Post).where(Post.slug == slug)).one()
+        return {t.name for t in post.tags}
+
+
+def _projects_tags(blog_id: int) -> list[Tag]:
+    with Session(engine) as session:
+        return session.exec(select(Tag).where(Tag.blog_id == blog_id, Tag.name.ilike("projects"))).all()
+
+
+def test_project_posts_get_a_projects_tag_and_articles_do_not(client):
+    blog_id, user_id = _register_owner(client)
+    project = _create_post(blog_id, user_id, is_project=True, tags=["Design"])
+    article = _create_post(blog_id, user_id)
+
+    _tag_project_posts()
+
+    assert _tag_names(project) == {"Design", "Projects"}
+    assert _tag_names(article) == set()
+    # Readers find them on the ordinary tag page.
+    assert project in _list_slugs(client, blog_id, tag="Projects", public_view="true")
+
+
+def test_tagging_project_posts_reuses_the_blogs_own_tag_and_is_repeatable(client):
+    blog_id, user_id = _register_owner(client)
+    already_tagged = _create_post(blog_id, user_id, is_project=True, tags=["projects"])
+    untagged = _create_post(blog_id, user_id, is_project=True)
+
+    _tag_project_posts()
+    _tag_project_posts()
+
+    tags = _projects_tags(blog_id)
+    assert [t.name for t in tags] == ["projects"]
+    assert _tag_names(already_tagged) == {"projects"}
+    assert _tag_names(untagged) == {"projects"}
+
+
+def test_tagging_project_posts_leaves_blogs_without_projects_alone(client):
+    blog_id, user_id = _register_owner(client)
+    _create_post(blog_id, user_id)
+
+    _tag_project_posts()
+
+    assert _projects_tags(blog_id) == []
 
 
 # ── related ──────────────────────────────────────────────────────────────────

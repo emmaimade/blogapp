@@ -5,14 +5,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import SimpleMDE from 'react-simplemde-editor';
-import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Layout, FileText, Star } from 'lucide-react';
+import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Star } from 'lucide-react';
 
 import { usePostEditor } from '../hooks/usePostEditor';
 import { TagSelector } from '../components/TagSelector';
 import { markdownComponents, getEditorOptions } from '../components/MarkdownConfig';
 import { SchedulePublishPanel } from '../components/SchedulePublishPanel';
 import { EditorToolbarIcons } from '../components/EditorToolbarIcons';
-import { ContentBlueprint } from '../components/ContentBlueprint';
+import { OutlineStarter } from '../components/OutlineStarter';
 import { FloatingSaveBar } from '../components/FloatingSaveBar';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 
@@ -27,7 +27,7 @@ export const PostEditor: React.FC = () => {
   const {
     control, register, setValue, isEditMode, isPreview, setIsPreview, isUploading,
     tagSearch, setTagSearch, content, thumbnail, selectedTagIds, currentStatus,
-    currentPubAt, isProject, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
+    currentPubAt, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
     isDirty, errors, scheduledPosts, savedTitle, editedAt
@@ -41,6 +41,15 @@ export const PostEditor: React.FC = () => {
 
   const editorOptions = useMemo(() => getEditorOptions(handleImageUpload), [handleImageUpload]);
   const [editor, setEditor] = useState<EasyMDE | null>(null);
+
+  const insertOutline = (markdown: string) => {
+    setValue('content', markdown, { shouldDirty: true });
+    // Put the cursor on the empty first line, where the opening paragraph goes.
+    requestAnimationFrame(() => {
+      editor?.codemirror.focus();
+      editor?.codemirror.setCursor({ line: 0, ch: 0 });
+    });
+  };
 
   if (isEditMode && isLoading) {
     return (
@@ -88,31 +97,6 @@ export const PostEditor: React.FC = () => {
                 {errors.title.message}
               </p>
             )}
-          </div>
-
-          {/* Post Type Selector Switch */}
-          <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-fit">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-2">Post Type</span>
-            <div className="flex bg-zinc-200/70 dark:bg-zinc-800 rounded-lg p-0.5 relative">
-              <button
-                type="button"
-                onClick={() => setValue("is_project", false)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  !isProject ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
-                }`}
-              >
-                <FileText size={14} /> Standard Article
-              </button>
-              <button
-                type="button"
-                onClick={() => setValue("is_project", true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  isProject ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
-                }`}
-              >
-                <Layout size={14} /> Showcase Project
-              </button>
-            </div>
           </div>
 
           {/* Homepage Featured Story Toggle */}
@@ -190,9 +174,16 @@ export const PostEditor: React.FC = () => {
               </ReactMarkdown>
             </div>
           ) : (
-            <div className="editor-container">
+            <div className="editor-container relative">
               <Controller name="content" control={control} render={({ field }) => <SimpleMDE {...field} options={editorOptions} getMdeInstance={setEditor} />} />
               <EditorToolbarIcons editor={editor} />
+              {/* Sits inside the empty editor rather than above it, so nothing
+                  jumps when it goes away. */}
+              {!content?.trim() && (
+                <div className="absolute inset-x-0 bottom-0 z-10 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+                  <OutlineStarter onInsert={insertOutline} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -223,8 +214,6 @@ export const PostEditor: React.FC = () => {
             toggleTag={toggleTag}
             onCreateTag={handleCreateTagSubmit}
           />
-
-          <ContentBlueprint isProject={isProject} />
         </div>
       </div>
     </div>

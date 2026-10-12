@@ -4,6 +4,7 @@ import {
   Ban,
   Calendar,
   CheckCircle,
+  Crown,
   ExternalLink,
   Globe,
   Loader2,
@@ -12,7 +13,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
+import { toastApiError } from '../../../shared/lib/apiErrors';
 import { Modal } from '../../../shared/components/Modal';
 import { SkeletonBar, SkeletonStatCard } from '../../../shared/ui/Skeleton';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -70,7 +73,10 @@ interface RecentPost {
 }
 
 interface Member {
+  /** The BlogMember id, which ownership transfers address. */
+  member_id: number;
   user_id: number;
+  name?: string | null;
   email: string;
   role: string;
   joined_at?: string | null;
@@ -104,6 +110,9 @@ export const SuperAdminBlogDetailPage = () => {
     type: 'suspend' | 'activate' | 'delete' | null;
   }>({ isOpen: false, type: null });
 
+  // The member a superadmin is about to make owner (confirm dialog open).
+  const [transferTo, setTransferTo] = useState<Member | null>(null);
+
   const { data: blog, isLoading, error } = useQuery<BlogDetail>({
     queryKey: ['superadminBlog', blogId],
     queryFn: async () => (await api.get(`/superadmin/blogs/${blogId}`)).data,
@@ -121,6 +130,17 @@ export const SuperAdminBlogDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ['superadminBlogs'] });
       setConfirmModal({ isOpen: false, type: null });
     },
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: async (memberId: number) =>
+      (await api.post(`/superadmin/blogs/${blogId}/transfer-ownership`, { member_id: memberId })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superadminBlog', blogId] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin-users'] });
+      toast.success('Ownership transferred');
+    },
+    onError: (err) => toastApiError(err, 'Failed to transfer ownership.'),
   });
 
   const deleteBlogMutation = useMutation({
@@ -409,8 +429,9 @@ export const SuperAdminBlogDetailPage = () => {
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">
-                    {member.email}
+                    {member.name || member.email}
                   </p>
+                  {member.name && <p className="truncate text-xs text-zinc-500">{member.email}</p>}
                   {member.joined_at && (
                     <p className="mt-0.5 text-xs text-zinc-500">
                       Joined{' '}
@@ -422,9 +443,20 @@ export const SuperAdminBlogDetailPage = () => {
                     </p>
                   )}
                 </div>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                  {member.role}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {member.role}
+                  </span>
+                  {member.role !== 'owner' && (
+                    <button
+                      onClick={() => setTransferTo(member)}
+                      disabled={transferMutation.isPending}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <Crown size={13} /> Make owner
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -474,6 +506,18 @@ export const SuperAdminBlogDetailPage = () => {
           Delete Workspace
         </button>
       </div>
+
+      <Modal
+        isOpen={!!transferTo}
+        onClose={() => setTransferTo(null)}
+        title="Transfer ownership"
+        isDanger={false}
+        confirmText="Make owner"
+        message={`Make ${transferTo?.name || transferTo?.email} the owner of "${blogName}"?
+
+They take over the plan and billing. The current owner (${blog.owner_email || 'unknown'}) stays on as an editor and is notified.`}
+        onConfirm={() => transferTo && transferMutation.mutate(transferTo.member_id)}
+      />
 
       {/* Confirmation Modal */}
       {confirmModal.isOpen && activeModalProps && (

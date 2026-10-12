@@ -5,14 +5,14 @@ from typing import Any, List, Optional
 from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, status, Request, Response, BackgroundTasks
 from sqlmodel import Session, delete, select
-from sqlalchemy import func, cast, Date
+from sqlalchemy import and_, case, func, cast, Date, or_
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from app.core.audit import add_audit_log
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
-from app.core.exceptions import BadRequestError, NotFoundError, ValidationError
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError, ValidationError
 from app.core.moderation import record_moderation_action
 from app.core.notifications import add_notification
 from app.core.permissions import require_super_admin
@@ -21,6 +21,15 @@ from app.core.security import get_current_user, get_password_hash
 from app.core.email import dispatch_email
 from app.core.email_templates import get_password_reset_template, get_password_reset_template_text, get_temporary_password_issued_template, get_temporary_password_issued_template_text
 from app.services.auth_tokens import create_password_reset_token
+from app.services.deletion import (
+    SOFT_DELETE_RETENTION_DAYS,
+    delete_blog_permanently,
+    deleted_prefix,
+    ensure_account_deletable,
+    restore_deadline,
+)
+from app.core.datetimes import utc_now
+from app.modules.blogs import service as blog_service
 from app.models import (
     Blog,
     User,
@@ -38,6 +47,8 @@ from app.modules.comments.service import soft_delete_comment
 from app.modules.support.router import SupportTicketRead
 from app.schemas import (
     BlogAnalytics,
+    BlogMemberRead,
+    OwnershipTransfer,
     ModerationActionCreate,
     ModerationActionRead,
     ModerationQueueItemRead,
@@ -47,6 +58,8 @@ from app.schemas import (
     PlatformSettingsUpdate,
     PlatformStats,
     UserRead,
+    SuperadminUserCounts,
+    SuperadminUserList,
     SuperadminUserQueryParams,
 )
 
@@ -73,7 +86,10 @@ class RecentPostSummary(BaseModel):
 
 
 class MemberSummary(BaseModel):
+    # The BlogMember id, which ownership transfers address.
+    member_id: int
     user_id: int
+    name: Optional[str] = None
     email: str
     role: str
     joined_at: Optional[datetime] = None
@@ -226,10 +242,12 @@ def get_blog_detail(
             user = getattr(m, "user", None)
             members.append(
                 MemberSummary(
+                    member_id=m.id,
                     user_id=m.user_id,
+                    name=(" ".join(filter(None, [user.first_name, user.last_name])) or user.username) if user else None,
                     email=user.email if user else "unknown",
                     role=getattr(m, "role", "member") or "member",
-                    joined_at=getattr(m, "created_at", None),
+                    joined_at=m.invited_at,
                 )
             )
 
@@ -285,17 +303,6 @@ def delete_blog(
     if not blog:
         raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
     
-    # Delete all posts
-    posts = session.exec(select(Post).where(Post.blog_id == blog_id)).all()
-    for post in posts:
-        session.delete(post)
-    
-    # Delete all members
-    from app.models.blog import BlogMember
-    members = session.exec(select(BlogMember).where(BlogMember.blog_id == blog_id)).all()
-    for member in members:
-        session.delete(member)
-    
     # Not linked by blog_id: audit_logs.blog_id cascades, so the record of
     # this delete would go with the blog. The id stays in the details.
     add_audit_log(
@@ -307,49 +314,103 @@ def delete_blog(
         details={"name": blog.name, "blog_id": blog.id, "slug": blog.slug},
         request=request,
     )
-
-    # A bulk delete, so settings, tags, subscriptions and the rest go by the
-    # database's ON DELETE CASCADE; session.delete(blog) would have the ORM
-    # set their (NOT NULL) blog_id to null first and fail.
-    session.flush()
-    session.expunge(blog)
-    session.exec(delete(Blog).where(Blog.id == blog_id))
+    delete_blog_permanently(session, blog)
     session.commit()
+
+
+@router.post("/blogs/{blog_id}/transfer-ownership", response_model=BlogMemberRead)
+def superadmin_transfer_ownership(
+    blog_id: int,
+    payload: OwnershipTransfer,
+    request: Request,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Hand a workspace to another of its members on the owner's behalf - e.g.
+    so an unresponsive owner's account can be deleted. Same rules as the
+    owner's own transfer; the previous owner stays on as an editor.
+    """
+    blog = session.get(Blog, blog_id)
+    if not blog:
+        raise NotFoundError(ErrorCode.BLOG_NOT_FOUND)
+    previous_owner_id = blog.owner_id
+
+    member = blog_service.transfer_ownership(blog_id, payload.member_id, session, current_user, request=request)
+
+    # The owner didn't do this themselves, so tell them.
+    if previous_owner_id != current_user.id:
+        new_owner = member.user
+        new_owner_name = " ".join(filter(None, [new_owner.first_name, new_owner.last_name])) or new_owner.username
+        add_notification(
+            session,
+            user_id=previous_owner_id,
+            blog_id=blog_id,
+            type="ownership_transferred",
+            title=f"{blog.name} has a new owner",
+            body=f"A platform admin made {new_owner_name} the owner. You're now an editor.",
+            link=f"/admin/w/{blog.slug}/dashboard",
+        )
+        session.commit()
+    session.refresh(member)
+    return member
 
 
 # ============================================================================
 # USER MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@router.get("/users", response_model=List[UserRead])
+@router.get("/users", response_model=SuperadminUserList)
 def get_all_users(
-    params: SuperadminUserQueryParams = Depends(),  # Query parameters encapsulated
+    params: SuperadminUserQueryParams = Depends(),
     _: None = Depends(require_super_admin),
     session: Session = Depends(get_session),
 ):
-    # Base query optimizing loads
-    query = select(User).options(
-        selectinload(User.blog_memberships).selectinload(BlogMember.blog)
-    )
-
-    # Applying conditional adjustments from your schema parameter state
-    if not params.include_deleted:
-        query = query.where(User.deleted_at == None)
-        
+    filters = []
     if params.platform_role:
-        query = query.where(User.platform_role == params.platform_role)
-        
-    if params.search:
-        search_term = f"%{params.search}%"
-        query = query.where(
-            (User.username.ilike(search_term)) | (User.email.ilike(search_term))
-        )
+        filters.append(User.platform_role == params.platform_role)
+    if params.blog_id is not None:
+        filters.append(User.id.in_(select(BlogMember.user_id).where(BlogMember.blog_id == params.blog_id)))
+    term = (params.search or "").strip()
+    if term:
+        pattern = f"%{term}%"
+        full_name = func.coalesce(User.first_name, "") + " " + func.coalesce(User.last_name, "")
+        filters.append(or_(User.username.ilike(pattern), User.email.ilike(pattern), full_name.ilike(pattern)))
 
-    # Execute offset/limit pagination parameters clean boundary
-    query = query.order_by(User.created_at.desc()).offset(params.skip).limit(params.limit)
-    
-    users = session.exec(query).all()
-    return users
+    not_deleted = User.deleted_at.is_(None)
+    status_conditions = {
+        "all": not_deleted,
+        "active": and_(not_deleted, User.is_active == True),  # noqa: E712
+        "suspended": and_(not_deleted, User.is_active == False),  # noqa: E712
+        "deleted": User.deleted_at.is_not(None),
+    }
+
+    # One pass for every tab's count, so switching tabs never shows stale numbers.
+    count_row = session.exec(
+        select(*(func.coalesce(func.sum(case((cond, 1), else_=0)), 0) for cond in status_conditions.values()))
+        .where(*filters)
+    ).one()
+    counts = SuperadminUserCounts(**dict(zip(status_conditions.keys(), (int(n) for n in count_row))))
+
+    users = session.exec(
+        select(User)
+        .options(selectinload(User.blog_memberships).selectinload(BlogMember.blog))
+        .where(*filters, status_conditions[params.status])
+        .order_by(User.created_at.desc(), User.id.desc())
+        .offset(params.skip)
+        .limit(params.limit)
+    ).all()
+
+    total = getattr(counts, params.status)
+    return SuperadminUserList(
+        items=[UserRead.model_validate(user) for user in users],
+        total=total,
+        skip=params.skip,
+        limit=params.limit,
+        has_more=params.skip + len(users) < total,
+        counts=counts,
+    )
 
 
 @router.patch("/users/{user_id}", response_model=UserRead)
@@ -368,7 +429,11 @@ def update_user_status(
     
     if not user:
         raise NotFoundError(ErrorCode.USER_NOT_FOUND)
-    
+    if user.deleted_at is not None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "Restore this account before changing its status.")
+    if user.id == current_user.id and not data.is_active:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "You can't suspend your own account.")
+
     previous_is_active = user.is_active
     user.is_active = data.is_active
     session.add(user)
@@ -486,6 +551,10 @@ def superadmin_delete_user(
             ErrorCode.OPERATION_NOT_ALLOWED,
             "You cannot delete your own account from here.",
         )
+    if user.deleted_at is not None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "This account is already deleted.")
+    name = " ".join(filter(None, [user.first_name, user.last_name])) or user.username
+    ensure_account_deletable(session, user, subject=name)
 
     # Prevent deleting the last superadmin
     if user.is_super_admin:
@@ -522,8 +591,8 @@ def superadmin_delete_user(
     user.deleted_at = datetime.now(timezone.utc) # Fixed deprecated utcnow()
     
     # Free up username and email for re-registration while maintaining DB integrity/FKs
-    user.username = f"deleted_{user.id}_{user.username}"
-    user.email = f"deleted_{user.id}_{user.email}"
+    user.username = f"{deleted_prefix(user.id)}{user.username}"
+    user.email = f"{deleted_prefix(user.id)}{user.email}"
 
     session.add(user)
     session.commit()
@@ -531,6 +600,68 @@ def superadmin_delete_user(
     # FIX: Explicitly return an empty Response with a 204 status code 
     # This prevents FastAPI from running validations on a 'None' return value
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/restore", response_model=UserRead)
+def superadmin_restore_user(
+    user_id: int,
+    request: Request,
+    _: None = Depends(require_super_admin),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Undo a soft delete while the account is still inside the purge window."""
+    user = session.exec(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.blog_memberships).selectinload(BlogMember.blog))
+    ).first()
+    if not user:
+        raise NotFoundError(ErrorCode.USER_NOT_FOUND)
+    if user.deleted_at is None:
+        raise BadRequestError(ErrorCode.OPERATION_NOT_ALLOWED, "This account isn't deleted.")
+    # A hard deadline: past it the account counts as erased, whether or not
+    # the purge job has physically removed the row yet.
+    if utc_now() > restore_deadline(user.deleted_at):
+        raise BadRequestError(
+            ErrorCode.OPERATION_NOT_ALLOWED,
+            f"This account was deleted more than {SOFT_DELETE_RETENTION_DAYS} days ago and can no longer be restored.",
+        )
+
+    # Superadmin deletes renamed the account; self-deletes didn't. Strip the
+    # prefix either way, then make sure nobody signed up with the freed name.
+    prefix = deleted_prefix(user.id)
+    username = user.username.removeprefix(prefix) if user.username else user.username
+    email = user.email.removeprefix(prefix)
+    if username and session.exec(select(User.id).where(User.username == username, User.id != user.id)).first():
+        raise ConflictError(
+            ErrorCode.USERNAME_ALREADY_EXISTS,
+            f"Another account now uses the username @{username}, so this one can't be restored.",
+        )
+    if session.exec(select(User.id).where(User.email == email, User.id != user.id)).first():
+        raise ConflictError(
+            ErrorCode.EMAIL_ALREADY_EXISTS,
+            f"Another account now uses {email}, so this one can't be restored.",
+        )
+
+    user.username = username
+    user.email = email
+    user.deleted_at = None
+    user.is_active = True
+    session.add(user)
+
+    add_audit_log(
+        session,
+        action="superadmin.user_restore",
+        resource_type="user",
+        resource_id=user.id,
+        actor=current_user,
+        details={"username": username, "email": email},
+        request=request,
+    )
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 # ============================================================================

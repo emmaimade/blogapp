@@ -170,6 +170,31 @@ async def get_current_user_optional(
         return None
 
 
+def reject_unusable_token(request: Request) -> None:
+    """
+    For a route that serves signed-out readers and signed-in staff alike:
+    get_current_user_optional treats an expired or malformed token as no
+    token, so a staff request whose session lapsed would quietly get the
+    reader's answer (live posts only — drafts seem to vanish) and never a 401
+    to make the client refresh. Call this where that matters; it raises the
+    same errors get_current_user would, and does nothing when no token was
+    sent at all.
+    """
+    token = extract_bearer_token(request)
+    if not token:
+        return
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except ExpiredSignatureError:
+        raise AuthenticationError(ErrorCode.SESSION_EXPIRED, headers=_BEARER_CHALLENGE)
+    except JWTError as exc:
+        raise AuthenticationError(
+            ErrorCode.AUTHENTICATION_REQUIRED,
+            headers=_BEARER_CHALLENGE,
+            log_message=f"token rejected: {type(exc).__name__}",
+        )
+
+
 def admin_only(current_user: User = Depends(get_current_user)):
     if not current_user.is_super_admin and current_user.platform_role != PlatformRole.SUPER_ADMIN:
         raise AuthorizationError(ErrorCode.SUPER_ADMIN_REQUIRED)

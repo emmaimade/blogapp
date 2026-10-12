@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Edit, Trash2, FolderOpen, FileText, Plus, Search,
+  Plus, Search,
   Eye, Tag as TagIcon, Feather, Clock, ChevronLeft, ChevronRight, Star,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
@@ -14,8 +14,14 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { toastApiError } from '../../../shared/lib/apiErrors';
+import { getPostUrl } from '../../../shared/lib/blogUrl';
+import { PostActionsMenu } from '../components/PostActionsMenu';
 
 type FilterTab = 'all' | 'published' | 'scheduled' | 'draft';
+const FILTER_TABS: FilterTab[] = ['all', 'published', 'scheduled', 'draft'];
+
+// Publishing, unpublishing and deleting from the list each ask first.
+type PendingAction = { kind: 'publish' | 'revert' | 'delete'; post: Post };
 
 const PAGE_SIZE = 20;
 
@@ -49,61 +55,39 @@ const describePostDate = (post: Post): string => {
 };
 
 // ── Status badge ──────────────────────────────────────────────────────────────
-const StatusBadge = ({
-  status,
-  publishedAt,
-  interactive = false,
-  onClick,
-}: {
-  status: string;
-  publishedAt?: string | null;
-  interactive?: boolean;
-  onClick?: () => void;
-}) => {
+// A label only. Changing status from the list goes through the row menu,
+// which asks first — the badge used to flip it on a single click. Dates live
+// in each row's date line, so a scheduled time isn't repeated here.
+const StatusBadge = ({ status }: { status: string }) => {
   const cfg = {
     published: {
       label: 'Live',
       dot: 'bg-emerald-500',
       cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-      ring: 'hover:ring-emerald-200 dark:hover:ring-emerald-800',
     },
     scheduled: {
       label: 'Scheduled',
       dot: 'bg-yellow-500',
       cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      ring: 'hover:ring-yellow-200 dark:hover:ring-yellow-800',
     },
     draft: {
       label: 'Draft',
       dot: 'bg-zinc-400',
       cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400',
-      ring: 'hover:ring-zinc-200 dark:hover:ring-zinc-700',
     },
   }[status] ?? {
     label: status,
     dot: 'bg-zinc-400',
     cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
-    ring: '',
   };
 
-  const Tag = interactive ? 'button' : 'span';
-
   return (
-    <div className="space-y-1">
-      <Tag
-        onClick={onClick}
-        title={interactive ? 'Click to toggle' : undefined}
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all ${cfg.cls} ${interactive ? `cursor-pointer hover:ring-2 hover:ring-offset-1 dark:hover:ring-offset-zinc-900 ${cfg.ring}` : ''}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-        {cfg.label}
-      </Tag>
-      {status === 'scheduled' && publishedAt && (
-        <p className="text-[10px] text-yellow-700 dark:text-yellow-500 pl-1">
-          {formatScheduled(publishedAt)}
-        </p>
-      )}
-    </div>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${cfg.cls}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
   );
 };
 
@@ -115,28 +99,53 @@ export const PostList = () => {
   const navigate = useNavigate();
   const { activeBlog } = useBlog();
 
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<FilterTab>('all');
-  const [page, setPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
+  // The tab, search and page live in the URL, so coming back from a post (or
+  // pressing Back, or sharing the link) returns to the same view. Changing
+  // what's viewed goes back to page 1; `replace` keeps Back from stepping
+  // through every tab and keystroke.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusParam = searchParams.get('status') as FilterTab | null;
+  const filter: FilterTab = statusParam && FILTER_TABS.includes(statusParam) ? statusParam : 'all';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+  const debouncedSearch = searchParams.get('q') ?? '';
 
-  // Any change to what's being viewed resets pagination to the first page.
-  const viewKey = `${filter}|${debouncedSearch}|${activeBlog?.id}`;
-  const [prevViewKey, setPrevViewKey] = useState(viewKey);
-  if (viewKey !== prevViewKey) {
-    setPrevViewKey(viewKey);
-    setPage(1);
+  const updateParams = (changes: Record<string, string | null>) => {
+    // From the live URL, not the params this render saw: the search update
+    // fires after a pause and would otherwise undo a tab clicked meanwhile.
+    setSearchParams(() => {
+      const next = new URLSearchParams(window.location.search);
+      for (const [key, value] of Object.entries(changes)) {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      }
+      return next;
+    }, { replace: true });
+  };
+  const setFilter = (tab: FilterTab) => updateParams({ status: tab === 'all' ? null : tab, page: null });
+  const setPage = (next: number) => updateParams({ page: next > 1 ? String(next) : null });
+
+  // The box shows what's typed; the URL gets it after a pause. Back/Forward
+  // can change the URL underneath, so the box follows it then.
+  const [searchTerm, setSearchTerm] = useState(debouncedSearch);
+  const [syncedSearch, setSyncedSearch] = useState(debouncedSearch);
+  if (debouncedSearch !== syncedSearch) {
+    setSyncedSearch(debouncedSearch);
+    if (searchTerm.trim() !== debouncedSearch) setSearchTerm(debouncedSearch);
   }
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = searchTerm.trim();
+      if (q !== debouncedSearch) updateParams({ q: q || null, page: null });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new search term should schedule an update
+  }, [searchTerm]);
 
   const postsQueryKey = ['adminPosts', activeBlog?.id, filter, debouncedSearch, page] as const;
 
-  const { data, isLoading, isFetching } = useQuery<PaginatedPosts>({
+  const { data, isLoading, isFetching, isPlaceholderData } = useQuery<PaginatedPosts>({
     queryKey: postsQueryKey,
     queryFn: async () =>
       (await api.get(`/blogs/${activeBlog!.id}/posts`, {
@@ -148,7 +157,11 @@ export const PostList = () => {
         },
       })).data,
     enabled: !!activeBlog?.id,
-    placeholderData: keepPreviousData,
+    // Keep the old rows on screen only while paging through the same list.
+    // A new tab or search must never show the previous one's posts — Drafts
+    // selected over a list of Live posts — so it loads from a skeleton.
+    placeholderData: (prev, prevQuery) =>
+      prevQuery && prevQuery.queryKey[2] === filter && prevQuery.queryKey[3] === debouncedSearch ? prev : undefined,
   });
 
   const posts = data?.items ?? [];
@@ -165,28 +178,25 @@ export const PostList = () => {
     queryClient.invalidateQueries({ queryKey: ['adminPostCounts', activeBlog?.id] });
   };
 
-  // ── Toggle published/draft (not scheduled) ───────────────────────────────
-  const togglePublish = useMutation({
-    mutationFn: (post: Post) => {
-      const newStatus = post.status === 'published' ? 'draft' : 'published';
-      return api.patch(`/blogs/${activeBlog!.id}/posts/${post.id}`, { status: newStatus });
-    },
-    onMutate: async (updatedPost) => {
+  // ── Publish a draft / revert a live post (confirmed first) ──────────────
+  const setStatus = useMutation({
+    mutationFn: ({ post, status }: { post: Post; status: 'published' | 'draft' }) =>
+      api.patch(`/blogs/${activeBlog!.id}/posts/${post.id}`, { status }),
+    onMutate: async ({ post, status }) => {
       await queryClient.cancelQueries({ queryKey: postsQueryKey });
       const prev = queryClient.getQueryData<PaginatedPosts>(postsQueryKey);
       queryClient.setQueryData<PaginatedPosts | undefined>(postsQueryKey, (old) =>
         old && {
           ...old,
           items: old.items.map((p) =>
-            p.id === updatedPost.id
-              ? { ...p, status: p.status === 'published' ? 'draft' : 'published', published: p.status !== 'published' }
-              : p
+            p.id === post.id ? { ...p, status, published: status === 'published' } : p
           ),
         }
       );
       return { prev };
     },
-    onSuccess: () => toast.success('Status updated'),
+    onSuccess: (_, { post, status }) =>
+      toast.success(status === 'published' ? `“${post.title}” is live` : `“${post.title}” moved to drafts`),
     onError: (err, __, ctx) => {
       queryClient.setQueryData(postsQueryKey, ctx?.prev);
       toastApiError(err, 'Failed to update status');
@@ -198,11 +208,75 @@ export const PostList = () => {
     mutationFn: (id: number) => api.delete(`/blogs/${activeBlog!.id}/posts/${id}`),
     onSuccess: () => {
       invalidatePosts();
-      setDeleteId(null);
       toast.success('Post deleted');
     },
     onError: (error) => toastApiError(error, 'Could not delete post'),
   });
+
+  const statusOf = (post: Post) => post.status ?? (post.published ? 'published' : 'draft');
+  const editPost = (post: Post) => navigate(toWorkspace(`/posts/edit/${post.id}`));
+
+  const renderActions = (post: Post) => {
+    const status = statusOf(post);
+    return (
+      <PostActionsMenu
+        postTitle={post.title}
+        onEdit={() => editPost(post)}
+        onPreview={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
+        liveUrl={status === 'published' && activeBlog ? getPostUrl(activeBlog, post.slug) : undefined}
+        onPublish={status === 'draft' ? () => setPending({ kind: 'publish', post }) : undefined}
+        onRevert={status === 'published' ? () => setPending({ kind: 'revert', post }) : undefined}
+        onDelete={() => setPending({ kind: 'delete', post })}
+      />
+    );
+  };
+
+  const confirmPending = () => {
+    if (!pending) return;
+    const { kind, post } = pending;
+    if (kind === 'delete') deleteMutation.mutate(post.id);
+    else setStatus.mutate({ post, status: kind === 'publish' ? 'published' : 'draft' });
+  };
+
+  const pendingCopy = pending && {
+    publish: {
+      title: `Publish “${pending.post.title}”?`,
+      message: 'It goes live on your blog straight away.',
+      confirmText: 'Publish now',
+      isDanger: false,
+    },
+    revert: {
+      title: `Take “${pending.post.title}” off your blog?`,
+      message: "It moves back to drafts. Readers won't see it until you publish it again.",
+      confirmText: 'Revert to draft',
+      isDanger: true,
+    },
+    delete: {
+      title: `Delete “${pending.post.title}”?`,
+      message: statusOf(pending.post) === 'published'
+        ? "It's live now and will disappear from your blog. This can't be undone, and its comments are deleted too."
+        : "This can't be undone, and its comments are deleted too.",
+      confirmText: 'Delete post',
+      isDanger: true,
+    },
+  }[pending.kind];
+
+  // On the narrowest phones the tabs scroll inside their bar (never the
+  // page); keep the selected one in view. Counts arriving widen the tabs,
+  // so this re-runs then too.
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const bar = tabBarRef.current;
+    const selected = bar?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!bar || !selected) return;
+    const barBox = bar.getBoundingClientRect();
+    const tabBox = selected.getBoundingClientRect();
+    if (tabBox.left < barBox.left) {
+      bar.scrollBy({ left: tabBox.left - barBox.left - 6, behavior: 'smooth' });
+    } else if (tabBox.right > barBox.right) {
+      bar.scrollBy({ left: tabBox.right - barBox.right + 6, behavior: 'smooth' });
+    }
+  }, [filter, counts]);
 
   const TABS: { key: FilterTab; label: string }[] = [
     { key: 'all',       label: 'All' },
@@ -211,58 +285,58 @@ export const PostList = () => {
     { key: 'draft',     label: 'Drafts' },
   ];
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
-  if (isLoading) return (
-    <div className="space-y-6 animate-pulse">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="flex w-full gap-2 rounded-2xl bg-white p-1.5 shadow-sm dark:bg-zinc-900 md:w-fit border border-zinc-200 dark:border-zinc-800">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-9 w-24 rounded-xl bg-zinc-200 dark:bg-zinc-800" />)}
-        </div>
-        <div className="flex gap-3">
-          <div className="h-9 w-64 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-          <div className="h-9 w-28 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-        </div>
-      </div>
-      <div className="admin-card overflow-hidden">
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center justify-between p-4">
-              <div className="flex w-5/12 flex-col gap-2">
-                <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-                <div className="h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-              </div>
-              <div className="h-6 w-16 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
-              <div className="h-4 w-12 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-8 w-16 rounded-md bg-zinc-200 dark:bg-zinc-800" />
-            </div>
-          ))}
-        </div>
-      </div>
+  // ── Loading skeletons (the list only — tabs and search stay put) ─────────
+  const cardSkeleton = [...Array(3)].map((_, i) => (
+    <div key={i} className="admin-card animate-pulse space-y-4 rounded-[1.7rem] p-5">
+      <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-6 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />
     </div>
-  );
+  ));
+  const rowSkeleton = [...Array(5)].map((_, i) => (
+    <tr key={i} className="animate-pulse">
+      <td className="p-4">
+        <div className="h-5 w-3/4 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-2 h-4 w-24 rounded-md bg-zinc-100 dark:bg-zinc-800/50" />
+      </td>
+      <td className="p-4"><div className="h-6 w-16 rounded-full bg-zinc-200 dark:bg-zinc-800" /></td>
+      <td className="p-4"><div className="h-4 w-20 rounded-md bg-zinc-100 dark:bg-zinc-800/50" /></td>
+      <td className="p-4"><div className="ml-auto h-4 w-10 rounded-md bg-zinc-200 dark:bg-zinc-800" /></td>
+      <td className="p-4"><div className="ml-auto h-8 w-8 rounded-lg bg-zinc-200 dark:bg-zinc-800" /></td>
+    </tr>
+  ));
+  // While paging, the old rows stay but are dimmed until the new page lands.
+  const listStateClass = `transition-opacity ${isPlaceholderData ? 'opacity-50' : 'opacity-100'}`;
+  const showEmpty = !isLoading && posts.length === 0;
 
   return (
     <div className="space-y-6">
 
       {/* ─── Toolbar ─── */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         {/* Filter tabs */}
-        <div className="flex w-full rounded-2xl bg-white p-1.5 shadow-sm dark:bg-zinc-900 md:w-fit border border-zinc-200 dark:border-zinc-800">
+        <div
+          ref={tabBarRef}
+          role="group"
+          aria-label="Show posts"
+          className="flex w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm [scrollbar-width:none] dark:border-zinc-800 dark:bg-zinc-900 md:w-fit [&::-webkit-scrollbar]:hidden"
+        >
           {TABS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-all md:flex-none ${
+              aria-pressed={filter === key}
+              className={`flex-1 shrink-0 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition-all sm:px-4 md:flex-none ${
                 filter === key
                   ? 'bg-violet-100 text-violet-900 shadow-sm dark:bg-violet-900/40 dark:text-violet-100'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               {label}
+              {/* A plain number on phones, so all four tabs fit; a pill from sm up. */}
               {counts[key] > 0 && (
-                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                  filter === key ? 'bg-violet-200 text-violet-800 dark:bg-violet-800 dark:text-violet-200' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
+                <span className={`ml-1 text-[11px] font-bold sm:ml-1.5 sm:rounded-full sm:px-1.5 sm:py-0.5 sm:text-[10px] ${
+                  filter === key ? 'text-violet-700 sm:bg-violet-200 sm:text-violet-800 dark:text-violet-300 dark:sm:bg-violet-800 dark:sm:text-violet-200' : 'text-zinc-400 sm:bg-zinc-100 sm:text-zinc-500 dark:sm:bg-zinc-800'
                 }`}>
                   {counts[key]}
                 </span>
@@ -271,7 +345,7 @@ export const PostList = () => {
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex flex-col gap-3 md:ml-auto md:flex-row md:items-center">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
             <input
@@ -302,14 +376,15 @@ export const PostList = () => {
         </div>
       )}
 
-      {/* ─── Mobile View ─── */}
-      <div className="space-y-4 md:hidden">
-        {posts?.map((post) => (
+      {/* ─── Cards: phones and tablets ─── */}
+      <div className={`space-y-4 lg:hidden ${listStateClass}`} aria-busy={isLoading || isPlaceholderData}>
+        {isLoading && cardSkeleton}
+        {posts.map((post) => (
           <article key={post.id} className="admin-card space-y-4 rounded-[1.7rem] p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1 min-w-0">
                 <button
-                  onClick={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
+                  onClick={() => editPost(post)}
                   className="min-w-0 text-left font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-2"
                 >
                   {post.title}
@@ -320,17 +395,11 @@ export const PostList = () => {
                   <span className="flex items-center gap-1"><Eye size={12} /> {post.views.toLocaleString()}</span>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))} className="admin-icon-btn admin-icon-btn-edit"><Edit size={16} /></button>
-                <button onClick={() => setDeleteId(post.id)} className="admin-icon-btn admin-icon-btn-delete"><Trash2 size={16} /></button>
-              </div>
+              <div className="shrink-0">{renderActions(post)}</div>
             </div>
 
             <div className="flex flex-wrap gap-2 items-center">
-              <StatusBadge status={post.status ?? (post.published ? 'published' : 'draft')} publishedAt={post.published_at} />
-              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                {post.is_project ? <><FolderOpen size={12} /> Project</> : <><FileText size={12} /> Post</>}
-              </span>
+              <StatusBadge status={statusOf(post)} />
               {post.is_featured && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                   <Star size={12} className="fill-amber-500 text-amber-500" /> Featured
@@ -357,7 +426,7 @@ export const PostList = () => {
           </article>
         ))}
 
-        {posts?.length === 0 && (
+        {showEmpty && (
           <div className="admin-card flex flex-col items-center gap-4 p-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
               <Feather size={24} className="text-zinc-400" />
@@ -375,11 +444,11 @@ export const PostList = () => {
         )}
       </div>
 
-      {/* ─── Desktop Table ─── */}
-      <div className="hidden md:block">
+      {/* ─── Table: wide screens ─── */}
+      <div className={`hidden lg:block ${listStateClass}`} aria-busy={isLoading || isPlaceholderData}>
         <div className="admin-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <table className="w-full min-w-170 border-collapse text-left text-sm">
               <thead className="border-b border-zinc-200 bg-zinc-50/50 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 <tr>
                   <th className="p-4 w-5/12">Post</th>
@@ -390,8 +459,9 @@ export const PostList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {posts?.map((post) => {
-                  const postStatus = post.status ?? (post.published ? 'published' : 'draft');
+                {isLoading && rowSkeleton}
+                {posts.map((post) => {
+                  const postStatus = statusOf(post);
                   return (
                     <tr key={post.id} className="group transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
                       {/* Post title + meta */}
@@ -399,7 +469,7 @@ export const PostList = () => {
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => navigate(toWorkspace(`/posts/view/${post.id}`))}
+                              onClick={() => editPost(post)}
                               className="text-left text-base font-bold text-zinc-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400 line-clamp-1"
                             >
                               {post.title}
@@ -409,10 +479,6 @@ export const PostList = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                              {post.is_project ? <><FolderOpen size={10} /> Project</> : <><FileText size={10} /> Post</>}
-                            </span>
-                            <span className="text-xs text-zinc-400">·</span>
                             <span className="text-xs text-zinc-500">
                               {postStatus === 'scheduled' && post.published_at
                                 ? <span className="flex items-center gap-1 text-yellow-700 dark:text-yellow-500"><Clock size={10} /> {formatScheduled(post.published_at)}</span>
@@ -433,14 +499,8 @@ export const PostList = () => {
                         </div>
                       </td>
 
-                      {/* Status — only toggle for published/draft, not scheduled */}
                       <td className="p-4 align-top">
-                        <StatusBadge
-                          status={postStatus}
-                          publishedAt={post.published_at}
-                          interactive={postStatus !== 'scheduled'}
-                          onClick={postStatus !== 'scheduled' ? () => togglePublish.mutate(post) : undefined}
-                        />
+                        <StatusBadge status={postStatus} />
                       </td>
 
                       {/* Author */}
@@ -464,22 +524,7 @@ export const PostList = () => {
 
                       {/* Actions */}
                       <td className="p-4 text-right align-top">
-                        <div className="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                          <button
-                            onClick={() => navigate(toWorkspace(`/posts/edit/${post.id}`))}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
-                            aria-label={`Edit ${post.title}`}
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(post.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 transition-colors"
-                            aria-label={`Delete ${post.title}`}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        <div className="flex justify-end">{renderActions(post)}</div>
                       </td>
                     </tr>
                   );
@@ -488,7 +533,7 @@ export const PostList = () => {
             </table>
           </div>
 
-          {posts?.length === 0 && (
+          {showEmpty && (
             <div className="flex flex-col items-center gap-4 p-16 text-center bg-zinc-50/30 dark:bg-zinc-900/30">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700">
                 <Feather size={24} className="text-zinc-400" />
@@ -518,14 +563,14 @@ export const PostList = () => {
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
               className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-all hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:disabled:hover:bg-zinc-900"
             >
               <ChevronLeft size={14} /> Previous
             </button>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
               className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-all hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:disabled:hover:bg-zinc-900"
             >
@@ -536,11 +581,13 @@ export const PostList = () => {
       )}
 
       <Modal
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        title="Delete Post"
-        message="Are you sure you want to delete this post? This action cannot be undone and will permanently remove the post and all its comments."
+        isOpen={!!pending}
+        onClose={() => setPending(null)}
+        onConfirm={confirmPending}
+        title={pendingCopy?.title ?? ''}
+        message={pendingCopy?.message ?? ''}
+        confirmText={pendingCopy?.confirmText}
+        isDanger={pendingCopy?.isDanger}
       />
     </div>
   );

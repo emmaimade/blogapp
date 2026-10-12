@@ -73,9 +73,11 @@ export const ScheduleCalendar = ({
           day: 'relative p-0 text-center',
           day_button:
             'mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-xs font-medium text-zinc-700 transition hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:text-zinc-300 dark:hover:bg-zinc-700',
-          today: '[&>button]:font-bold [&>button]:text-primary',
+          // `!` because the admin's dark theme forces `.dark .text-zinc-700`
+          // (the day button's base colour) with !important.
+          today: '[&>button]:font-bold [&>button]:!text-primary',
           selected:
-            '[&>button]:bg-primary [&>button]:text-white [&>button]:hover:bg-primary-hover after:!bg-white',
+            '[&>button]:bg-primary [&>button]:!text-white [&>button]:hover:bg-primary-hover after:!bg-white',
           disabled: '[&>button]:pointer-events-none [&>button]:opacity-30',
           outside: '[&>button]:text-zinc-400 dark:[&>button]:text-zinc-600',
         }}

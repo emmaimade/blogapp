@@ -15,6 +15,7 @@ from .superadmin.audit_router import router as superadmin_audit_router
 from .support.router import router as support_router
 from .notifications.router import router as notifications_router
 from .billing.router import router as billing_router
+from .cron.router import router as cron_router
 
 __all__ = [
     "auth_router",
@@ -34,4 +35,5 @@ __all__ = [
     "support_router",
     "notifications_router",
     "billing_router",
+    "cron_router",
 ]

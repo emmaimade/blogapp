@@ -61,7 +61,6 @@ export const About: React.FC = () => {
   const stats = {
     articles: postStats?.articles ?? 0,
     views: postStats?.views ?? 0,
-    projects: postStats?.projects ?? 0,
   };
 
   const formatNumber = (num: number): string => {
@@ -71,9 +70,8 @@ export const About: React.FC = () => {
   };
 
   const statItems = [
-    { label: 'Articles published', value: String(stats.articles) },
+    { label: 'Posts published', value: String(stats.articles) },
     { label: 'Total views', value: formatNumber(stats.views) },
-    ...(stats.projects > 0 ? [{ label: 'Projects', value: String(stats.projects) }] : []),
   ];
 
   // Use settings data or defaults
@@ -121,9 +119,9 @@ export const About: React.FC = () => {
       <div className="max-w-4xl mx-auto px-6 py-16">
         
         {/* Stats — hidden until the blog has published something, so a new
-            blog doesn't open with a row of zeros. Projects only when there are some. */}
+            blog doesn't open with a row of zeros. */}
         {show_stats !== false && stats.articles > 0 && (
-          <div className={`grid gap-4 sm:gap-6 mb-20 ${stats.projects > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-20">
             {statItems.map((item) => (
               <div key={item.label} className="card text-center p-6">
                 <div className="text-3xl sm:text-4xl font-black text-zinc-900 dark:text-zinc-50 mb-2">

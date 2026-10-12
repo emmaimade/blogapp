@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     MAX_OWNED_WORKSPACES: int = Field(10, ge=1)
     WORKSPACE_CREATIONS_PER_HOUR: int = Field(5, ge=1)
 
+    # ── Scheduled jobs ──
+    # Shared secret Vercel Cron sends as "Authorization: Bearer <secret>" to
+    # /internal/cron/*. Unset = those endpoints are disabled (404).
+    CRON_SECRET: Optional[str] = None
+    # Run the deleted-account purge in-process (nightly + once at startup).
+    # Off by default: production purges via Vercel Cron, and a dev server on
+    # a shared database must not erase accounts in it. Ignored on Vercel.
+    PURGE_ON_STARTUP: bool = False
+
     # ── Observability ──
     LOG_LEVEL: str = "INFO"
     # SQLAlchemy statement echo. Off by default: it writes every statement and

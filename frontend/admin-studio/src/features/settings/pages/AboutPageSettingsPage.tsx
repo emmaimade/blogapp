@@ -257,7 +257,7 @@ export const AboutPageSettings: React.FC = () => {
               />
               <div>
                 <div className="font-bold text-zinc-900">Show Stats</div>
-                <div className="text-sm text-zinc-600">Display article count, total views, and project count</div>
+                <div className="text-sm text-zinc-600">Show how many posts you have published and their total views</div>
               </div>
             </label>
 

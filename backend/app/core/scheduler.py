@@ -4,6 +4,7 @@ when their published_at time has passed, and clears soft-deleted users.
 
 """
 import logging
+import os
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,6 +13,7 @@ from apscheduler.triggers.cron import CronTrigger  # Imported for daily schedule
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
+from app.core.config import settings
 from app.core.db import engine
 from app.core.notifications import add_notification
 from app.models import Post
@@ -78,6 +80,34 @@ def publish_scheduled_posts() -> None:
         logger.info(f"[scheduler] Done — {len(due_posts)} post(s) published.")
 
 
+def _register_purge_jobs(scheduler: AsyncIOScheduler) -> None:
+    """
+    The deleted-account purge, in-process: nightly at 00:00 UTC plus once at
+    startup to catch up on nights the server wasn't up for (jobs aren't
+    persisted).
+
+    Off unless PURGE_ON_STARTUP is set, and never on Vercel. Production purges
+    through Vercel Cron (vercel.json -> /internal/cron/...); this is for a
+    self-hosted server, or for testing the purge locally. Off by default so a
+    dev server pointed at a shared database never erases accounts in it.
+    """
+    if not settings.PURGE_ON_STARTUP or os.environ.get("VERCEL"):
+        return
+    scheduler.add_job(
+        purge_expired_soft_deleted_users,
+        trigger=CronTrigger(hour=0, minute=0),
+        id="user_retention_purge",
+        replace_existing=True,
+        misfire_grace_time=3600,  # 1 hour grace if execution loop delays
+    )
+    scheduler.add_job(
+        purge_expired_soft_deleted_users,
+        next_run_time=datetime.now(timezone.utc),
+        id="user_retention_purge_catchup",
+        replace_existing=True,
+    )
+
+
 def start_scheduler() -> None:
     # 1. Your Existing Job: Run every 60 seconds
     _scheduler.add_job(
@@ -88,20 +118,10 @@ def start_scheduler() -> None:
         misfire_grace_time=30,   # if a run is missed by ≤30s, still run it
     )
     
-    # 2. Your New Automated Job: Runs every night at midnight (UTC)
-    _scheduler.add_job(
-        purge_expired_soft_deleted_users,
-        trigger=CronTrigger(hour=0, minute=0),
-        id="user_retention_purge",
-        replace_existing=True,
-        misfire_grace_time=3600, # 1 hour grace if execution loop delays
-    )
-
-    # TIP FOR LOCAL DEV TESTING: Un-comment this line below to see it run every 10 seconds!
-    # _scheduler.add_job(purge_expired_soft_deleted_users, trigger=IntervalTrigger(seconds=10), id="test_purge", replace_existing=True)
+    _register_purge_jobs(_scheduler)
 
     _scheduler.start()
-    logger.info("[scheduler] Automation tasks started (Post scheduler & User retention purge online).")
+    logger.info("[scheduler] Started (post scheduler; account purge %s).", "on" if settings.PURGE_ON_STARTUP else "off")
 
 
 def stop_scheduler() -> None:

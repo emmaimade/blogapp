@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from app.core.db import get_session
 from app.core.moderation import flag_post, load_post_for_flag
-from app.core.security import get_current_user, get_current_user_optional
+from app.core.security import get_current_user, get_current_user_optional, reject_unusable_token
 from app.core.permissions import get_public_blog, require_blog_author, require_completed_onboarding
 from app.models import Blog, Post, User
 from app.modules.comments.service import count_live_comments
@@ -49,10 +49,10 @@ def create_post(
 @router.get("/", response_model=PaginatedResponse[PostRead])
 def read_posts(
     blog_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
     current_user: Optional[User] = Depends(get_current_user_optional),
-    filter: Optional[str] = None,
     tag: Optional[str] = None,
     sort: Literal["latest", "popular"] = "latest",
     skip: int = Query(0, ge=0),
@@ -61,8 +61,13 @@ def read_posts(
     q: Optional[str] = None,
     public_view: bool = False,
 ):
+    # The admin studio's list: a lapsed session must get a 401 (so the client
+    # refreshes and retries), not the reader's answer without the drafts.
+    # The public blog always asks for public_view and is unaffected.
+    if not public_view and current_user is None:
+        reject_unusable_token(request)
     items, total = post_service.read_posts(
-        blog_id, session, current_user, filter, tag, sort, skip, limit, status, q, public_view
+        blog_id, session, current_user, tag, sort, skip, limit, status, q, public_view
     )
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 
@@ -183,10 +188,16 @@ def flag_post_for_moderation(
 def read_post(
     blog_id: int,
     post_id: int,
+    request: Request,
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    # The studio's editor and preview load posts by id (the public blog uses
+    # the slug route): a lapsed session must be a 401 the client can refresh,
+    # not a "post not found" for a draft that's still there.
+    if current_user is None:
+        reject_unusable_token(request)
     post = post_service.read_post(blog_id, post_id, session, current_user)
     return _with_comment_count(post, session)
 

@@ -24,7 +24,6 @@ export interface Post {
   /** Last content revision made after the post went live, if any. */
   edited_at?: string | null;
   views?: number;
-  is_project?: boolean;
   is_featured?: boolean;
   is_sample?: boolean;
   status?: 'published' | 'scheduled' | 'draft';
