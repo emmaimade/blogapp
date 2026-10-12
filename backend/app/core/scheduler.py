@@ -108,6 +108,19 @@ def _register_purge_jobs(scheduler: AsyncIOScheduler) -> None:
     )
 
 
+def send_trial_notices() -> None:
+    # Imported here: the billing module imports the app's routers' services,
+    # which this low-level module shouldn't load at import time.
+    from app.modules.billing.trial_notices import run_trial_notices
+
+    try:
+        with Session(engine) as session:
+            run = run_trial_notices(session)
+        logger.info(f"[scheduler] Trial notices: {run}")
+    except Exception:
+        logger.exception("[scheduler] Trial notices failed")
+
+
 def start_scheduler() -> None:
     # 1. Your Existing Job: Run every 60 seconds
     _scheduler.add_job(
@@ -119,6 +132,16 @@ def start_scheduler() -> None:
     )
     
     _register_purge_jobs(_scheduler)
+
+    # Trial reminders / trial-ended notices. Production runs this from Vercel
+    # Cron instead (see vercel.json); running it twice is harmless.
+    _scheduler.add_job(
+        send_trial_notices,
+        trigger=IntervalTrigger(hours=1),
+        id="trial_notices",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
 
     _scheduler.start()
     logger.info("[scheduler] Started (post scheduler; account purge %s).", "on" if settings.PURGE_ON_STARTUP else "off")

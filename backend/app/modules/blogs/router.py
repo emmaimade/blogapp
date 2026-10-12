@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlmodel import Session
 
 from app.core.db import get_session
+from app.core.plans import paused_member_user_ids
 from app.core.permissions import (
     get_current_blog,
     get_public_blog,
@@ -172,7 +173,11 @@ def read_blog_members(
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_owner),
 ):
-    return blog_service.read_blog_members(blog_id, session)
+    paused = paused_member_user_ids(session, blog_id)
+    return [
+        BlogMemberRead.model_validate(member).model_copy(update={"access_paused": member.user_id in paused})
+        for member in blog_service.read_blog_members(blog_id, session)
+    ]
 
 
 @router.post("/{blog_id}/members/{member_id}/trigger-reset-email")

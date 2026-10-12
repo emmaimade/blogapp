@@ -54,7 +54,7 @@ export const UserManager = () => {
   const {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
     showInviteModal, setShowInviteModal,
-    filteredMembers, pendingInvitations, revokeInvitationMutation,
+    filteredMembers, pausedCount, pendingInvitations, revokeInvitationMutation,
     isOwner, isLoading, updateRoleMutation, removeMutation, transferOwnershipMutation
   } = useUserManager();
 
@@ -190,6 +190,24 @@ export const UserManager = () => {
         </div>
       </div>
 
+      {isOwner && pausedCount > 0 && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm">
+            <span className="font-semibold">
+              {pausedCount === 1 ? "1 member is" : `${pausedCount} members are`} paused.
+            </span>{" "}
+            Your workspace has more members than your plan includes, so they can view but not edit. Upgrade to
+            restore their access straight away, or remove members to free up seats.
+          </p>
+          <Link
+            to={toWorkspace("/settings/billing")}
+            className="inline-flex flex-shrink-0 items-center justify-center rounded-lg bg-amber-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-950 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
+          >
+            Upgrade plan
+          </Link>
+        </div>
+      )}
+
       {/* Mobile puts pending invites first (order-first) so they're not buried under a long team list */}
       <div className="flex flex-col gap-5">
         {memberCount === 0 && (
@@ -227,6 +245,7 @@ export const UserManager = () => {
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{fullName(member)}</span>
                           {isCurrentUser && <span className="flex-shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[11px] font-medium leading-none text-zinc-600 dark:text-zinc-400">you</span>}
+                          {member.access_paused && <span className="flex-shrink-0 rounded-full bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 text-[11px] font-medium leading-none text-amber-700 dark:text-amber-400">paused</span>}
                         </div>
                         <p className="truncate text-[13px] text-zinc-500 dark:text-zinc-400">
                           @{member.user.username}
@@ -287,6 +306,7 @@ export const UserManager = () => {
                                     {fullName(member)}
                                   </Link>
                                   {isCurrentUser && <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 tracking-wider select-none">you</span>}
+                                  {member.access_paused && <span title="Over the plan's member limit: can view, can't edit" className="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 tracking-wider select-none">Paused · view only</span>}
                                 </div>
                                 <div className="text-xs text-zinc-500 dark:text-zinc-400">@{member.user.username} <span className="text-zinc-300 dark:text-zinc-700 mx-1">•</span> {member.user.email}</div>
                               </div>

@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.datetimes import as_utc, utc_now
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError
-from app.models.blog import BlogInvitation, BlogMember, BlogSubscription, SubscriptionPlan, SubscriptionStatus
+from app.models.blog import BlogInvitation, BlogMember, BlogRole, BlogSubscription, SubscriptionPlan, SubscriptionStatus
 from app.models.post import Post, PostStatus
 
 
@@ -118,8 +118,9 @@ def get_plan_limits(subscription: Optional[BlogSubscription], now: Optional[date
 
 
 # ── Enforcement ──────────────────────────────────────────────────────────────
-# Limits only ever block adding something new. Nothing existing is removed or
-# hidden when a workspace drops to a smaller plan.
+# Limits block adding something new. Nothing existing is removed or hidden
+# when a workspace drops to a smaller plan — except that members beyond the
+# seat limit become read-only until the owner upgrades (paused_member_user_ids).
 
 def load_subscription(session: Session, blog_id: int) -> Optional[BlogSubscription]:
     return session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
@@ -168,6 +169,34 @@ def ensure_member_capacity(
         raise _upgrade_required(
             f"Your plan allows {seats}. Upgrade your plan in Settings → Billing to add more people."
         )
+
+
+def paused_member_user_ids(session: Session, blog_id: int) -> set[int]:
+    """
+    Members over the plan's seat limit — typically after a trial ends unpaid,
+    or a downgrade. They keep reading the workspace but can't change anything
+    until the owner upgrades or frees a seat (enforced in get_current_blog).
+
+    Worked out on every call, like the plan itself, so access comes back the
+    moment the owner pays. Owners are never paused; of everyone else, those
+    who joined first keep the seats the plan includes.
+    """
+    limit = get_blog_limits(session, blog_id).max_members
+    if limit is None:
+        return set()
+    members = session.exec(
+        select(BlogMember).where(BlogMember.blog_id == blog_id).order_by(BlogMember.invited_at, BlogMember.id)
+    ).all()
+    if len(members) <= limit:
+        return set()
+    owners = [m for m in members if m.role == BlogRole.OWNER]
+    others = [m for m in members if m.role != BlogRole.OWNER]
+    seats_for_others = max(limit - len(owners), 0)
+    return {m.user_id for m in others[seats_for_others:]}
+
+
+def is_member_paused(session: Session, blog_id: int, user_id: int) -> bool:
+    return user_id in paused_member_user_ids(session, blog_id)
 
 
 def ensure_can_publish(session: Session, blog_id: int) -> None:

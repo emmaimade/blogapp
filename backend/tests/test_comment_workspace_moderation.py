@@ -11,10 +11,10 @@ Workspace comment moderation (app/modules/comments/workspace.py):
   403, and team members can't be blocked.
 """
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.db import engine
-from app.models import Blog, BlogMember, Comment, OnboardingStatus
+from app.models import Blog, BlogMember, BlogSubscription, Comment, OnboardingStatus, SubscriptionPlan
 from app.models.blog import BlogRole
 from app.models.comment import CommentDeletedBy
 from app.modules.comments.service import soft_delete_comment
@@ -23,12 +23,19 @@ from tests.test_comments_endpoints import _create_post, _register_owner
 
 
 def _workspace(client) -> tuple[str, int, int]:
-    """An owner whose workspace has finished onboarding (moderation writes require it)."""
+    """
+    An owner whose workspace has finished onboarding (moderation writes require
+    it), on the Team plan so the members these tests add have seats rather than
+    being paused.
+    """
     token, blog_id, user_id = _register_owner(client)
     with Session(engine) as session:
         blog = session.get(Blog, blog_id)
         blog.onboarding_status = OnboardingStatus.COMPLETED
         session.add(blog)
+        subscription = session.exec(select(BlogSubscription).where(BlogSubscription.blog_id == blog_id)).first()
+        subscription.plan = SubscriptionPlan.TEAM
+        session.add(subscription)
         session.commit()
     return token, blog_id, user_id
 

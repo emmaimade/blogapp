@@ -11,6 +11,7 @@ from app.models import Blog, BlogMember, BlogRole, OnboardingStatus, PlatformRol
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError, NotFoundError
+from app.core.plans import is_member_paused
 from app.core.security import extract_bearer_token, get_current_user, get_current_user_optional
 
 class Permissions:
@@ -144,6 +145,15 @@ async def get_current_blog(
         and not _allowed_while_suspended(request, blog_id)
     ):
         raise AuthorizationError(ErrorCode.WORKSPACE_DEACTIVATED)
+    # A member over the plan's seat limit (e.g. after a trial ended unpaid) is
+    # likewise read-only here, but can still leave.
+    if (
+        membership.role != BlogRole.OWNER
+        and request.method not in _READ_METHODS
+        and not request.url.path.rstrip("/").endswith(f"/blogs/{blog_id}/members/me")
+        and is_member_paused(session, blog_id, current_user.id)
+    ):
+        raise AuthorizationError(ErrorCode.MEMBER_ACCESS_PAUSED)
     return blog
 
 async def require_blog_owner(

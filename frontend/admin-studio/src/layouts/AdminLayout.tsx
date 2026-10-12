@@ -163,7 +163,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { activeBlog, activeRole, requiresOnboarding, routeSlug } = useBlog();
+  const { activeBlog, activeMembership, activeRole, requiresOnboarding, routeSlug } = useBlog();
   const toWorkspace = useWorkspacePath();
   const location = useLocation();
   const navigate = useNavigate();
@@ -339,6 +339,8 @@ useEffect(() => {
     sectionPath === "/admin/superadmin";
   // Suspended by a superadmin: readable, but the backend refuses changes.
   const isSuspended = !!routeSlug && !!activeBlog && activeBlog.is_active === false;
+  // Over the plan's seat limit — usually the workspace's trial ended unpaid.
+  const isAccessPaused = !!routeSlug && !isSuspended && !!activeMembership?.access_paused;
   const showOnboardingLock =
     requiresOnboarding && location.pathname !== NEW_WORKSPACE_PATH && !userIsSuperAdmin;
   const onboardingStepOrder = ["about", "profile", "publication", "plan"];
@@ -526,6 +528,24 @@ useEffect(() => {
               >
                 Contact support
               </Link>
+            </div>
+          )}
+          {isAccessPaused && (
+            <div
+              role="status"
+              className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">
+                <PauseCircle size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold">Your editing access is paused</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-200/80">
+                  {activeBlog?.name} has more members than its plan includes, so you can view everything but
+                  can't make changes. Nothing you wrote has been removed. Ask the workspace owner to upgrade or
+                  free up a seat — your access comes back straight away.
+                </p>
+              </div>
             </div>
           )}
           {showOnboardingLock && (

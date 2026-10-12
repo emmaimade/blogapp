@@ -71,6 +71,8 @@ class BlogMemberRead(UTCDatetimeMixin, BaseModel):
     role: BlogRole
     invited_at: datetime
     user: UserRead
+    # Over the plan's seat limit, so read-only until the owner upgrades.
+    access_paused: bool = False
 
     class Config:
         from_attributes = True

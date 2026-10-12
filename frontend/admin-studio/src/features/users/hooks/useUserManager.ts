@@ -22,6 +22,8 @@ export interface BlogMember {
     last_login: string | null;
     created_at: string;
   };
+  /** Over the plan's seat limit: can view, can't edit, until the owner upgrades. */
+  access_paused?: boolean;
 }
 
 export interface BlogInvitation {
@@ -162,6 +164,8 @@ export const useUserManager = () => {
     showInviteModal,
     setShowInviteModal,
     filteredMembers,
+    // Counted over everyone, not the search results.
+    pausedCount: members.filter((member) => member.access_paused).length,
     pendingInvitations,
     revokeInvitationMutation,
     isOwner,

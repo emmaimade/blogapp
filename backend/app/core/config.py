@@ -33,6 +33,8 @@ class Settings(BaseSettings):
 
     # ── Core App Security Settings ──
     SECRET_KEY: Optional[str] = None
+    # Vercel Cron sends it as a bearer token to /internal/cron/*; unset disables those routes.
+    CRON_SECRET: Optional[str] = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30

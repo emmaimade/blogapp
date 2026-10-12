@@ -107,6 +107,7 @@ class ErrorCode(str, Enum):
     WORKSPACE_FULL = "WORKSPACE_FULL"
     WORKSPACE_LIMIT_REACHED = "WORKSPACE_LIMIT_REACHED"
     WORKSPACE_DEACTIVATED = "WORKSPACE_DEACTIVATED"
+    MEMBER_ACCESS_PAUSED = "MEMBER_ACCESS_PAUSED"
     PAYMENT_METHOD_REQUIRED = "PAYMENT_METHOD_REQUIRED"
     NO_PENDING_CHANGE = "NO_PENDING_CHANGE"
 
@@ -387,6 +388,12 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
         status.HTTP_403_FORBIDDEN,
         "This workspace has been suspended by Inko support. You can view it, "
         "but changes are turned off. Contact support to restore it.",
+    ),
+    ErrorCode.MEMBER_ACCESS_PAUSED: ErrorSpec(
+        status.HTTP_403_FORBIDDEN,
+        "Your editing access to this workspace is paused because it has more members "
+        "than its plan includes. You can still view everything. Ask the workspace "
+        "owner to upgrade or free up a seat.",
     ),
     ErrorCode.WORKSPACE_LIMIT_REACHED: ErrorSpec(
         status.HTTP_403_FORBIDDEN,

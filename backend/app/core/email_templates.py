@@ -337,3 +337,113 @@ def get_contact_message_template_text(
         f"{subject}\n\n{message}\n\n"
         f"Reply to: {sender_email}"
     )
+
+# ── Trial ending / ended (members over the Free limit get paused) ───────────
+
+def _paused_members_line(members_affected: int) -> str:
+    if members_affected <= 0:
+        return ""
+    people = "1 teammate" if members_affected == 1 else f"{members_affected} teammates"
+    return f"{people} will become view-only: they can still see everything, but can't edit until you upgrade."
+
+
+def get_trial_ending_template(
+    owner_name: str, blog_name: str, plan_name: str, ends_on: str, members_affected: int, billing_url: str
+) -> str:
+    paused = _paused_members_line(members_affected)
+    body = f"""<p style="margin:0 0 16px 0; color:#4b5563;">
+        Hi {owner_name}, the {plan_name} trial for <strong>{blog_name}</strong> ends on <strong>{ends_on}</strong>.
+        Add a payment method to keep {plan_name} — you won't be charged until the trial ends.
+    </p>
+    <p style="margin:0; color:#4b5563;">
+        If you don't, the workspace moves to the Free plan. Nothing is deleted. {paused}
+    </p>"""
+    return _base_email(
+        preheader=f"Your {plan_name} trial for {blog_name} ends on {ends_on}.",
+        heading=f"Your {plan_name} trial ends soon",
+        body_html=body,
+        cta_label="Add payment method",
+        cta_url=billing_url,
+        cta_color="#7b39ed",
+        footer_note="You're receiving this because you own this workspace on Inko.",
+    )
+
+
+def get_trial_ending_template_text(
+    owner_name: str, blog_name: str, plan_name: str, ends_on: str, members_affected: int, billing_url: str
+) -> str:
+    paused = _paused_members_line(members_affected)
+    return (
+        f"Hi {owner_name},\n\n"
+        f"The {plan_name} trial for {blog_name} ends on {ends_on}. Add a payment method to keep "
+        f"{plan_name} — you won't be charged until the trial ends:\n{billing_url}\n\n"
+        f"If you don't, the workspace moves to the Free plan. Nothing is deleted. {paused}"
+    ).rstrip() + "\n"
+
+
+def get_trial_ended_template(
+    owner_name: str, blog_name: str, plan_name: str, members_affected: int, invites_cancelled: int, billing_url: str
+) -> str:
+    details = []
+    if members_affected > 0:
+        people = "1 teammate is" if members_affected == 1 else f"{members_affected} teammates are"
+        details.append(f"{people} now view-only. Their access comes back as soon as you upgrade.")
+    if invites_cancelled > 0:
+        invites = "1 pending invitation was" if invites_cancelled == 1 else f"{invites_cancelled} pending invitations were"
+        details.append(f"{invites} cancelled, since the Free plan has no seat for them.")
+    extra = "".join(f'<p style="margin:12px 0 0 0; color:#4b5563;">{line}</p>' for line in details)
+    body = f"""<p style="margin:0; color:#4b5563;">
+        Hi {owner_name}, the {plan_name} trial for <strong>{blog_name}</strong> has ended, so the workspace is now
+        on the Free plan. Nothing has been deleted.
+    </p>{extra}"""
+    return _base_email(
+        preheader=f"{blog_name} is now on the Free plan.",
+        heading=f"Your {plan_name} trial has ended",
+        body_html=body,
+        cta_label=f"Upgrade to {plan_name}",
+        cta_url=billing_url,
+        cta_color="#7b39ed",
+        footer_note="You're receiving this because you own this workspace on Inko.",
+    )
+
+
+def get_trial_ended_template_text(
+    owner_name: str, blog_name: str, plan_name: str, members_affected: int, invites_cancelled: int, billing_url: str
+) -> str:
+    lines = [
+        f"Hi {owner_name},",
+        "",
+        f"The {plan_name} trial for {blog_name} has ended, so the workspace is now on the Free plan. Nothing has been deleted.",
+    ]
+    if members_affected > 0:
+        people = "1 teammate is" if members_affected == 1 else f"{members_affected} teammates are"
+        lines.append(f"{people} now view-only. Their access comes back as soon as you upgrade.")
+    if invites_cancelled > 0:
+        invites = "1 pending invitation was" if invites_cancelled == 1 else f"{invites_cancelled} pending invitations were"
+        lines.append(f"{invites} cancelled, since the Free plan has no seat for them.")
+    lines += ["", f"Upgrade here: {billing_url}"]
+    return "\n".join(lines) + "\n"
+
+
+def get_invitation_cancelled_template(blog_name: str) -> str:
+    # Says nothing about the workspace's plan — that's the owner's business.
+    body = f"""<p style="margin:0; color:#4b5563;">
+        The invitation you received to join <strong>{blog_name}</strong> on {BRAND_NAME} is no longer available.
+        If you were expecting to join, ask the person who invited you to send a new invitation.
+    </p>"""
+    return _base_email(
+        preheader=f"Your invitation to {blog_name} is no longer available.",
+        heading="Invitation no longer available",
+        body_html=body,
+        cta_label=f"Visit {BRAND_NAME}",
+        cta_url=getattr(settings, "PUBLIC_SITE_URL", "") or "https://inko.blog",
+        cta_color="#7b39ed",
+        footer_note="You're receiving this because you were invited to a workspace on Inko.",
+    )
+
+
+def get_invitation_cancelled_template_text(blog_name: str) -> str:
+    return (
+        f"The invitation you received to join {blog_name} on {BRAND_NAME} is no longer available.\n"
+        "If you were expecting to join, ask the person who invited you to send a new invitation.\n"
+    )

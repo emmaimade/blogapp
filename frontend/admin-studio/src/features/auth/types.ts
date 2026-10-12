@@ -37,6 +37,8 @@ export interface UserBlogMembership {
   blog: MembershipBlog;
   /** The workspace's effective plan; the backend sends it only on memberships the user owns. */
   plan?: PlanKey | null;
+  /** Over the workspace's seat limit (e.g. its trial ended unpaid): read-only until the owner upgrades. */
+  access_paused?: boolean;
 }
 
 export interface AuthUser {

@@ -15,7 +15,7 @@ from app.core.security import (
     create_access_token,
     verify_password,
 )
-from app.core.plans import get_effective_plan
+from app.core.plans import get_effective_plan, is_member_paused
 from app.models import BlogMember, BlogRole, BlogSubscription, User
 from app.schemas import UserRead
 from app.services.auth_tokens import create_refresh_token, create_verification_token
@@ -59,6 +59,9 @@ def build_user_payload(user_id: int, session: Session) -> UserRead:
         for membership in payload.blog_memberships:
             if membership.role == BlogRole.OWNER:
                 membership.plan = get_effective_plan(subscriptions.get(membership.blog_id))
+    for membership in payload.blog_memberships:
+        if membership.role != BlogRole.OWNER:
+            membership.access_paused = is_member_paused(session, membership.blog_id, user_id)
     return payload
 
 
