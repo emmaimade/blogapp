@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, CheckCircle2, Copy, ExternalLink, Zap, Lock } from 'lucide-react';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
+import { getBlogDisplayUrl, getBlogUrl } from '../../../shared/lib/blogUrl';
 
 interface SiteCardProps {
   subdomain: string;
@@ -14,15 +15,8 @@ export const SiteCard = ({ subdomain, customDomain, plan, canManageSettings }: S
   const toWorkspace = useWorkspacePath();
   const [copied, setCopied] = useState(false);
   const isPro = plan === 'pro' || plan === 'team';
-  const BLOG_BASE_URL = import.meta.env.VITE_BLOG_URL || 'http://localhost:5174';
-  
-  const liveUrl = customDomain
-    ? `https://${customDomain}`
-    : import.meta.env.DEV
-      ? `${BLOG_BASE_URL}`
-      : `https://${subdomain}.inko.blog`;
-      
-  const displayUrl = customDomain ?? (import.meta.env.DEV ? BLOG_BASE_URL.replace(/^https?:\/\//, '') : `${subdomain}.inko.blog`);
+  const liveUrl = getBlogUrl({ subdomain, custom_domain: customDomain });
+  const displayUrl = getBlogDisplayUrl({ subdomain, custom_domain: customDomain });
 
   const handleCopy = () => {
     navigator.clipboard.writeText(liveUrl);
