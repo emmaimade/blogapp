@@ -6,7 +6,7 @@ token: code_hash holds its HMAC, code_attempts counts wrong guesses. Rows made
 before this have no code and keep working as links.
 
 Revision ID: a4c8e2f6b1d3
-Revises: e1a7c3d5f9b2
+Revises: a4d7e2c9f1b3
 Create Date: 2026-10-12 00:00:00.000000
 
 """
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "a4c8e2f6b1d3"
-down_revision = "e1a7c3d5f9b2"
+down_revision = "a4d7e2c9f1b3"
 branch_labels = None
 depends_on = None
 
