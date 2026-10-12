@@ -43,7 +43,9 @@ class Post(SQLModel, table=True):
     title:         str
     slug:          str            = Field(index=True)
     content:       str
-    author_id:     Optional[int] = Field(default=None, foreign_key="user.id", ondelete="CASCADE")
+    # SET NULL: a post belongs to its workspace, so it outlives its author's
+    # account (shown without an author) instead of vanishing with it.
+    author_id:     Optional[int] = Field(default=None, foreign_key="user.id", ondelete="SET NULL")
     thumbnail_url: Optional[str] = Field(default=None)
     views:         int            = Field(default=0)
     is_project:    bool           = Field(default=False)

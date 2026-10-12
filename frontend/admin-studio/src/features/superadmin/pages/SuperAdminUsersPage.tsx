@@ -43,7 +43,7 @@ interface UserListPage {
 
 const PAGE_SIZE = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Mirrors SOFT_DELETE_RETENTION_DAYS in backend/app/core/tasks.py.
+// Mirrors SOFT_DELETE_RETENTION_DAYS in backend/app/services/deletion.py.
 const SOFT_DELETE_RETENTION_DAYS = 30;
 
 const STATUS_TABS: { key: AccountStatus; label: string }[] = [
@@ -67,8 +67,10 @@ const identityOf = (user: PlatformUser) => {
   return { username, email: strip(user.email) ?? user.email, name };
 };
 
+const restoreDeadline = (deletedAt: string) => new Date(deletedAt).getTime() + SOFT_DELETE_RETENTION_DAYS * DAY_MS;
+
 const purgeLabel = (deletedAt: string, now: number) => {
-  const days = Math.ceil((new Date(deletedAt).getTime() + SOFT_DELETE_RETENTION_DAYS * DAY_MS - now) / DAY_MS);
+  const days = Math.ceil((restoreDeadline(deletedAt) - now) / DAY_MS);
   if (days <= 0) return 'Purge pending';
   return `Purges in ${days} ${days === 1 ? 'day' : 'days'}`;
 };
@@ -257,7 +259,11 @@ export const SuperAdminUsersPage = () => {
       { kind: 'link', label: 'View details', to: `/admin/platform-users/${user.id}`, icon: <UserIcon size={16} /> },
     ];
     if (user.deleted_at) {
-      items.push({ kind: 'button', label: 'Restore account', icon: <RotateCcw size={16} />, onSelect: () => restoreMutation.mutate(user.id) });
+      // The window is a hard deadline: past it the account counts as erased,
+      // even if the purge hasn't removed it yet (the backend refuses too).
+      if (now < restoreDeadline(user.deleted_at)) {
+        items.push({ kind: 'button', label: 'Restore account', icon: <RotateCcw size={16} />, onSelect: () => restoreMutation.mutate(user.id) });
+      }
       return items;
     }
     if (user.is_active) {

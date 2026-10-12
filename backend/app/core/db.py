@@ -1,3 +1,4 @@
+from sqlalchemy import event
 from sqlmodel import SQLModel, Session, create_engine
 
 from .config import DATABASE_URL, settings
@@ -21,6 +22,16 @@ _is_sqlite = bool(DATABASE_URL and DATABASE_URL.startswith("sqlite"))
 _pool_args = {} if _is_sqlite else {"pool_recycle": 240, "pool_use_lifo": True}
 
 engine = create_engine(DATABASE_URL, echo=settings.SQL_ECHO, connect_args=_connect_args, **_pool_args)
+
+if _is_sqlite:
+    # Postgres always enforces foreign keys; SQLite only when asked, per
+    # connection. Without this the test suite never exercises the ON DELETE
+    # rules production relies on (e.g. purging an account).
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def create_db_and_tables():

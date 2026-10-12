@@ -4,6 +4,7 @@ when their published_at time has passed, and clears soft-deleted users.
 
 """
 import logging
+import os
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -97,8 +98,17 @@ def start_scheduler() -> None:
         misfire_grace_time=3600, # 1 hour grace if execution loop delays
     )
 
-    # TIP FOR LOCAL DEV TESTING: Un-comment this line below to see it run every 10 seconds!
-    # _scheduler.add_job(purge_expired_soft_deleted_users, trigger=IntervalTrigger(seconds=10), id="test_purge", replace_existing=True)
+    # The nightly run is missed whenever the server isn't up at that hour (a
+    # laptop, a restart), and jobs aren't persisted, so catch up once at
+    # startup. Not on Vercel: there every cold start would trigger it, and
+    # Vercel Cron covers the purge (vercel.json -> /internal/cron/...).
+    if not os.environ.get("VERCEL"):
+        _scheduler.add_job(
+            purge_expired_soft_deleted_users,
+            next_run_time=datetime.now(timezone.utc),
+            id="user_retention_purge_catchup",
+            replace_existing=True,
+        )
 
     _scheduler.start()
     logger.info("[scheduler] Automation tasks started (Post scheduler & User retention purge online).")

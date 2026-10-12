@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from slugify import slugify
 
+from app.services.deletion import ensure_account_deletable
 from app.core.audit import add_audit_log, get_client_ip, resolve_primary_blog_id
 from app.services.login_throttle import check_login_allowed, record_failed_login
 from app.core.geolocation import describe_location
@@ -369,6 +370,7 @@ def delete_user_account(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_password_changed),
 ):
+    ensure_account_deletable(session, current_user, subject="You")
     add_audit_log(
         session,
         action="user.delete_account",

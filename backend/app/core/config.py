@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     MAX_OWNED_WORKSPACES: int = Field(10, ge=1)
     WORKSPACE_CREATIONS_PER_HOUR: int = Field(5, ge=1)
 
+    # ── Scheduled jobs ──
+    # Shared secret Vercel Cron sends as "Authorization: Bearer <secret>" to
+    # /internal/cron/*. Unset = those endpoints are disabled (404).
+    CRON_SECRET: Optional[str] = None
+
     # ── Observability ──
     LOG_LEVEL: str = "INFO"
     # SQLAlchemy statement echo. Off by default: it writes every statement and
