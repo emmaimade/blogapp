@@ -6,13 +6,15 @@ the migration that turns old "Showcase Project" posts into a Projects tag.
 """
 
 import importlib.util
+from datetime import timedelta
 import uuid
 from pathlib import Path
 
 from sqlmodel import Session, select
 
 from app.core.db import engine
-from app.core.security import ACCESS_TOKEN_COOKIE_NAME
+from app.core.security import ACCESS_TOKEN_COOKIE_NAME, create_access_token
+from app.models import User
 from app.models import BlogMember, Post, Tag
 from app.models.blog import BlogRole
 from app.models.post import PostStatus
@@ -132,6 +134,86 @@ def _list_slugs(client, blog_id: int, headers: dict | None = None, **params) -> 
     res = client.get(f"/blogs/{blog_id}/posts/", params={"limit": 100, **params}, headers=headers or {})
     assert res.status_code == 200, res.text
     return {p["slug"] for p in res.json()["items"]}
+
+
+def _token_for(user_id: int, minutes: int) -> str:
+    with Session(engine) as session:
+        username = session.get(User, user_id).username
+    return create_access_token({"sub": username}, expires_delta=timedelta(minutes=minutes))
+
+
+def test_lapsed_session_on_the_admin_list_is_a_401_not_the_reader_view(client):
+    """An expired token used to be treated as no token: the owner quietly got
+    live posts only, and never the 401 that makes the studio refresh."""
+    blog_id, owner_id, _ = _register(client)
+    _create_post(blog_id, owner_id)
+    _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    expired = {"Authorization": f"Bearer {_token_for(owner_id, -5)}"}
+
+    res = client.get(f"/blogs/{blog_id}/posts/", headers=expired)
+
+    assert res.status_code == 401, res.text
+    assert res.json()["code"] == "SESSION_EXPIRED"
+
+
+def test_malformed_token_on_the_admin_list_is_a_401(client):
+    blog_id, _, _ = _register(client)
+
+    res = client.get(f"/blogs/{blog_id}/posts/", headers={"Authorization": "Bearer not-a-token"})
+
+    assert res.status_code == 401, res.text
+
+
+def test_valid_session_on_the_admin_list_includes_drafts(client):
+    blog_id, owner_id, _ = _register(client)
+    published = _create_post(blog_id, owner_id)
+    draft = _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    valid = {"Authorization": f"Bearer {_token_for(owner_id, 5)}"}
+
+    assert {published, draft} <= _list_slugs(client, blog_id, valid)
+
+
+def test_lapsed_session_still_reads_the_public_view_and_anonymous_still_works(client):
+    """Readers are unaffected: the public blog always asks for public_view,
+    and a request with no token at all is still the reader's list."""
+    blog_id, owner_id, _ = _register(client)
+    published = _create_post(blog_id, owner_id)
+    draft = _create_post(blog_id, owner_id, status=PostStatus.DRAFT)
+    expired = {"Authorization": f"Bearer {_token_for(owner_id, -5)}"}
+
+    public = _list_slugs(client, blog_id, expired, public_view="true")
+    anonymous = _list_slugs(client, blog_id)
+
+    assert published in public and draft not in public
+    assert published in anonymous and draft not in anonymous
+
+
+def _post_id(slug: str) -> int:
+    with Session(engine) as session:
+        return session.exec(select(Post.id).where(Post.slug == slug)).one()
+
+
+def test_lapsed_session_opening_a_draft_by_id_is_a_401_not_a_404(client):
+    """The editor loads posts by id: an expired session used to make a draft
+    look deleted ("post not found") instead of refreshing."""
+    blog_id, owner_id, _ = _register(client)
+    draft_id = _post_id(_create_post(blog_id, owner_id, status=PostStatus.DRAFT))
+
+    expired = client.get(f"/blogs/{blog_id}/posts/{draft_id}",
+                         headers={"Authorization": f"Bearer {_token_for(owner_id, -5)}"})
+    valid = client.get(f"/blogs/{blog_id}/posts/{draft_id}",
+                       headers={"Authorization": f"Bearer {_token_for(owner_id, 5)}"})
+
+    assert expired.status_code == 401, expired.text
+    assert expired.json()["code"] == "SESSION_EXPIRED"
+    assert valid.status_code == 200, valid.text
+
+
+def test_signed_out_visitor_opening_a_draft_by_id_still_gets_not_found(client):
+    blog_id, owner_id, _ = _register(client)
+    draft_id = _post_id(_create_post(blog_id, owner_id, status=PostStatus.DRAFT))
+
+    assert client.get(f"/blogs/{blog_id}/posts/{draft_id}").status_code == 404
 
 
 def test_owner_sees_drafts_only_outside_the_public_view(client):
