@@ -229,7 +229,7 @@ export const CommentManager = () => {
     <div className="space-y-6">
       {/* Toolbar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label="Filter comments" className="inline-flex rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900">
+        <div role="tablist" aria-label="Filter comments" className="flex w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm [scrollbar-width:none] dark:border-zinc-800 dark:bg-zinc-900 sm:w-fit [&::-webkit-scrollbar]:hidden">
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -239,10 +239,10 @@ export const CommentManager = () => {
                 setStatus(tab.value);
                 setPage(0);
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              className={`flex-1 shrink-0 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition-all sm:flex-none sm:px-4 ${
                 status === tab.value
-                  ? 'bg-violet-600 text-white'
-                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                  ? 'bg-violet-100 text-violet-900 shadow-sm dark:bg-violet-900/40 dark:text-violet-100'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
               {tab.label}
