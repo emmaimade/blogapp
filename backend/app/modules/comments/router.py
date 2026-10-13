@@ -122,13 +122,17 @@ def get_blog_comments(
     blog_id: int,
     q: Optional[str] = None,
     status: CommentStatusFilter = "all",
+    post_id: Optional[int] = None,
+    focus: Optional[int] = Query(None, description="Return the page containing this comment."),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     session: Session = Depends(get_session),
     _: None = Depends(require_blog_author),
     current_user: User = Depends(get_current_user),
 ):
-    items, total = workspace.list_blog_comments(session, blog_id, current_user, q, status, skip, limit)
+    items, total, skip = workspace.list_blog_comments(
+        session, blog_id, current_user, q, status, skip, limit, post_id=post_id, focus=focus
+    )
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit, has_more=skip + len(items) < total)
 
 

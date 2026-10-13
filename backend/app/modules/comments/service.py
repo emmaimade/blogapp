@@ -65,12 +65,12 @@ def create_comment(
             blog_id=post.blog_id,
             type="comment_created",
             title=f'New comment on "{post.title}"',
-            body=f"{current_user.first_name} {current_user.last_name} commented on your post",
-            link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
+            body=_notification_body(current_user, comment.content),
+            link=_comment_link(session, post, comment.id),
         )
 
     if parent_id is not None:
-        _notify_reply_recipient(session, post, parent_id, current_user)
+        _notify_reply_recipient(session, post, parent_id, comment, current_user)
 
     session.commit()
     return _load_comment(session, comment.id)
@@ -259,7 +259,9 @@ def _resolve_reply_parent(session: Session, parent_id: Optional[int], post_id: i
     return parent.parent_id or parent.id
 
 
-def _notify_reply_recipient(session: Session, post: Post, parent_id: int, replier: User) -> None:
+def _notify_reply_recipient(
+    session: Session, post: Post, parent_id: int, reply: Comment, replier: User
+) -> None:
     """
     Tells the parent commenter about a reply. Notifications only surface in
     the admin studio, so this is limited to workspace team members — a
@@ -280,9 +282,28 @@ def _notify_reply_recipient(session: Session, post: Post, parent_id: int, replie
         blog_id=post.blog_id,
         type="comment_reply",
         title=f'New reply on "{post.title}"',
-        body=f"{replier.first_name} {replier.last_name} replied to your comment",
-        link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
+        body=_notification_body(replier, reply.content),
+        link=_comment_link(session, post, reply.id),
     )
+
+
+# Long enough to tell what a comment is about; the full text is one click away.
+NOTIFICATION_EXCERPT_LENGTH = 120
+
+
+def _comment_link(session: Session, post: Post, comment_id: int) -> str:
+    """The studio's Comments page, filtered to the post, with this comment highlighted."""
+    blog = session.get(Blog, post.blog_id)
+    return f"/admin/w/{blog.slug}/comments?post={post.id}&highlight={comment_id}"
+
+
+def _notification_body(author: User, content: str) -> str:
+    """`Ada Lovelace: "Great point about…"` — who said it and the start of what they said."""
+    name = f"{author.first_name or ''} {author.last_name or ''}".strip() or author.username or "Someone"
+    text = " ".join(content.split())
+    if len(text) > NOTIFICATION_EXCERPT_LENGTH:
+        text = text[: NOTIFICATION_EXCERPT_LENGTH - 1].rstrip() + "…"
+    return f'{name}: "{text}"'
 
 
 def _load_comment(session: Session, comment_id: int) -> Comment:
