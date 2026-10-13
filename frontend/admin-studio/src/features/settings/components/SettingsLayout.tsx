@@ -106,7 +106,7 @@ export const SettingsLayout = () => {
       </nav>
 
       <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="hidden h-fit rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:sticky lg:top-20 lg:block">
+        <aside className="hidden h-fit rounded-[1.5rem] border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:sticky lg:top-20 lg:block lg:self-start">
           <nav aria-label="Settings sections" className="space-y-4">
             {visibleGroups.map((group) => (
               <div key={group.label}>

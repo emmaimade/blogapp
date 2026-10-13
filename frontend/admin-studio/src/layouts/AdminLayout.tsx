@@ -288,6 +288,7 @@ useEffect(() => {
       titleSegments[2]
     ) {
       const settingType = titleSegments[2];
+      if (settingType === "social") return "Social Profiles";
       // The branding page covers layout too, so it's shown as "Appearance"
       // (its URL stays /settings/branding so existing links keep working).
       const settingLabels: Record<string, string> = { branding: "Appearance" };

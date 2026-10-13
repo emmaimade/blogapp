@@ -168,7 +168,7 @@ export const AboutPageSettings: React.FC = () => {
       <SettingsCard title="Stats" icon={SlidersHorizontal} description="How many posts you've published and their total views.">
         <SwitchRow
           label="Show stats"
-          description="Hidden until you publish your first post, either way."
+          description="Appears once you've published a post."
           checked={values.show_stats}
           onChange={(checked) => update('show_stats', checked)}
         />

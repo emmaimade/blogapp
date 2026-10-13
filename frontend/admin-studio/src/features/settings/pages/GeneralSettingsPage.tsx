@@ -82,7 +82,14 @@ export const GeneralSettings: React.FC = () => {
     },
     enabled: !!blogId,
     load: async () => {
-      const data = (await api.get(`/blogs/${blogId}/settings/general`)).data ?? {};
+      // Publishing defaults live on the blog itself; read them fresh rather than
+      // from the signed-in user's memberships, which lag behind a save.
+      const [settingsRes, blogRes] = await Promise.all([
+        api.get(`/blogs/${blogId}/settings/general`),
+        api.get(`/blogs/${blogId}`),
+      ]);
+      const data = settingsRes.data ?? {};
+      const blog = blogRes.data ?? {};
       return {
         site_name: data.site_name && data.site_name !== LEGACY_DEFAULTS.site_name ? data.site_name : activeBlog?.name ?? '',
         site_tagline:
@@ -91,8 +98,8 @@ export const GeneralSettings: React.FC = () => {
         timezone: data.timezone || activeBlog?.timezone || 'UTC',
         language: data.language || activeBlog?.primary_language || 'en',
         posts_per_page: data.posts_per_page || activeBlog?.posts_per_page || 10,
-        comments_enabled: activeBlog?.comments_enabled ?? true,
-        default_post_visibility: activeBlog?.default_post_visibility ?? 'public',
+        comments_enabled: blog.comments_enabled ?? true,
+        default_post_visibility: blog.default_post_visibility ?? 'public',
       };
     },
     validate: (values) => postsPerPageError(values.posts_per_page),
@@ -106,7 +113,7 @@ export const GeneralSettings: React.FC = () => {
           comments_enabled: values.comments_enabled,
           default_post_visibility: values.default_post_visibility,
         });
-        // These come from the signed-in user's memberships, which only refresh here.
+        // Other pages read these from the signed-in user's memberships.
         await refreshUser();
         queryClient.invalidateQueries({ queryKey: ['blog', blogId] });
         queryClient.invalidateQueries({ queryKey: ['blogs'] });

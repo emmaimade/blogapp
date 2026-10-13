@@ -36,11 +36,16 @@ const newFaq = (): FAQItem => ({ id: ++lastAddedFaqId, question: '', answer: '' 
 
 const isBlank = (faq: FAQItem) => !faq.question.trim() && !faq.answer.trim();
 
-// A blank question is just left out on save; a half-written one needs finishing.
-const faqError = (faq: FAQItem) =>
-  !isBlank(faq) && (!faq.question.trim() || !faq.answer.trim())
-    ? 'Add both a question and an answer, or remove this one.'
-    : null;
+// A blank question is just left out on save; a half-written one needs finishing,
+// and the empty half is the one flagged.
+const faqErrors = (faq: FAQItem) => ({
+  question: !isBlank(faq) && !faq.question.trim() ? 'Add the question, or remove this one.' : null,
+  answer: !isBlank(faq) && !faq.answer.trim() ? 'Add an answer, or remove this one.' : null,
+});
+const isIncomplete = (faq: FAQItem) => {
+  const errors = faqErrors(faq);
+  return !!(errors.question || errors.answer);
+};
 
 const iconButtonClass =
   'rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100';
@@ -83,7 +88,7 @@ export const ContactSettings = () => {
       };
     },
     validate: (values) =>
-      values.show_faq && values.faqs.some(faqError) ? 'Finish or remove the incomplete FAQ before saving.' : null,
+      values.show_faq && values.faqs.some(isIncomplete) ? 'Finish or remove the incomplete FAQ before saving.' : null,
     save: (values) =>
       api.post(`/blogs/${blogId}/settings/contact`, {
         ...values,
@@ -105,7 +110,11 @@ export const ContactSettings = () => {
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
     if (!pendingFocus.current) return;
-    faqListRef.current?.querySelector<HTMLElement>(pendingFocus.current)?.focus();
+    const target = faqListRef.current?.querySelector<HTMLButtonElement | HTMLInputElement>(pendingFocus.current);
+    // A question moved to the top or bottom has that move button disabled;
+    // keep focus on the same question's other one.
+    const fallback = target?.closest('li')?.querySelector<HTMLButtonElement>('[data-faq-move]:not(:disabled)');
+    (target && !target.disabled ? target : fallback)?.focus();
     pendingFocus.current = null;
   });
 
@@ -223,7 +232,7 @@ export const ContactSettings = () => {
             ) : (
               <ol ref={faqListRef} className="space-y-4">
                 {values.faqs.map((faq, index) => {
-                  const error = faqError(faq);
+                  const errors = faqErrors(faq);
                   return (
                     <li key={faq.id} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700 sm:p-5">
                       <div className="mb-3 flex items-center justify-between gap-2">
@@ -262,7 +271,7 @@ export const ContactSettings = () => {
                         </div>
                       </div>
                       <div className="space-y-3">
-                        <Field label="Question" error={error}>
+                        <Field label="Question" error={errors.question}>
                           {(control) => (
                             <input
                               {...control}
@@ -275,7 +284,7 @@ export const ContactSettings = () => {
                             />
                           )}
                         </Field>
-                        <Field label="Answer">
+                        <Field label="Answer" error={errors.answer}>
                           {(control) => (
                             <textarea
                               {...control}

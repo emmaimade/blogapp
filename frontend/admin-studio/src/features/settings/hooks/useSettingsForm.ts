@@ -70,12 +70,12 @@ export function useSettingsForm<T>({
 
   const mutation = useMutation({
     mutationFn: (next: T) => save(next, saved as T),
-    onSuccess: (_, next) => {
-      // Show what was saved straight away; the refetch then picks up anything
-      // the server normalised.
-      queryClient.setQueryData(queryKey, next);
+    // Waits for the saved values to come back before dropping the draft, so the
+    // form shows what the server stored (blank FAQs left out, trimmed text)
+    // rather than what was sent. "Saving…" stays up until then.
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey, exact: true });
       setDraft(null);
-      queryClient.invalidateQueries({ queryKey });
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
       toast.success(successMessage);
     },
