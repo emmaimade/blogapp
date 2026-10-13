@@ -15,6 +15,8 @@ type PostLayout = 'feed' | 'list' | 'cards' | 'compact';
 
 interface BrandingSettingsData {
   primary_color: string;
+  // Not edited here (the blog only uses the primary colour) but kept, since
+  // the endpoint replaces the whole object.
   secondary_color: string;
   accent_color: string;
   logo_url: string;
@@ -42,13 +44,6 @@ const defaultBrandingSettings: BrandingSettingsData = {
 const HEADING_FONTS = ['Inter', 'Roboto', 'Poppins', 'Montserrat', 'Playfair Display', 'Merriweather', 'Lora', 'Open Sans'];
 const BODY_FONTS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Source Sans Pro', 'Raleway', 'PT Sans', 'Nunito'];
 
-// The blog only reads the primary colour today; the other two are stored for
-// themes that use them.
-const COLOR_FIELDS = [
-  { key: 'primary_color', label: 'Primary', hint: 'Buttons, links and highlights across your blog.' },
-  { key: 'secondary_color', label: 'Secondary', hint: "Saved with your brand. The current theme doesn't use it yet." },
-  { key: 'accent_color', label: 'Accent', hint: "Saved with your brand. The current theme doesn't use it yet." },
-] as const;
 
 const LAYOUT_OPTIONS: Array<{ value: PostLayout; label: string; description: string }> = [
   { value: 'feed', label: 'Feed', description: 'Title, excerpt and byline. A thumbnail only when the post has one.' },
@@ -235,7 +230,7 @@ export const BrandingSettings: React.FC = () => {
       };
     },
     validate: (values) =>
-      COLOR_FIELDS.some(({ key }) => colorError(values[key])) ? 'Fix the highlighted colours before saving.' : null,
+      colorError(values.primary_color) ? 'Fix the brand colour before saving.' : null,
     save: (values) =>
       api.post(`/blogs/${blogId}/settings/branding`, {
         ...values,
@@ -393,32 +388,33 @@ export const BrandingSettings: React.FC = () => {
         />
       </SettingsCard>
 
-      <SettingsCard title="Colors" icon={Palette}>
-        <div className="grid gap-6 md:grid-cols-3">
-          {COLOR_FIELDS.map(({ key, label, hint }) => (
-            <Field key={key} label={label} hint={hint} error={colorError(values[key])}>
-              {(control) => (
-                <div className="flex min-w-0 items-center gap-2">
-                  <input
-                    type="color"
-                    value={getSafeHexColor(values[key], defaultBrandingSettings[key])}
-                    onChange={(e) => update(key, e.target.value.toUpperCase())}
-                    aria-label={`${label} colour picker`}
-                    className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
-                  />
-                  <input
-                    {...control}
-                    type="text"
-                    spellCheck={false}
-                    value={values[key]}
-                    onChange={(e) => update(key, e.target.value.trim())}
-                    className={`${inputClass} min-w-0 font-mono uppercase`}
-                  />
-                </div>
-              )}
-            </Field>
-          ))}
-        </div>
+      <SettingsCard title="Colour" icon={Palette}>
+        <Field
+          label="Brand colour"
+          hint="Buttons, links and highlights across your blog."
+          error={colorError(values.primary_color)}
+          className="sm:max-w-sm"
+        >
+          {(control) => (
+            <div className="flex min-w-0 items-center gap-2">
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={(e) => update('primary_color', e.target.value.toUpperCase())}
+                aria-label="Brand colour picker"
+                className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+              <input
+                {...control}
+                type="text"
+                spellCheck={false}
+                value={values.primary_color}
+                onChange={(e) => update('primary_color', e.target.value.trim())}
+                className={`${inputClass} min-w-0 font-mono uppercase`}
+              />
+            </div>
+          )}
+        </Field>
 
         <div className="flex flex-wrap items-center gap-3">
           <span
@@ -435,7 +431,7 @@ export const BrandingSettings: React.FC = () => {
           <p role="status" className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>
-              Hard to read: this primary colour has a contrast of {primaryContrast.toFixed(1)}:1 with white. Aim for at least{' '}
+              Hard to read: this colour has a contrast of {primaryContrast.toFixed(1)}:1 with white. Aim for at least{' '}
               {MIN_CONTRAST}:1 — try a darker shade.
             </span>
           </p>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mailbox, PanelBottom, SlidersHorizontal } from 'lucide-react';
+import { PanelBottom, SlidersHorizontal } from 'lucide-react';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
@@ -13,14 +13,12 @@ import { useSettingsForm } from '../hooks/useSettingsForm';
 
 interface FooterSettingsData {
   footer_text: string;
-  show_newsletter: boolean;
-  newsletter_title: string;
-  newsletter_description: string;
   show_social_links: boolean;
   copyright_text: string;
   show_categories: boolean;
-  // Anything else the API sends (social links, show_quick_links) is sent back
-  // unchanged, since the endpoint replaces the whole object.
+  // Anything else the API sends (social links, show_quick_links, the unused
+  // newsletter fields) is sent back unchanged, since the endpoint replaces the
+  // whole object.
   [other: string]: unknown;
 }
 
@@ -35,9 +33,6 @@ export const FooterSettings: React.FC = () => {
     queryKey: ['footerSettings', blogId],
     empty: {
       footer_text: '',
-      show_newsletter: true,
-      newsletter_title: '',
-      newsletter_description: '',
       show_social_links: true,
       copyright_text: '',
       show_categories: true,
@@ -48,9 +43,6 @@ export const FooterSettings: React.FC = () => {
       return {
         ...data,
         footer_text: data.footer_text ?? '',
-        show_newsletter: data.show_newsletter ?? true,
-        newsletter_title: data.newsletter_title ?? '',
-        newsletter_description: data.newsletter_description ?? '',
         show_social_links: data.show_social_links ?? true,
         copyright_text: data.copyright_text ?? '',
         show_categories: data.show_categories ?? true,
@@ -124,41 +116,6 @@ export const FooterSettings: React.FC = () => {
         />
       </SettingsCard>
 
-      <SettingsCard
-        title="Newsletter"
-        icon={Mailbox}
-        description="A sign-up prompt in the footer."
-        toggle={{ checked: values.show_newsletter, onChange: (checked) => update('show_newsletter', checked), label: 'Show' }}
-      >
-        {values.show_newsletter && (
-          <>
-            <Field label="Heading">
-              {(control) => (
-                <input
-                  {...control}
-                  type="text"
-                  value={values.newsletter_title}
-                  onChange={(e) => update('newsletter_title', e.target.value)}
-                  placeholder="Newsletter"
-                  className={inputClass}
-                />
-              )}
-            </Field>
-            <Field label="Description">
-              {(control) => (
-                <textarea
-                  {...control}
-                  value={values.newsletter_description}
-                  onChange={(e) => update('newsletter_description', e.target.value)}
-                  placeholder="Get the latest posts delivered to your inbox."
-                  rows={2}
-                  className={`${inputClass} resize-y`}
-                />
-              )}
-            </Field>
-          </>
-        )}
-      </SettingsCard>
     </SettingsForm>
   );
 };
