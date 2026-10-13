@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Eye, AlertCircle, Loader2 } from 'lucide-react';
+import React from 'react';
+import { Eye, BookOpen, Megaphone, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
-import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { SettingsCard } from '../components/SettingsCard';
+import { SettingsForm } from '../components/SettingsForm';
+import { Field, SwitchRow, inputClass, secondaryButtonClass } from '../components/SettingsFields';
+import { useSettingsForm } from '../hooks/useSettingsForm';
 
 interface AboutSettingsData {
   bio_title: string;
@@ -15,32 +17,22 @@ interface AboutSettingsData {
   bio_content: string;
   show_stats: boolean;
   show_contact_cta: boolean;
+  show_social_links: boolean;
   email: string;
-  social_links: {
-    github: string;
-    twitter: string;
-    linkedin: string;
-  };
+  /** Edited under Social profiles; sent back as received. */
+  social_links: Record<string, string | null>;
 }
 
-const defaultAboutSettings: AboutSettingsData = {
-  bio_title: 'Welcome to My Blog',
-  bio_subtitle: 'Sharing ideas, stories, and insights',
-  bio_content: '',
-  show_stats: true,
-  show_contact_cta: true,
-  email: '',
-  social_links: {
-    github: '',
-    twitter: '',
-    linkedin: '',
-  },
-};
+// What the platform used to save as every blog's story. Treated as no story,
+// so it's never published by accident.
+const LEGACY_BIO = 'This is a modern blog CMS. Customize this in your admin panel.';
 
 export const AboutPageSettings: React.FC = () => {
   useDocumentTitle('About page settings');
-  const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+  const toWorkspace = useWorkspacePath();
+  const blogId = activeBlog?.id;
+
   const publicSiteOrigin =
     import.meta.env.VITE_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
     (window.location.hostname === 'localhost' && window.location.port === '5173'
@@ -48,56 +40,39 @@ export const AboutPageSettings: React.FC = () => {
       : window.location.origin);
   const previewUrl = `${publicSiteOrigin}/about`;
 
-  const { data: settings, isLoading } = useQuery<AboutSettingsData>({
-    queryKey: ['aboutSettings', activeBlog?.id],
-    queryFn: async () => {
-      let data: any = {};
-      try {
-        const res = await api.get(`/blogs/${activeBlog!.id}/settings/about`);
-        data = res.data || {};
-      } catch (error) {}
+  const form = useSettingsForm<AboutSettingsData>({
+    queryKey: ['aboutSettings', blogId],
+    empty: {
+      bio_title: '',
+      bio_subtitle: '',
+      bio_content: '',
+      show_stats: true,
+      show_contact_cta: true,
+      show_social_links: true,
+      email: '',
+      social_links: {},
+    },
+    enabled: !!blogId,
+    load: async () => {
+      const data = (await api.get(`/blogs/${blogId}/settings/about`)).data ?? {};
       return {
-        bio_title: data.bio_title || "Welcome to My Blog",
-        bio_subtitle: data.bio_subtitle || "Sharing ideas, stories, and insights",
-        bio_content: data.bio_content && data.bio_content !== "This is a modern blog CMS. Customize this in your admin panel." 
-          ? data.bio_content 
-          : (activeBlog?.description || "This is where you tell your story..."),
+        bio_title: data.bio_title ?? '',
+        bio_subtitle: data.bio_subtitle ?? '',
+        bio_content: data.bio_content && data.bio_content !== LEGACY_BIO ? data.bio_content : '',
         show_stats: data.show_stats ?? true,
         show_contact_cta: data.show_contact_cta ?? true,
-        email: data.email || "",
-        social_links: {
-          github: data.social_links?.github || "",
-          twitter: data.social_links?.twitter || "",
-          linkedin: data.social_links?.linkedin || ""
-        }
+        show_social_links: data.show_social_links ?? true,
+        email: data.email ?? '',
+        social_links: data.social_links ?? {},
       };
     },
-    enabled: !!activeBlog?.id,
+    save: (values) => api.post(`/blogs/${blogId}/settings/about`, { ...values, email: values.email.trim() || null }),
+    invalidate: [['siteSettings']],
+    successMessage: 'About page saved',
+    errorMessage: "Couldn't save the About page",
   });
 
-  const [formData, setFormData] = useState<AboutSettingsData>(defaultAboutSettings);
-
-  useEffect(() => {
-    if (settings) {
-      setFormData(settings);
-    }
-  }, [settings]);
-
-  const saveMutation = useMutation({
-    mutationFn: (data: AboutSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/about`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['aboutSettings'] });
-      queryClient.invalidateQueries({ queryKey: ['siteSettings'] });
-      toast.success('About page settings saved successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to save settings');
-    }
-  });
-
-  const handleSave = () => {
-    saveMutation.mutate(formData);
-  };
+  const { values, update } = form;
 
   // The draft goes to the preview tab over postMessage, never in the URL —
   // a URL-borne draft let anyone make a blog's About page show any content.
@@ -106,7 +81,7 @@ export const AboutPageSettings: React.FC = () => {
   // pinned to the blog's origin. No `noopener`, since the tab needs
   // window.opener to reach back here.
   const handlePreview = () => {
-    const draft = { ...formData };
+    const draft = { ...values };
     const url = new URL(previewUrl);
     url.searchParams.set('preview', '1');
     const blogOrigin = url.origin;
@@ -127,221 +102,117 @@ export const AboutPageSettings: React.FC = () => {
     window.setTimeout(() => window.removeEventListener('message', handleReady), 60_000);
   };
 
-  const handleChange = (field: keyof AboutSettingsData, value: AboutSettingsData[keyof AboutSettingsData]) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSocialChange = (platform: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      social_links: {
-        ...prev.social_links,
-        [platform]: value
-      }
-    }));
-  };
-
-  const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
-
-  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
-  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
-
-  if (isLoading) {
-    return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
-  }
-
+  const toolbar = (
+    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        See your About page as readers will, including changes you haven't saved.
+      </p>
+      <button type="button" onClick={handlePreview} className={secondaryButtonClass}>
+        <Eye size={15} aria-hidden="true" /> Preview
+      </button>
+    </div>
+  );
 
   return (
-    <div className="max-w-4xl pb-12 relative">
-      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
-      {/* Floating Action Bar */}
-      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
-          <div className="flex items-center gap-2 pr-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Unsaved changes
-            </span>
-          </div>
-          
-          <button
-            type="button"
-            onClick={handlePreview}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-100 px-4 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-200 active:scale-95 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            <Eye size={14} />
-            Preview
-          </button>
+    <SettingsForm form={form} loadErrorTitle="Couldn't load the About page" skeletonCards={4} toolbar={toolbar}>
+      <SettingsCard title="Heading" icon={Sparkles} description="The first thing readers see on your About page.">
+        <Field label="Title" hint="Leave blank to use your blog name.">
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              value={values.bio_title}
+              onChange={(e) => update('bio_title', e.target.value)}
+              placeholder={activeBlog?.name ?? 'About'}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Field label="Subtitle" hint="A short line under the title. Leave blank to use your tagline.">
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              value={values.bio_subtitle}
+              onChange={(e) => update('bio_subtitle', e.target.value)}
+              placeholder={activeBlog?.tagline || 'Sharing ideas, stories, and insights'}
+              className={inputClass}
+            />
+          )}
+        </Field>
+      </SettingsCard>
 
-          <button
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-          >
-            {saveMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
-            Save
-          </button>
-        </div>
-      </div>
+      <SettingsCard title="Your story" icon={BookOpen} description="Who you are, what you write about, and why readers should follow along.">
+        <Field
+          label="Story"
+          hint={
+            <>
+              Supports Markdown: <code className="font-mono">**bold**</code>, <code className="font-mono">_italic_</code>,{' '}
+              <code className="font-mono">[links](https://…)</code> and lists. Left blank, this section is hidden.
+            </>
+          }
+        >
+          {(control) => (
+            <textarea
+              {...control}
+              value={values.bio_content}
+              onChange={(e) => update('bio_content', e.target.value)}
+              rows={12}
+              placeholder="I started this blog to…"
+              className={`${inputClass} resize-y leading-relaxed`}
+            />
+          )}
+        </Field>
+      </SettingsCard>
 
-      {/* Info Banner */}
-      <div className="admin-note mb-8 flex items-start gap-3 p-4">
-        <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
-        <div className="text-sm text-zinc-700 dark:text-zinc-200">
-          <p className="font-bold mb-1">💡 Tip: Make it personal!</p>
-          <p>Share your unique story, what makes your blog special, and why readers should follow along.</p>
-        </div>
-      </div>
+      <SettingsCard title="Stats" icon={SlidersHorizontal} description="How many posts you've published and their total views.">
+        <SwitchRow
+          label="Show stats"
+          description="Hidden until you publish your first post, either way."
+          checked={values.show_stats}
+          onChange={(checked) => update('show_stats', checked)}
+        />
+      </SettingsCard>
 
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Hero Section</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Title
-              </label>
-              <input
-                type="text"
-                value={formData.bio_title || ''}
-                onChange={(e) => handleChange('bio_title', e.target.value)}
-                placeholder="Welcome to My Blog"
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-              <p className="text-xs text-zinc-500 mt-1">The main headline on your About page</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Subtitle
-              </label>
-              <input
-                type="text"
-                value={formData.bio_subtitle || ''}
-                onChange={(e) => handleChange('bio_subtitle', e.target.value)}
-                placeholder="Sharing ideas, stories, and insights"
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-              <p className="text-xs text-zinc-500 mt-1">A short tagline that appears under the title</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bio Content */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Your Story</h2>
-          <textarea
-            value={formData.bio_content || ''}
-            onChange={(e) => handleChange('bio_content', e.target.value)}
-            rows={12}
-            className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm leading-relaxed"
-          />
-        </div>
-
-        {/* Display Options */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Display Options</h2>
-          
-          <div className="space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer p-3 hover:bg-zinc-50 rounded-lg transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.show_stats !== false}
-                onChange={(e) => handleChange('show_stats', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary mt-0.5"
-              />
-              <div>
-                <div className="font-bold text-zinc-900">Show Stats</div>
-                <div className="text-sm text-zinc-600">Show how many posts you have published and their total views</div>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer p-3 hover:bg-zinc-50 rounded-lg transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.show_contact_cta !== false}
-                onChange={(e) => handleChange('show_contact_cta', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary mt-0.5"
-              />
-              <div>
-                <div className="font-bold text-zinc-900">Show Contact Section</div>
-                <div className="text-sm text-zinc-600">Display "Let's Connect" call-to-action at the bottom</div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Contact Information */}
-        {formData.show_contact_cta !== false && (
-          <div className="bg-white rounded-xl border border-zinc-200 p-6">
-            <h2 className="text-lg font-bold text-zinc-900 mb-4">Contact Information</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Email Address
-                </label>
+      <SettingsCard
+        title="Let's connect"
+        icon={Megaphone}
+        description="A section at the end of the page with a button to your Contact page."
+        toggle={{ checked: values.show_contact_cta, onChange: (checked) => update('show_contact_cta', checked), label: 'Show' }}
+      >
+        {values.show_contact_cta && (
+          <>
+            <Field label="Email" hint={'Shown under the button as "or email …". Leave blank to show only the button.'}>
+              {(control) => (
                 <input
+                  {...control}
                   type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => handleChange('email', e.target.value)}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={values.email}
+                  onChange={(e) => update('email', e.target.value)}
                   placeholder="hello@example.com"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  className={inputClass}
                 />
-                <p className="text-xs text-zinc-500 mt-1">Used for the "Get in Touch" button</p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">
-                    GitHub URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.social_links?.github || ''}
-                    onChange={(e) => handleSocialChange('github', e.target.value)}
-                    placeholder="https://github.com/username"
-                    className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">
-                    Twitter URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.social_links?.twitter || ''}
-                    onChange={(e) => handleSocialChange('twitter', e.target.value)}
-                    placeholder="https://twitter.com/username"
-                    className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">
-                    LinkedIn URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.social_links?.linkedin || ''}
-                    onChange={(e) => handleSocialChange('linkedin', e.target.value)}
-                    placeholder="https://linkedin.com/in/username"
-                    className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+              )}
+            </Field>
+            <SwitchRow
+              label="Social links"
+              description={
+                <>
+                  Your links from{' '}
+                  <Link to={toWorkspace('/settings/social')} className="font-semibold text-violet-600 hover:underline dark:text-violet-400">
+                    Social profiles
+                  </Link>
+                  , under the email.
+                </>
+              }
+              checked={values.show_social_links}
+              onChange={(checked) => update('show_social_links', checked)}
+            />
+          </>
         )}
-
-        
-      </div>
-    </div>
+      </SettingsCard>
+    </SettingsForm>
   );
 };

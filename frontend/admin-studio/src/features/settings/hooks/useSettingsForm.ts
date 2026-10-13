@@ -9,6 +9,8 @@ interface UseSettingsFormOptions<T> {
   queryKey: QueryKey;
   load: () => Promise<T>;
   enabled: boolean;
+  /** Shape-complete values to render with until the real ones load (the page shows a skeleton meanwhile). */
+  empty: T;
   /** Gets the edited values and the last saved ones, so it can send only what changed. */
   save: (values: T, saved: T) => Promise<unknown>;
   /** Shown after saving, e.g. "SEO settings saved". */
@@ -51,6 +53,7 @@ export function useSettingsForm<T>({
   queryKey,
   load,
   enabled,
+  empty,
   save,
   successMessage,
   errorMessage,
@@ -62,7 +65,7 @@ export function useSettingsForm<T>({
   const [draft, setDraft] = useState<T | null>(null);
 
   const saved = query.data;
-  const values = (draft ?? saved) as T;
+  const values = draft ?? saved ?? empty;
   const isDirty = draft !== null && saved !== undefined && !sameValues(draft, saved);
 
   const mutation = useMutation({

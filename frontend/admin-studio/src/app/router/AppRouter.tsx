@@ -17,6 +17,7 @@ import { ContactSettings } from '../../features/settings/pages/ContactSettingsPa
 import { FooterSettings } from '../../features/settings/pages/FooterSettingsPage';
 import { GeneralSettings } from '../../features/settings/pages/GeneralSettingsPage';
 import { SEOSettings } from '../../features/settings/pages/SeoSettingsPage';
+import { SocialSettings } from '../../features/settings/pages/SocialSettingsPage';
 import { BillingPage } from '../../features/billing/pages/BillingPage';
 import { BillingCallbackPage } from '../../features/billing/pages/BillingCallbackPage';
 import { ActivityLogPage } from '../../features/audit-log/pages/ActivityLogPage';
@@ -150,6 +151,7 @@ const router = createBrowserRouter(
                 <Route path="footer" element={<FooterSettings />} />
                 <Route path="branding" element={<BrandingSettings />} />
                 <Route path="seo" element={<SEOSettings />} />
+                <Route path="social" element={<SocialSettings />} />
                 <Route path="contact" element={<ContactSettings />} />
                 <Route path="billing" element={<BillingPage />} />
                 <Route path="billing/callback" element={<BillingCallbackPage />} />

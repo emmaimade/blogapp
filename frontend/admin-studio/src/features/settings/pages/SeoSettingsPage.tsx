@@ -1,328 +1,258 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, Search, BarChart3 } from 'lucide-react';
+import React, { useRef } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { BarChart3, ImageIcon, Loader2, Search, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
-import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
-import type { AxiosError } from 'axios';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { toastApiError } from '../../../shared/lib/apiErrors';
+import { getBlogDisplayUrl } from '../../../shared/lib/blogUrl';
+import { SettingsCard } from '../components/SettingsCard';
+import { SettingsForm } from '../components/SettingsForm';
+import { Field, hintClass, inputClass, labelClass, secondaryButtonClass } from '../components/SettingsFields';
+import { useSettingsForm } from '../hooks/useSettingsForm';
 
 interface SEOSettingsData {
   meta_title: string;
   meta_description: string;
-  meta_keywords: string;
   google_analytics_id: string;
   google_site_verification: string;
   og_image: string;
   twitter_handle: string;
+  // meta_keywords and anything else the API sends go back unchanged.
+  [other: string]: unknown;
 }
 
-const defaultSEOSettings: SEOSettingsData = {
-  meta_title: '',
-  meta_description: '',
-  meta_keywords: '',
-  google_analytics_id: '',
-  google_site_verification: '',
-  og_image: '',
-  twitter_handle: '',
-};
+const TEXT_FIELDS = ['meta_title', 'meta_description', 'google_analytics_id', 'google_site_verification', 'og_image', 'twitter_handle'] as const;
 
-type PartialSEOSettingsData = Partial<Record<keyof SEOSettingsData, string | null>>;
+const TITLE_LENGTH = 60;
+const DESCRIPTION_LENGTH = 160;
 
-const normalizeSEOSettings = (settings?: PartialSEOSettingsData | null): SEOSettingsData => ({
-  meta_title: settings?.meta_title ?? '',
-  meta_description: settings?.meta_description ?? '',
-  meta_keywords: settings?.meta_keywords ?? '',
-  google_analytics_id: settings?.google_analytics_id ?? '',
-  google_site_verification: settings?.google_site_verification ?? '',
-  og_image: settings?.og_image ?? '',
-  twitter_handle: settings?.twitter_handle ?? '',
-});
+const GA4_ID = /^G-[A-Z0-9]{4,}$/;
+const analyticsError = (value: string) =>
+  value.trim() && !GA4_ID.test(value.trim().toUpperCase()) ? 'A Measurement ID looks like G-XXXXXXXXXX.' : null;
+
+/** Accepts the code itself, or the whole <meta … content="…"> tag Search Console shows. */
+const verificationCode = (value: string) => value.match(/content=["']([^"']+)["']/)?.[1] ?? value.trim();
+
+const truncate = (text: string, length: number) => (text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text);
 
 export const SEOSettings: React.FC = () => {
   useDocumentTitle('SEO settings');
-  const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+  const blogId = activeBlog?.id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: settings, isLoading } = useQuery<SEOSettingsData>({
-    queryKey: ['seoSettings', activeBlog?.id],
-    queryFn: async () => {
-      let data: PartialSEOSettingsData = {};
-      try {
-        const res = await api.get(`/blogs/${activeBlog!.id}/settings/seo`);
-        data = res.data || {};
-      } catch {
-        // Fallback to defaults on error
-      }
-      
-      const normalized = normalizeSEOSettings(data);
-      return {
-        ...normalized,
-        meta_title: normalized.meta_title || activeBlog?.name || '',
-        meta_description: normalized.meta_description || activeBlog?.description || '',
-      };
+  const form = useSettingsForm<SEOSettingsData>({
+    queryKey: ['seoSettings', blogId],
+    empty: Object.fromEntries(TEXT_FIELDS.map((field) => [field, ''])) as SEOSettingsData,
+    enabled: !!blogId,
+    load: async () => {
+      const data = (await api.get(`/blogs/${blogId}/settings/seo`)).data ?? {};
+      return { ...data, ...Object.fromEntries(TEXT_FIELDS.map((field) => [field, data[field] ?? ''])) } as SEOSettingsData;
     },
-    enabled: !!activeBlog?.id,
+    validate: (values) => analyticsError(values.google_analytics_id) && 'Check the Google Analytics Measurement ID.',
+    save: (values) =>
+      api.post(`/blogs/${blogId}/settings/seo`, {
+        ...values,
+        ...Object.fromEntries(TEXT_FIELDS.map((field) => [field, values[field].trim() || null])),
+        google_analytics_id: values.google_analytics_id.trim().toUpperCase() || null,
+        google_site_verification: verificationCode(values.google_site_verification) || null,
+        twitter_handle: values.twitter_handle.trim().replace(/^@/, '') || null,
+      }),
+    invalidate: [['allSettings']],
+    successMessage: 'SEO settings saved',
+    errorMessage: "Couldn't save SEO settings",
   });
 
-  const [formData, setFormData] = useState<SEOSettingsData>(defaultSEOSettings);
+  // What the blog's home page falls back to when the fields here are blank.
+  const { data: general } = useQuery({
+    queryKey: ['generalSettingsForSeo', blogId],
+    queryFn: async () => (await api.get(`/blogs/${blogId}/settings/general`)).data,
+    enabled: !!blogId,
+  });
+  const siteName = general?.site_name || activeBlog?.name || '';
+  const siteTagline = general?.site_tagline || activeBlog?.tagline || '';
+  const defaultTitle = siteTagline ? `${siteName} - ${siteTagline}` : siteName;
+  const defaultDescription = general?.site_description || activeBlog?.description || '';
 
-  useEffect(() => {
-    if (settings) {
-      setFormData(normalizeSEOSettings(settings));
-    }
-  }, [settings]);
-
-  const saveMutation = useMutation({
-    mutationFn: (data: SEOSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/seo`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['seoSettings'] });
-      queryClient.invalidateQueries({ queryKey: ['allSettings'] });
-      toast.success('SEO settings saved successfully!');
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await api.post(`/blogs/${blogId}/settings/seo/upload-og-image`, body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return res.data.url as string;
     },
-    onError: (error: AxiosError<{ detail?: string }>) => {
-      toast.error(error.response?.data?.detail || 'Failed to save settings');
-    }
+    onSuccess: (url) => {
+      form.update('og_image', url);
+      toast.success('Image uploaded — save to use it');
+    },
+    onError: (error) => toastApiError(error, "Couldn't upload the image"),
   });
 
-  const handleSave = () => {
-    saveMutation.mutate(formData);
-  };
-
-  const handleChange = (field: keyof SEOSettingsData, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const isDirty = !!settings && (
-    formData.meta_title !== settings.meta_title ||
-    formData.meta_description !== settings.meta_description ||
-    formData.meta_keywords !== settings.meta_keywords ||
-    formData.google_analytics_id !== settings.google_analytics_id ||
-    formData.google_site_verification !== settings.google_site_verification ||
-    formData.og_image !== settings.og_image ||
-    formData.twitter_handle !== settings.twitter_handle
-  );
-
-  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
-  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
-
-  if (isLoading) {
-    return <SettingsSkeleton cardsCount={3} fieldsPerCard={2} />;
-  }
-
-  const descriptionLength = (formData.meta_description || '').length;
-
+  const { values, update } = form;
+  const previewTitle = values.meta_title.trim() || defaultTitle;
+  const previewDescription = values.meta_description.trim() || defaultDescription;
 
   return (
-    <div className="max-w-4xl pb-24 lg:pb-12 relative">
-      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
-      {/* Floating Save Button - Mobile Optimized */}
-      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Unsaved changes
-            </span>
+    <SettingsForm form={form} loadErrorTitle="Couldn't load SEO settings" skeletonCards={3}>
+      <SettingsCard title="Search results" icon={Search} description="How your home page appears on Google and other search engines.">
+        <Field
+          label="Title"
+          hint={`Leave blank to use "${defaultTitle}". Around ${TITLE_LENGTH} characters fit before Google cuts it off.`}
+          count={{ length: values.meta_title.length, recommended: TITLE_LENGTH }}
+        >
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              value={values.meta_title}
+              onChange={(e) => update('meta_title', e.target.value)}
+              placeholder={defaultTitle}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Field
+          label="Description"
+          hint={`Around ${DESCRIPTION_LENGTH} characters fit. Leave blank to use your blog's description.`}
+          count={{ length: values.meta_description.length, recommended: DESCRIPTION_LENGTH }}
+        >
+          {(control) => (
+            <textarea
+              {...control}
+              value={values.meta_description}
+              onChange={(e) => update('meta_description', e.target.value)}
+              placeholder={defaultDescription || 'What readers will find on your blog, in a sentence or two.'}
+              rows={3}
+              className={`${inputClass} resize-y`}
+            />
+          )}
+        </Field>
+
+        <div>
+          <p className={`mb-1.5 ${labelClass}`}>Preview</p>
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950">
+            <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">{activeBlog ? getBlogDisplayUrl(activeBlog) : ''}</p>
+            <p className="mt-1 text-lg leading-snug text-[#1a0dab] dark:text-[#8ab4f8]">
+              {truncate(previewTitle || 'Your blog', TITLE_LENGTH)}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+              {previewDescription ? truncate(previewDescription, DESCRIPTION_LENGTH) : 'Add a description so search engines show something useful here.'}
+            </p>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-          >
-            {saveMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
-            Save
-          </button>
+          <p className={`mt-1.5 ${hintClass}`}>An approximation — search engines decide the final layout.</p>
         </div>
-      </div>
+      </SettingsCard>
 
-      {/* Info Banner */}
-      <div className="admin-note mb-8 flex items-start gap-3 p-4">
-        <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
-        <div className="text-sm text-zinc-700 dark:text-zinc-200">
-          <p className="font-bold mb-1">🔍 Search Engine Optimization</p>
-          <p>These settings help search engines understand and rank your blog better.</p>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {/* Meta Tags */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
-            <Search size={20} className="text-zinc-900" />
-            Meta Tags
-          </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Title</label>
+      <SettingsCard title="Social sharing" icon={ImageIcon} description="What shows when someone shares a link to your blog.">
+        <div>
+          <p className={`mb-1.5 ${labelClass}`}>Share image</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 sm:w-64">
+              {values.og_image ? (
+                <img src={values.og_image} alt="Share image preview" className="h-full w-full object-cover" />
+              ) : (
+                <ImageIcon size={28} className="text-zinc-300 dark:text-zinc-600" aria-hidden="true" />
+              )}
+            </div>
+            <div className="space-y-3">
+              <p className={hintClass}>Shown on Facebook, LinkedIn, X and in chat apps. 1200×630 pixels works best; PNG, JPEG or WebP.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={upload.isPending}
+                  className={secondaryButtonClass}
+                >
+                  {upload.isPending ? <Loader2 className="animate-spin" size={15} aria-hidden="true" /> : <Upload size={15} aria-hidden="true" />}
+                  {values.og_image ? 'Replace image' : 'Upload image'}
+                </button>
+                {values.og_image && (
+                  <button
+                    type="button"
+                    onClick={() => update('og_image', '')}
+                    className="rounded-xl px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
               <input
-                type="text"
-                value={formData.meta_title || ''}
-                onChange={(e) => handleChange('meta_title', e.target.value)}
-                maxLength={60}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) upload.mutate(file);
+                  e.target.value = '';
+                }}
               />
-              <div className="flex justify-between text-xs mt-1">
-                <p className="text-zinc-500">Appears in search results (50-60 characters recommended)</p>
-                <p className={`${(formData.meta_title || '').length > 60 ? 'text-red-600' : 'text-zinc-500'}`}>
-                  {(formData.meta_title || '').length}/60
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Description</label>
-              <textarea
-                value={formData.meta_description || ''}
-                onChange={(e) => handleChange('meta_description', e.target.value)}
-                maxLength={160}
-                rows={3}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-              <div className="flex justify-between text-xs mt-1">
-                <p className="text-zinc-500">Shows under your title in search results</p>
-                <p className={`${descriptionLength > 160 ? 'text-red-600' : 'text-zinc-500'}`}>
-                  {descriptionLength}/160
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Meta Keywords</label>
-              <input
-                type="text"
-                value={formData.meta_keywords || ''}
-                onChange={(e) => handleChange('meta_keywords', e.target.value)}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Social Media / Open Graph */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Social Media Sharing</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Open Graph Image URL
-              </label>
-              <input
-                type="url"
-                value={formData.og_image || ''}
-                onChange={(e) => handleChange('og_image', e.target.value)}
-                placeholder="https://example.com/og-image.jpg"
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-              <p className="text-xs text-zinc-500 mt-1">Image shown when sharing on Facebook, LinkedIn (1200x630px recommended)</p>
-            </div>
-
-            {formData.og_image && (
-              <div className="p-4 bg-zinc-50 rounded-xl">
-                <p className="text-sm font-bold text-zinc-700 mb-3">Preview</p>
-                <img 
-                  src={formData.og_image} 
-                  alt="OG image preview" 
-                  className="w-full max-w-md h-auto rounded-lg border border-zinc-200"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Twitter Handle
-              </label>
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-600 font-bold">@</span>
-                <input
-                  type="text"
-                  value={formData.twitter_handle || ''}
-                  onChange={(e) => handleChange('twitter_handle', e.target.value)}
-                  placeholder="yourusername"
-                  className="flex-1 px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-              <p className="text-xs text-zinc-500 mt-1">Used for Twitter Card attribution</p>
             </div>
           </div>
         </div>
 
-        {/* Analytics */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
-            <BarChart3 size={20} className="text-zinc-900" />
-            Analytics & Verification
-          </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Google Analytics ID
-              </label>
+        <Field label="X (Twitter) handle" hint="Credits you on cards when your posts are shared on X.">
+          {(control) => (
+            <div className="flex items-center rounded-xl">
+              <span className="pr-2 text-sm font-semibold text-zinc-500 dark:text-zinc-400" aria-hidden="true">
+                @
+              </span>
               <input
+                {...control}
                 type="text"
-                value={formData.google_analytics_id || ''}
-                onChange={(e) => handleChange('google_analytics_id', e.target.value)}
-                placeholder="G-XXXXXXXXXX or UA-XXXXXXXXX-X"
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={values.twitter_handle}
+                onChange={(e) => update('twitter_handle', e.target.value.replace(/^@/, ''))}
+                placeholder="username"
+                className={inputClass}
               />
-              <p className="text-xs text-zinc-500 mt-1">GA4 Measurement ID or Universal Analytics ID</p>
             </div>
+          )}
+        </Field>
+      </SettingsCard>
 
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Google Site Verification
-              </label>
-              <input
-                type="text"
-                value={formData.google_site_verification || ''}
-                onChange={(e) => handleChange('google_site_verification', e.target.value)}
-                placeholder="ABC123def456..."
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm"
-              />
-              <p className="text-xs text-zinc-500 mt-1">Verification code from Google Search Console</p>
-            </div>
-          </div>
-        </div>
-
-        {/* SEO Tips */}
-        <div className="bg-zinc-50 rounded-xl border border-zinc-300 p-6">
-          <h3 className="text-lg font-bold text-zinc-900 mb-3">💡 SEO Tips</h3>
-          <ul className="space-y-2 text-sm text-zinc-700">
-            <li className="flex items-start gap-2">
-              <span className="text-zinc-900 font-bold">•</span>
-              <span>Keep your meta title under 60 characters to avoid truncation in search results</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-zinc-900 font-bold">•</span>
-              <span>Write compelling meta descriptions between 150-160 characters</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-zinc-900 font-bold">•</span>
-              <span>Use relevant keywords naturally - don't stuff them</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-zinc-900 font-bold">•</span>
-              <span>Update your OG image regularly to keep social shares fresh</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-zinc-900 font-bold">•</span>
-              <span>Monitor your Google Analytics to understand your audience</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
+      <SettingsCard title="Analytics and verification" icon={BarChart3} description="Connect Google's tools to your blog.">
+        <Field
+          label="Google Analytics Measurement ID"
+          hint="In Google Analytics: Admin → Data streams → your stream. Your blog starts sending visits once you save."
+          error={analyticsError(values.google_analytics_id)}
+        >
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              autoCapitalize="characters"
+              spellCheck={false}
+              value={values.google_analytics_id}
+              onChange={(e) => update('google_analytics_id', e.target.value)}
+              placeholder="G-XXXXXXXXXX"
+              className={`${inputClass} font-mono`}
+            />
+          )}
+        </Field>
+        <Field
+          label="Google Search Console verification"
+          hint='Choose the "HTML tag" method and paste the tag or just its code.'
+        >
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={values.google_site_verification}
+              onChange={(e) => update('google_site_verification', e.target.value)}
+              placeholder="abc123def456…"
+              className={`${inputClass} font-mono`}
+            />
+          )}
+        </Field>
+      </SettingsCard>
+    </SettingsForm>
   );
 };

@@ -10,6 +10,8 @@ interface SettingsFormProps<T> {
   /** For the load error, e.g. "Couldn't load SEO settings". */
   loadErrorTitle: string;
   skeletonCards?: number;
+  /** A row above the sections, e.g. a Preview button. */
+  toolbar?: ReactNode;
   children: ReactNode;
 }
 
@@ -18,7 +20,7 @@ interface SettingsFormProps<T> {
  * save bar, and the prompt before leaving with unsaved changes. Enter in a
  * text field saves, like any form.
  */
-export function SettingsForm<T>({ form, loadErrorTitle, skeletonCards = 3, children }: SettingsFormProps<T>) {
+export function SettingsForm<T>({ form, loadErrorTitle, skeletonCards = 3, toolbar, children }: SettingsFormProps<T>) {
   if (form.isLoading) return <SettingsSkeleton cardsCount={skeletonCards} fieldsPerCard={2} />;
   if (form.isError) return <LoadError title={loadErrorTitle} onRetry={form.retry} isRetrying={form.isRetrying} />;
 
@@ -32,6 +34,7 @@ export function SettingsForm<T>({ form, loadErrorTitle, skeletonCards = 3, child
       className="max-w-4xl space-y-6"
     >
       <UnsavedChangesDialog blocker={form.blocker} />
+      {toolbar}
       {children}
       <SaveBar isDirty={form.isDirty} isSaving={form.isSaving} onDiscard={form.discard} />
     </form>
