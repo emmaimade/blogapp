@@ -50,6 +50,7 @@ from app.models import (
     Comment,
     OnboardingStatus,
     OnboardingStep,
+    PlatformRole,
     Post,
     SiteSettings,
     SubscriptionPlan,
@@ -1081,7 +1082,7 @@ def update_blog_member_permissions(
     request: Request | None = None,
 ) -> BlogMember:
     # Allow access if the user is a global superadmin OR a verified workspace owner
-    is_super_admin = current_user.is_super_admin or getattr(current_user, "platform_role", None) == "superadmin"
+    is_super_admin = current_user.is_super_admin or current_user.platform_role == PlatformRole.SUPER_ADMIN
 
     if not is_super_admin:
         actor_membership = session.exec(
