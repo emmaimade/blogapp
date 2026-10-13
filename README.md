@@ -1,4 +1,4 @@
-# Blog CMS - Monorepo
+# Inko — Multi-Tenant Blogging Platform
 
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
@@ -6,198 +6,138 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-A full-stack Content Management System built with FastAPI, PostgreSQL, and React. This monorepo contains the backend API, admin panel, and public-facing blog frontend.
+Inko is a hosted blogging platform. Anyone can sign up, create a workspace (a blog),
+invite a team, and publish to their own subdomain (`{slug}.inko.blog`) or a custom
+domain. This monorepo contains the API, the workspace studio, the public blog
+renderer, and the marketing site.
 
 ## Live Deployments
 
 - **Public Blog:** [https://blogapp-blog.vercel.app](https://blogapp-blog.vercel.app)
 - **Admin Studio:** [https://blogapp-admin-studio-livid.vercel.app](https://blogapp-admin-studio-livid.vercel.app)
+- **Marketing Site:** [https://blogapp-u6pi.vercel.app](https://blogapp-u6pi.vercel.app)
 - **Backend API Docs:** [https://blogapp-eta-woad.vercel.app/docs](https://blogapp-eta-woad.vercel.app/docs)
+
 
 ## Project Architecture
 
 ```
 blogapp/
-├── backend/          # FastAPI REST API
+├── backend/               # FastAPI REST API (Python 3.12, SQLModel, Alembic)
 ├── frontend/
-│   ├── admin-studio/ # Admin dashboard (React + TypeScript)
-│   └── blog/         # Public blog (React + TypeScript)
-└── README.md         # This file
+│   ├── admin-studio/      # Workspace studio + platform superadmin (port 5173)
+│   ├── blog/              # Public blog, one build serves every tenant (port 5174)
+│   └── site/              # Marketing site: landing, pricing, signup (port 5175)
+├── tools/
+│   └── marketing-shots/   # Scripts that generate the site's screenshots and OG image
+└── docs/                  # Architecture notes
 ```
+
+How the pieces fit:
+
+- **site** is the marketing front door: landing, features, pricing, contact and legal
+  pages. Its signup and invitation links hand off to the studio, and emailed verification
+  links land on its `/verify-email` page.
+- **admin-studio** is where a workspace's members write posts, moderate comments,
+  manage the team, change settings and billing. Platform superadmins get an extra area
+  for every workspace, user, subscription, moderation report, support ticket and the
+  platform audit log.
+- **blog** works out which workspace it is serving from the hostname
+  (`GET /blogs/resolve?host=...`), then renders that workspace's posts and branding.
+- **backend** serves all three. Every workspace-scoped route lives under
+  `/blogs/{blog_id}/...`.
 
 ## Quick Start
 
 ### Prerequisites
 
-- **Python 3.10+** (for backend)
-- **Node.js 18+** (for frontend)
-- **PostgreSQL 12+** (database)
-- **uv** (Python package manager) - [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
+- **Python 3.12+** and [**uv**](https://docs.astral.sh/uv/getting-started/installation/)
+- **Node.js 20+**
+- **PostgreSQL** (tests use SQLite and need no database)
+- A **Cloudinary** account (required: the API won't start without its credentials)
 
-### Development Setup
-
-#### 1. Clone and Navigate
-
-```bash
-git clone <repository-url>
-cd blogapp
-```
-
-#### 2. Backend Setup
+### 1. Backend
 
 ```bash
 cd backend
-python -m venv .venv
-.venv\Scripts\Activate  # On Windows
-# or
-source .venv/bin/activate  # On macOS/Linux
-
-uv sync  # Install dependencies
-```
-
-Set up your `.env` file (see [backend/README.md](backend/README.md) for required variables).
-
-```bash
-# Run migrations
-alembic upgrade head
-
-# Start the dev server
+cp .env.example .env     # then fill in DATABASE_URL, SECRET_KEY, CLOUDINARY_*
+uv sync
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-API runs at `http://localhost:8000` | Docs at `http://localhost:8000/docs`
+API at `http://localhost:8000`, docs at `http://localhost:8000/docs`.
+See [backend/README.md](backend/README.md) for every environment variable.
 
-#### 3. Admin Studio Setup
+### 2. Frontends
+
+Each app is independent. Copy its `.env.example` to `.env`, then:
 
 ```bash
-cd frontend/admin-studio
+cd frontend/admin-studio   # or frontend/blog, frontend/site
 npm install
 npm run dev
 ```
 
-Admin panel runs at `http://localhost:5173`
+| App | Port | README |
+|-----|------|--------|
+| admin-studio | 5173 | [frontend/admin-studio/README.md](frontend/admin-studio/README.md) |
+| blog | 5174 | [frontend/blog/README.md](frontend/blog/README.md) |
+| site | 5175 | [frontend/site/README.md](frontend/site/README.md) |
 
-#### 4. Blog Frontend Setup
+On `localhost` the blog has no hostname to resolve, so it serves the workspace whose
+slug is in `VITE_BLOG_SLUG` (default `myblog`).
 
-```bash
-cd frontend/blog
-npm install
-npm run dev
-```
+## Core Features
 
-Blog runs at `http://localhost:5174` (or next available port)
-
-## Workspaces
-
-### [Backend](backend/README.md)
-FastAPI REST API with PostgreSQL, JWT authentication, and CMS features.
-
-**Key Files:**
-- `app/main.py` - FastAPI application setup
-- `app/models/` - SQLModel database models
-- `app/modules/` - domain API routers and feature logic
-- `app/schemas/` - Pydantic request/response schemas
-- `alembic/` - Database migrations
-
-### [Admin Studio](frontend/admin-studio/README.md)
-React admin dashboard for managing posts, users, comments, settings, and tags.
-
-**Key Features:**
-- Post editor with markdown support
-- User management
-- Comment moderation
-- Site settings configuration
-
-### [Blog Frontend](frontend/blog/README.md)
-Public-facing React blog with post listings, search, and comments.
-
-**Key Features:**
-- Post browsing and filtering by tags
-- Full-text search
-- Comments system
-- Responsive design
+- **Workspaces**: self-serve signup with email verification (link or 6-digit code), guided onboarding, several workspaces per account
+- **Teams**: owner / editor / author roles, email invitations, ownership transfer
+- **Posts**: markdown editor, drafts, scheduled publishing, featured posts, image uploads, tags with usage counts
+- **Comments**: threaded comments, flagging, workspace moderation with restore and per-blog bans
+- **Settings**: general, about page (with live preview), footer, branding (logo/favicon), SEO and OG image, social links, contact page, Google Analytics
+- **Billing**: Free / Pro / Team plans through Paystack, with trials, plan changes, a grace period and seat-limit pausing
+- **Activity logs**: a per-workspace activity log, and a platform audit log with cursor paging, lookup and export
+- **Platform admin**: workspaces, users, subscriptions, moderation queue, support tickets and platform settings
+- **Notifications**: in-app notifications and transactional email
+- **Security**: httpOnly cookie auth with refresh tokens, double-submit CSRF, login and content throttling, and a uniform error envelope with request IDs
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Backend | FastAPI, SQLModel, PostgreSQL, Alembic |
-| Frontend | React 19, TypeScript, Tailwind CSS, Vite |
-| State Management | TanStack Query (React Query) |
+| Backend | FastAPI, SQLModel, PostgreSQL, Alembic, APScheduler |
+| Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 4, React Router 7 |
+| Data fetching | TanStack Query, Axios |
 | Forms | React Hook Form |
-| UI Components | Lucide React |
-| Editor | EasyMDE (Admin), React Markdown (Blog) |
-
-## Core Features
-
-- ✅ User authentication with JWT
-- ✅ Role-based access control (admin/user)
-- ✅ Blog post management with markdown support
-- ✅ Tag-based categorization
-- ✅ Comment system
-- ✅ Cloudinary image integration
-- ✅ SEO settings
-- ✅ Site branding and footer management
-
-## Development Workflow
-
-1. **Backend Changes**: Modify files in `backend/app/`, restart dev server
-2. **Admin Changes**: Edit files in `frontend/admin-studio/src/`, auto-reload
-3. **Blog Changes**: Edit files in `frontend/blog/src/`, auto-reload
-4. **Database Changes**: Create migration, run `alembic upgrade head`
+| Editor / rendering | EasyMDE (studio), React Markdown + remark-gfm + highlight.js |
+| Services | Cloudinary (images), Paystack (billing), SMTP (email) |
+| Hosting | Vercel (all four apps; Vercel Cron for scheduled jobs) |
 
 ## Database Migrations
 
 ```bash
 cd backend
-
-# Create new migration
-alembic revision --autogenerate -m "Description of change"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
+uv run alembic revision --autogenerate -m "Describe the change"
+uv run alembic upgrade head
+uv run alembic downgrade -1
 ```
 
-## API Documentation
+## Testing and Linting
 
-Once the backend is running, view interactive API docs at:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
+```bash
+cd backend && uv run pytest                 # SQLite, no external services
+cd frontend/<app> && npm run lint && npm run build
+```
 
 ## Troubleshooting
 
-### Backend won't start
-- Check PostgreSQL is running
-- Verify `.env` database credentials
-- Run `alembic upgrade head`
-- Check port 8000 is available
-
-### Frontend build fails
-- Delete `node_modules` and reinstall: `npm install`
-- Clear Vite cache: delete `dist` folder, rebuild
-
-### CORS errors
-- Ensure frontend URL is in `backend/app/main.py` `origins` list
-- Default ports: Admin (5173), Blog (5174 or 5175)
-
-## Project Structure Details
-
-See individual README files in each workspace:
-- [Backend Documentation](backend/README.md)
-- [Admin Studio Documentation](frontend/admin-studio/README.md)
-- [Blog Frontend Documentation](frontend/blog/README.md)
+- **API won't start**: check `DATABASE_URL` and the three `CLOUDINARY_*` variables in `backend/.env`, then run `alembic upgrade head`.
+- **CORS errors**: add the frontend's origin to `CORS_ORIGINS` in `backend/.env` (comma-separated). The default already covers ports 5173–5175 on `localhost` and `127.0.0.1`.
+- **Blog shows "not found" locally**: set `VITE_BLOG_SLUG` in `frontend/blog/.env` to a slug that exists in your database.
 
 ## Contributing
 
-When contributing:
-1. Follow the workspace-specific guidelines in each folder's README
-2. Create feature branch from `main`
-3. Ensure code passes linting (`npm run lint` / backend checks)
-4. Test changes thoroughly before submitting PR
-
-<!-- ## License
-
-Add your license here. -->
+1. Branch from `main`.
+2. Keep backend tests green (`uv run pytest`) and frontends lint-clean (`npm run lint`).
+3. Include a migration with any model change.
+4. Open a PR against `main`.

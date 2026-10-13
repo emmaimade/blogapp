@@ -1,448 +1,121 @@
-# Admin Studio - CMS Dashboard
+# Admin Studio
 
-**Live Demo:** [https://blogapp-admin-studio-livid.vercel.app](https://blogapp-admin-studio-livid.vercel.app)
+**Live:** [https://blogapp-admin-studio-livid.vercel.app](https://blogapp-admin-studio-livid.vercel.app)
 
-React + TypeScript admin dashboard for managing blog content, users, comments, and site settings.
+The Inko studio, a React + TypeScript app with two areas:
+
+- **Workspace studio** (`/admin/w/:workspaceSlug/...`): where a workspace's members
+  write and publish, moderate comments, manage the team, and configure the blog and billing.
+- **Platform admin** (`/admin/superadmin`, `/admin/blogs`, …): visible only to platform
+  superadmins. Covers every workspace, user, subscription, moderation report and support
+  ticket, plus the platform audit log.
 
 ## Stack
 
-- **Framework**: React 19 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: TanStack Query (React Query)
-- **Forms**: React Hook Form
-- **Editor**: EasyMDE (Markdown)
-- **HTTP Client**: Axios
-- **Routing**: React Router v7
+React 19 · TypeScript · Vite 7 · Tailwind CSS 4 · React Router 7 · TanStack Query ·
+Axios · React Hook Form · EasyMDE (markdown editor) · React Markdown · react-day-picker ·
+react-hot-toast · Lucide icons
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-
-### Installation
-
-1. **Install Dependencies**
-
 ```bash
 cd frontend/admin-studio
+cp .env.example .env
 npm install
+npm run dev        # http://localhost:5173
 ```
 
-2. **Configure Environment**
+The backend must be running (see [backend/README.md](../../backend/README.md)).
 
-Create `.env` file:
+| Script | Does |
+|--------|------|
+| `npm run dev` | Dev server on port 5173 |
+| `npm run build` | Type-check (`tsc -b`) and build to `dist/` |
+| `npm run lint` | ESLint |
+| `npm run preview` | Serve the production build |
 
-```env
-# Local Development
-VITE_API_BASE_URL=http://localhost:8000
+## Environment Variables
 
-# Production / Live API (for reference or testing)
-# VITE_API_BASE_URL=https://blogapp-eta-woad.vercel.app
-```
-
-3. **Run Development Server**
-
-```bash
-npm run dev
-```
-
-Admin panel runs at `http://localhost:5173`
-
-4. **Build for Production**
-
-```bash
-npm run build
-```
-
-Built files in `dist/`
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_URL` | `http://localhost:8000` | Backend URL, **dev only**. Production builds always call `/api` (see Deployment) |
+| `VITE_BLOG_URL` | `http://localhost:5174` | Public blog origin in dev, for "view post" links |
+| `VITE_SITE_URL` | `http://localhost:5175` | Marketing site, linked from the login and auth pages |
+| `VITE_PUBLIC_SITE_URL` | `:5174` in dev, otherwise own origin | Blog origin that the About-page live preview loads |
 
 ## Project Structure
 
 ```
-admin-studio/
-├── src/
-│   ├── App.tsx              # Main app component
-│   ├── main.tsx             # Entry point
-│   ├── index.css            # Global styles
-│   ├── App.css              # App styles
-│   ├── api/
-│   │   └── client.ts        # Axios API client configuration
-│   ├── components/
-│   │   ├── Modal.tsx        # Generic modal component
-│   │   ├── ProtectedRoute.tsx   # Auth-protected route wrapper
-│   │   └── Sidebar.tsx      # Navigation sidebar
-│   ├── context/
-│   │   └── AuthContext.tsx  # AuthContext for user state
-│   ├── layouts/
-│   │   ├── AdminLayout.tsx  # Main admin layout
-│   │   └── SettingsLayout.tsx   # Settings page layout
-│   ├── types/
-│   │   └── index.ts         # TypeScript type definitions
-│   └── views/               # Page components
-│       ├── Dashboard.tsx
-│       ├── PostEditor.tsx
-│       ├── PostList.tsx
-│       ├── PostView.tsx
-│       ├── UserManager.tsx
-│       ├── CommentManager.tsx
-│       ├── TagManager.tsx
-│       ├── GeneralSettings.tsx
-│       ├── BrandingSettings.tsx
-│       ├── SEOSettings.tsx
-│       ├── FooterSettings.tsx
-│       ├── AboutPageSettings.tsx
-│       ├── ContactSettings.tsx
-│       └── LoginView.tsx
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── tailwind.config.js
-└── README.md                # This file
+src/
+├── app/
+│   ├── router/AppRouter.tsx   # Every route
+│   └── providers/             # Query client, auth, active-workspace (BlogProvider)
+├── features/                  # One folder per feature: pages/, components/, hooks/, lib/
+│   ├── auth/                  # Login, signup, verify email, forgot/reset/forced password change
+│   ├── onboarding/            # First-run setup for a new workspace
+│   ├── workspaces/            # Create and switch workspaces
+│   ├── dashboard/
+│   ├── posts/                 # List, editor, view
+│   ├── tags/  comments/  users/
+│   ├── settings/              # General, about, footer, branding, SEO, social, contact
+│   ├── billing/               # Plan, checkout, Paystack callback
+│   ├── audit-log/             # Workspace activity log
+│   ├── notifications/  search/  support/
+│   └── superadmin/            # Platform admin pages and API
+├── layouts/                   # AdminLayout (sidebar shell), AuthLayout
+└── shared/
+    ├── api/                   # Axios client, CSRF, auth calls, query client
+    ├── lib/                   # API error mapping, plans, workspace paths, theme
+    ├── components/  ui/       # Modal, unsaved-changes dialog, skeletons, Switch, PlanBadge…
+    ├── hooks/  types/  utils/
 ```
 
-## Features
+A new feature goes in its own `features/<name>/` folder. Shared code goes in `shared/`
+only once a second feature needs it.
 
-### Dashboard
-- Overview of recent posts, comments, and site stats
-- Quick access to key management tools
+## Routes
 
-### Post Management
-- **Create/Edit Posts** - Full markdown editor with EasyMDE
-- **Post List** - View, search, and manage all posts
-- **Post View** - Preview posts before publishing
-- Auto-save drafts
+| Path | Page |
+|------|------|
+| `/admin/login`, `/signup`, `/admin/forgot-password`, `/admin/reset-password` | Auth |
+| `/join/:token` | Accept a team invitation |
+| `/admin/workspaces/new` | Create a workspace |
+| `/admin/w/:slug/onboarding` | Workspace setup |
+| `/admin/w/:slug/dashboard` | Dashboard |
+| `/admin/w/:slug/posts`, `posts/new`, `posts/edit/:id`, `posts/view/:id` | Posts |
+| `/admin/w/:slug/tags`, `comments`, `users`, `activity` | Tags, comment moderation, team, activity log |
+| `/admin/w/:slug/settings/{general,about,footer,branding,seo,social,contact,billing}` | Settings and billing |
+| `/admin/profile`, `/admin/search`, `/admin/support-tickets` | Account, search, own support tickets |
+| `/admin/superadmin`, `/admin/analytics`, `/admin/blogs`, `/admin/platform-users`, `/admin/subscriptions`, `/admin/moderation`, `/admin/audit-log`, `/admin/platform-settings`, `/admin/support` | Platform admin |
 
-### User Management
-- List all users
-- View user details
-- Create/update/delete users
-- Role assignment (admin/user)
+## How It Talks to the API
 
-### Comment Moderation
-- View all comments with filters
-- Delete spam/inappropriate comments
-- Comment status management
-
-### Tag Management
-- Create and manage post tags
-- View tag usage statistics
-- Bulk operations
-
-### Site Settings
-- **General Settings** - Site title, description, favicon
-- **Branding** - Logo, colors, theme configuration
-- **SEO Settings** - Meta tags, robots.txt configuration
-- **Footer Content** - Custom footer text and links
-- **About Page** - About section content
-- **Contact Settings** - Contact form email, phone, address
-
-### Authentication
-- JWT-based login
-- Protected routes
-- Automatic token refresh
-- Role-based access control
-
-## Environment Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` or `https://blogapp-eta-woad.vercel.app` |
-
-## API Integration
-
-All API calls use Axios configured in `src/api/client.ts`:
-
-```typescript
-import { apiClient } from './api/client';
-
-// Axios instance with JWT token handling
-// Automatically includes Authorization header
-// Base URL from VITE_API_BASE_URL
-```
-
-## Available Scripts
-
-```bash
-# Development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Type checking
-npm run tsc -b
-
-# Linting
-npm run lint
-
-# Preview production build
-npm run preview
-```
-
-## Key Components
-
-### ProtectedRoute
-Wraps routes requiring authentication:
-```typescript
-<ProtectedRoute>
-  <AdminLayout>
-    <Dashboard />
-  </AdminLayout>
-</ProtectedRoute>
-```
-
-### AuthContext
-Manages user authentication state and token:
-```typescript
-const { user, token, login, logout } = useAuth();
-```
-
-### Modal
-Reusable modal for confirmations and forms:
-```typescript
-<Modal isOpen={true} onClose={handleClose}>
-  Content here
-</Modal>
-```
-
-### Sidebar
-Navigation with role-based menu items:
-```typescript
-<Sidebar>
-  {/* Auto-populates with navigation links */}
-</Sidebar>
-```
-
-## Forms
-
-Using React Hook Form for efficient form management:
-
-```typescript
-const { register, handleSubmit, formState: { errors } } = useForm();
-
-<form onSubmit={handleSubmit(onSubmit)}>
-  <input {...register('title', { required: true })} />
-  {errors.title && <span>Title required</span>}
-</form>
-```
-
-## TanStack Query (React Query)
-
-Data fetching with automatic caching and synchronization:
-
-```typescript
-import { useQuery, useMutation } from '@tanstack/react-query';
-
-// Fetch data
-const { data: posts } = useQuery({
-  queryKey: ['posts'],
-  queryFn: () => apiClient.get('/posts')
-});
-
-// Mutate data
-const { mutate: createPost } = useMutation({
-  mutationFn: (data) => apiClient.post('/posts', data),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['posts'] })
-});
-```
-
-## Markdown Editor
-
-EasyMDE integration for post content:
-
-```typescript
-import EasyMDEEditor from 'react-simplemde-editor';
-
-<EasyMDEEditor
-  value={content}
-  onChange={setContent}
-  options={{ spellChecker: false }}
-/>
-```
-
-## Styling
-
-Tailwind CSS for utility-first styling:
-
-```typescript
-<div className="flex gap-4 p-4 bg-white rounded-lg shadow">
-  <button className="px-4 py-2 bg-blue-500 text-white rounded">
-    Button
-  </button>
-</div>
-```
-
-## Type Safety
-
-TypeScript types in `src/types/index.ts`:
-
-```typescript
-interface Post {
-  id: number;
-  title: string;
-  content: string;
-  author_id: number;
-  // ...
-}
-
-interface User {
-  id: number;
-  email: string;
-  is_admin: boolean;
-  // ...
-}
-```
-
-## State Management
-
-1. **AuthContext** - Global auth state
-2. **TanStack Query** - Server state (posts, users, comments, etc.)
-3. **React Hook Form** - Form state
-4. **useState** - Component local state
-
-## Common Patterns
-
-### Data Fetching with Error Handling
-```typescript
-const { data, isLoading, error } = useQuery({
-  queryKey: ['posts'],
-  queryFn: async () => {
-    try {
-      const res = await apiClient.get('/posts');
-      return res.data;
-    } catch (err) {
-      toast.error('Failed to load posts');
-      throw err;
-    }
-  }
-});
-```
-
-### Protected Route
-```typescript
-function ProtectedView() {
-  const { user } = useAuth();
-  
-  if (!user?.is_admin) {
-    return <NotAuthorized />;
-  }
-  
-  return <AdminContent />;
-}
-```
-
-## Troubleshooting
-
-### Port 5173 already in use
-```bash
-# Use different port
-npm run dev -- --port 5173
-```
-
-### API calls fail with CORS error
-- Ensure backend runs at `http://localhost:8000`
-- Check `VITE_API_BASE_URL` matches backend URL
-- Verify backend has frontend URL in CORS origins
-
-### Token expiration
-- Tokens expire after set time
-- ApiClient should auto-refresh via backend logic
-- Manual re-login if refresh fails
-
-### Build fails
-```bash
-# Clear cache and reinstall
-rm -rf node_modules dist
-npm install
-npm run build
-```
-
-### Hot reload not working
-- Check Vite config in `vite.config.ts`
-- Ensure file changes are detected
-- Restart dev server
-
-## Development Workflow
-
-1. **Component Development**
-   - Create new component in `src/components/` or `src/views/`
-   - Add TypeScript types in `src/types/index.ts`
-   - Import and use in layout
-
-2. **Data Fetching**
-   - Use `useQuery` for reading data
-   - Use `useMutation` for creating/updating/deleting
-   - Handle loading and error states
-
-3. **Forms**
-   - Use `react-hook-form` for validation
-   - Call API via mutation on submit
-   - Show success/error toast notifications
-
-4. **Styling**
-   - Use Tailwind classes
-   - Keep consistent with existing design
-   - Use `App.css` for global overrides
-
-## Best Practices
-
-- ✅ Always handle loading and error states
-- ✅ Use TypeScript for type safety
-- ✅ Keep components small and focused
-- ✅ Use custom hooks for shared logic
-- ✅ Implement proper error boundaries
-- ✅ Cache API responses with React Query
-- ✅ Validate forms on both client and server
-- ✅ Show user feedback (toasts) for actions
+- All requests go through the Axios instance in
+  [src/shared/api/client.ts](src/shared/api/client.ts), with `withCredentials: true`.
+  Auth lives in httpOnly cookies, and the app never sees a token.
+- On `POST/PUT/PATCH/DELETE` the client copies the `csrf_token` cookie into an
+  `X-CSRF-Token` header.
+- On a 401 the client calls `/auth/refresh` once (requests share a single in-flight
+  refresh) and retries. A failed refresh caused by a server error doesn't sign the
+  user out.
+- Errors use the backend's envelope. Branch on `code` rather than `message`; helpers
+  are in [src/shared/lib/apiErrors.tsx](src/shared/lib/apiErrors.tsx).
 
 ## Deployment
 
-1. **Build**
-   ```bash
-   npm run build
-   ```
+Deployed on Vercel. [vercel.json](vercel.json) rewrites `/api/*` to the backend and
+everything else to `index.html`. Because of the rewrite, the auth cookies are
+first-party, and production builds call `/api` regardless of `VITE_API_URL`. To deploy
+against a different backend, change the rewrite destination.
 
-2. **Serve dist/ folder**
-   - Static hosting (Netlify, Vercel, AWS S3)
-   - Or web server (nginx, Apache)
+Set `VITE_SITE_URL` (and `VITE_PUBLIC_SITE_URL` if the blog lives on another origin)
+at build time.
 
-3. **Environment**
-   - Set `VITE_API_BASE_URL` to production backend URL
-   - Build with production values
+## Troubleshooting
 
-## Additional Resources
-
-- [React Documentation](https://react.dev/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Vite Guide](https://vitejs.dev/)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-- [TanStack Query Docs](https://tanstack.com/query/latest)
-- [React Router Documentation](https://reactrouter.com/)
-- [React Hook Form Docs](https://react-hook-form.com/)
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **Logged out on every reload in dev**: the backend's `CORS_ORIGINS` must include
+  `http://localhost:5173`, and you must use the same host name (`localhost` or `127.0.0.1`)
+  for the studio and the API.
+- **403 "session could not be verified"**: the CSRF cookie is stale. Refresh the page, or
+  clear the site's cookies.
+- **Port 5173 in use**: `npm run dev -- --port 5180`, and add that origin to `CORS_ORIGINS`.
