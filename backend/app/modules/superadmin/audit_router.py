@@ -12,8 +12,8 @@ import io
 import json
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy import func, or_
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import and_, func, or_
 from sqlmodel import Session, select
 
 from app.core.audit import add_audit_log
@@ -205,22 +205,92 @@ def get_audit_logs(
     _: None = Depends(require_super_admin),
     session: Session = Depends(get_session),
 ):
-    """Platform audit log, newest first. X-Total-Count carries the filtered total."""
+    """
+    Platform audit log, newest first. X-Total-Count carries the filtered total.
+
+    Paging is by cursor: `before_id` returns the entries just older than
+    that one, `after_id` the ones just newer, and X-Has-Older / X-Has-Newer
+    say whether there's more each way. Offsets shift as new entries land at
+    the top while someone pages, repeating or skipping rows; a cursor
+    doesn't. `at` jumps to a moment: the entries at or before it, from
+    where the id cursors carry on. `skip` still works for callers that
+    don't pass any of these.
+    """
+    if sum(value is not None for value in (params.before_id, params.after_id, params.at)) > 1:
+        raise HTTPException(status_code=400, detail="Pass only one of before_id, after_id and at.")
+
     conditions = _audit_conditions(params)
+    limit = params.limit
+    cursor_id = params.before_id if params.before_id is not None else params.after_id
+    # An unknown cursor (a shared link to entries since purged) reads as the first page.
+    cursor = session.get(AuditLog, cursor_id) if cursor_id is not None else None
 
-    # The total rides along on each row (a window count), saving a round
-    # trip; only a page past the end needs the separate count.
-    rows = session.exec(
-        select(AuditLog, func.count().over().label("total"))
-        .where(*conditions)
-        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
-        .offset(params.skip)
-        .limit(params.limit)
-    ).all()
-    total = rows[0][1] if rows else session.exec(select(func.count(AuditLog.id)).where(*conditions)).one()
+    if params.at is not None:
+        logs = session.exec(
+            select(AuditLog)
+            .where(*conditions, AuditLog.created_at <= params.at)
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(limit + 1)
+        ).all()
+        total = None
+        has_older = len(logs) > limit
+        has_newer = (
+            session.exec(select(AuditLog.id).where(*conditions, AuditLog.created_at > params.at).limit(1)).first()
+            is not None
+        )
+        logs = logs[:limit]
+    elif cursor is None:
+        # The total rides along on each row (a window count), saving a round
+        # trip; only a page past the end needs the separate count.
+        rows = session.exec(
+            select(AuditLog, func.count().over().label("total"))
+            .where(*conditions)
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .offset(params.skip)
+            .limit(limit + 1)
+        ).all()
+        total = rows[0][1] if rows else None
+        logs = [log for log, _ in rows]
+        has_older, has_newer = len(logs) > limit, params.skip > 0
+        logs = logs[:limit]
+    elif params.before_id is not None:
+        # (created_at, id) is the sort key, so ties on created_at fall back to id.
+        older = or_(
+            AuditLog.created_at < cursor.created_at,
+            and_(AuditLog.created_at == cursor.created_at, AuditLog.id < cursor.id),
+        )
+        logs = session.exec(
+            select(AuditLog)
+            .where(*conditions, older)
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(limit + 1)
+        ).all()
+        total = None
+        has_older, has_newer = len(logs) > limit, True
+        logs = logs[:limit]
+    else:
+        # Walk forward from the cursor, then flip back to newest first.
+        newer = or_(
+            AuditLog.created_at > cursor.created_at,
+            and_(AuditLog.created_at == cursor.created_at, AuditLog.id > cursor.id),
+        )
+        logs = session.exec(
+            select(AuditLog)
+            .where(*conditions, newer)
+            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+            .limit(limit + 1)
+        ).all()
+        total = None
+        has_older, has_newer = True, len(logs) > limit
+        logs = list(reversed(logs[:limit]))
+
+    if total is None:
+        total = session.exec(select(func.count(AuditLog.id)).where(*conditions)).one()
     response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Has-Older"] = "true" if has_older else "false"
+    response.headers["X-Has-Newer"] = "true" if has_newer else "false"
 
-    return _to_audit_log_read_list(session, [log for log, _ in rows])
+    return _to_audit_log_read_list(session, logs)
 
 
 @router.get("/summary", response_model=AuditLogSummary)
@@ -365,3 +435,16 @@ def export_audit_logs(
             "X-Export-Truncated": "true" if truncated else "false",
         },
     )
+
+
+@router.get("/{log_id:int}", response_model=AuditLogRead)
+def get_audit_log(
+    log_id: int,
+    _: None = Depends(require_super_admin),
+    session: Session = Depends(get_session),
+):
+    """One entry, for a shared link to it that's no longer on the first page."""
+    log = session.get(AuditLog, log_id)
+    if log is None:
+        raise HTTPException(status_code=404, detail="Audit log entry not found.")
+    return _to_audit_log_read_list(session, [log])[0]

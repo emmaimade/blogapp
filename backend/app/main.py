@@ -96,9 +96,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # X-Total-Count and X-Export-Truncated: the superadmin audit log reads them.
+    # X-Total-Count, X-Has-Older/Newer and X-Export-Truncated: the superadmin audit log reads them.
     # Retry-After: the verify-email page times its resend countdown from it.
-    expose_headers=["X-Request-ID", "X-Total-Count", "X-Export-Truncated", "Content-Disposition", "Retry-After"],
+    expose_headers=["X-Request-ID", "X-Total-Count", "X-Has-Older", "X-Has-Newer", "X-Export-Truncated", "Content-Disposition", "Retry-After"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────

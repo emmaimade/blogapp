@@ -96,6 +96,9 @@ class SuperadminAuditLogQueryParams(BaseModel):
     since: Optional[datetime] = Query(default=None, description="Only entries at or after this time")
     until: Optional[datetime] = Query(default=None, description="Only entries before this time")
     include_logins: bool = Query(default=False, description="Include user.login rows, which are hidden by default")
+    before_id: Optional[int] = Query(default=None, description="Cursor: the entries just older than this one")
+    after_id: Optional[int] = Query(default=None, description="Cursor: the entries just newer than this one")
+    at: Optional[datetime] = Query(default=None, description="Jump: the entries at or before this time")
 
 
 class AuditLogSummary(BaseModel):
