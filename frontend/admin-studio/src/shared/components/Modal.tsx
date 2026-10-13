@@ -13,10 +13,12 @@ interface ModalProps {
   isDanger?: boolean;
   validationMatch?: string;
   autoClose?: boolean;
+  /** While true, both buttons are disabled and Confirm shows a spinner (pair with autoClose={false}). */
+  isLoading?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", cancelText = "Cancel", isDanger = true, validationMatch, autoClose = true 
+  isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", cancelText = "Cancel", isDanger = true, validationMatch, autoClose = true, isLoading = false
 }) => {
   const [inputValue, setInputValue] = React.useState('');
   
@@ -40,6 +42,8 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              disabled={isLoading}
+              aria-label="Close"
               className="rounded-xl p-2 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800"
             >
               <X size={20} />
@@ -77,21 +81,22 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 p-4">
           <button
             onClick={onClose}
-            className="admin-btn admin-btn-secondary px-4 py-2 text-sm"
+            disabled={isLoading}
+            className="admin-btn admin-btn-secondary px-4 py-2 text-sm disabled:opacity-50"
           >
             {cancelText}
           </button>
           <button
             onClick={() => {
-              if (!isLocked) {
+              if (!isLocked && !isLoading) {
                 onConfirm();
                 if (autoClose) {
                   onClose();
                 }
               }
             }}
-            disabled={isLocked}
-            className={`admin-btn px-5 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-sm ${
+            disabled={isLocked || isLoading}
+            className={`admin-btn inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-sm ${
               isLocked
                 ? "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed opacity-60"
                 : isDanger
@@ -99,6 +104,9 @@ export const Modal: React.FC<ModalProps> = ({
                   : "bg-violet-600 text-white hover:bg-violet-700 focus:ring-2 focus:ring-violet-500"
             }`}
           >
+            {isLoading && (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            )}
             {confirmText}
           </button>
         </div>

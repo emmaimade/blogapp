@@ -1,2 +1,2 @@
 export type { Post } from './post';
-export type { Tag } from './tag';
+export type { Tag, TagUsage } from './tag';

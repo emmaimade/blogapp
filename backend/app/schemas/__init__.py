@@ -45,7 +45,7 @@ from .settings import (
     SEOSettingsResponse,
     SocialLinks,
 )
-from .tags import PopularTagRead, TagCreate, TagRead, TagUpdate
+from .tags import PopularTagRead, TagCreate, TagRead, TagUpdate, TagUsageRead
 from .users import PublicAuthorRead, UserBlogMembershipRead, UserCreate, UserRead, UserUpdate, SuperadminUserQueryParams, SuperadminUserCounts, SuperadminUserList
 
 CommentAdminRead.model_rebuild(_types_namespace={"PostShort": PostShort})
@@ -107,6 +107,7 @@ __all__ = [
     "TagRead",
     "PopularTagRead",
     "TagUpdate",
+    "TagUsageRead",
     "MetadataRead",
     "CommentRead",
     "CommentAdminRead",

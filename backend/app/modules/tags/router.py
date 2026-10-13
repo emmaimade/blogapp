@@ -11,7 +11,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.core.permissions import get_public_blog, require_blog_editor, require_completed_onboarding
 from app.core.security import get_current_user
 from app.models import Post, PostTagLink, Tag, User, Blog
-from app.schemas import PopularTagRead, TagCreate, TagRead, TagUpdate
+from app.schemas import PopularTagRead, TagCreate, TagRead, TagUpdate, TagUsageRead
 
 router = APIRouter(prefix="/blogs/{blog_id}/tags", tags=["tags"])
 
@@ -57,7 +57,31 @@ def read_tags(
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog)
 ):
-    return session.exec(select(Tag).where(Tag.blog_id == blog_id)).all()
+    return session.exec(select(Tag).where(Tag.blog_id == blog_id).order_by(Tag.name)).all()
+
+
+@router.get("/usage", response_model=List[TagUsageRead])
+def read_tag_usage(
+    blog_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_editor),
+):
+    """
+    Every tag with its post count, for the studio's tag manager.
+
+    Drafts count too, since deleting a tag strips it from them as well. Kept
+    off the public list above so readers can't infer unpublished work.
+    """
+    statement = (
+        select(Tag.id, Tag.name, func.count(PostTagLink.post_id).label("post_count"))
+        .outerjoin(PostTagLink, PostTagLink.tag_id == Tag.id)
+        .where(Tag.blog_id == blog_id)
+        .group_by(Tag.id, Tag.name)
+        .order_by(Tag.name)
+    )
+
+    rows = session.exec(statement).all()
+    return [TagUsageRead(id=row.id, name=row.name, blog_id=blog_id, post_count=row.post_count) for row in rows]
 
 
 @router.get("/popular", response_model=List[PopularTagRead])
