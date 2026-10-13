@@ -36,12 +36,14 @@ def test_team_member_is_notified_of_a_reply(client):
     reader_token, _, _ = _register_owner(client)
 
     parent = _comment(client, editor_token, post_id, content="Editor's note").json()["id"]
-    assert _comment(client, reader_token, post_id, content="Reply", parent_id=parent).status_code == 200
+    reply = _comment(client, reader_token, post_id, content="Reply", parent_id=parent)
+    assert reply.status_code == 200
 
     notifications = _reply_notifications(editor_id)
     assert len(notifications) == 1
     assert notifications[0].blog_id == blog_id
-    assert notifications[0].link == f"/admin/posts/view/{post_id}?blog={blog_id}"
+    # Opens the studio's Comments page at the reply (see test_comment_notification_links.py).
+    assert notifications[0].link.endswith(f"/comments?post={post_id}&highlight={reply.json()['id']}")
 
 
 def test_plain_reader_is_not_notified(client):

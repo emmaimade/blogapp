@@ -41,8 +41,17 @@ def list_blog_comments(
     status: CommentStatusFilter,
     skip: int,
     limit: int,
-) -> Tuple[List[CommentAdminRead], int]:
+    post_id: Optional[int] = None,
+    focus: Optional[int] = None,
+) -> Tuple[List[CommentAdminRead], int, int]:
+    """
+    Returns (page of comments, total, skip actually used). With `focus`, the
+    page is the one containing that comment — what a notification link
+    opens — so `skip` may differ from the one asked for.
+    """
     filters = [Post.blog_id == blog_id]
+    if post_id is not None:
+        filters.append(Comment.post_id == post_id)
 
     author_id = _author_scope(current_user, blog_id, session)
     if author_id is not None:
@@ -61,6 +70,8 @@ def list_blog_comments(
 
     base = select(Comment).join(Post, Comment.post_id == Post.id).where(*filters)
     total = session.exec(select(func.count()).select_from(base.subquery())).one()
+    if focus is not None:
+        skip = _page_containing(session, base, focus, limit, default=skip)
     comments = session.exec(
         base.options(selectinload(Comment.user), selectinload(Comment.post))
         .order_by(Comment.created_at.desc(), Comment.id.desc())
@@ -78,7 +89,7 @@ def list_blog_comments(
         )
         for c in comments
     ]
-    return items, total
+    return items, total, skip
 
 
 # ── Remove / restore ──────────────────────────────────────────────────────────
@@ -274,6 +285,23 @@ def _get_moderatable_comment(
         # so this is a 404 rather than a 403.
         raise NotFoundError(ErrorCode.COMMENT_NOT_FOUND)
     return comment, post
+
+
+def _page_containing(session: Session, base, comment_id: int, limit: int, default: int) -> int:
+    """
+    The offset of the page holding `comment_id` under the list's newest-first
+    order. Falls back to `default` when the comment isn't in the filtered
+    list (deleted post, other workspace, filtered out by status or search).
+    """
+    target = session.exec(base.where(Comment.id == comment_id)).first()
+    if target is None:
+        return default
+    newer = base.where(
+        (Comment.created_at > target.created_at)
+        | ((Comment.created_at == target.created_at) & (Comment.id > target.id))
+    )
+    position = session.exec(select(func.count()).select_from(newer.subquery())).one()
+    return (position // limit) * limit
 
 
 def _pending_report_subquery():

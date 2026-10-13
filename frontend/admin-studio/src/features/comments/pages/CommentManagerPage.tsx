@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquare,
@@ -14,14 +14,16 @@ import {
   RotateCcw,
   Ban,
   UserCheck,
+  X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { Modal } from '../../../shared/components/Modal';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { toastApiError } from '../../../shared/lib/apiErrors';
+import { getPostUrl } from '../../../shared/lib/blogUrl';
 import { useAuth } from '../../auth/context/AuthContext';
 import { formatLocalDateTime } from '../../../shared/utils/dates';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
@@ -48,7 +50,8 @@ interface Comment {
   content: string;
   created_at: string;
   user: { id: number; username: string };
-  post: { id: number; title: string };
+  parent_id: number | null;
+  post: { id: number; title: string; slug: string };
   is_deleted: boolean;
   deleted_by: 'author' | 'moderator' | 'platform' | null;
   open_reports: number;
@@ -79,7 +82,7 @@ const secondaryButton =
 
 export const CommentManager = () => {
   useDocumentTitle('Comments');
-  const { activeMembership, activeRole } = useBlog();
+  const { activeMembership, activeRole, activeBlog } = useBlog();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -88,31 +91,68 @@ export const CommentManager = () => {
   // Authors moderate comments on their own posts; blocking is blog-wide, so owner/editor only.
   const canBlock = activeRole === 'owner' || activeRole === 'editor';
 
+  // Notification links open /comments?post={id}&highlight={commentId}.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const postFilter = Number(searchParams.get('post')) || null;
+  const highlightId = Number(searchParams.get('highlight')) || null;
+
   const [status, setStatus] = useState<StatusFilter>('all');
   const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(0);
+  // null until the user pages or filters: the first load then asks the API
+  // for the page that contains the highlighted comment (`focus`).
+  const [page, setPage] = useState<number | null>(highlightId ? null : 0);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [collapsedPosts, setCollapsedPosts] = useState<Record<number, boolean>>({});
 
   // Debounce the search box so each keystroke isn't a request.
+  // Only an actual change to the text resets paging — not the first render,
+  // which would otherwise throw away the jump to a highlighted comment.
   useEffect(() => {
     const handle = setTimeout(() => {
-      setQuery(searchInput.trim());
+      const next = searchInput.trim();
+      if (next === query) return;
+      setQuery(next);
       setPage(0);
     }, 300);
     return () => clearTimeout(handle);
-  }, [searchInput]);
+  }, [searchInput, query]);
 
+  const focusing = page === null && !!highlightId;
   const { data, isLoading, isFetching } = useQuery<CommentPage>({
-    queryKey: ['blogComments', blogId, status, query, page],
+    queryKey: ['blogComments', blogId, status, query, postFilter, focusing ? `focus:${highlightId}` : page],
     queryFn: async () =>
       (await api.get(`/blogs/${blogId}/comments/`, {
-        params: { status, q: query || undefined, skip: page * PAGE_SIZE, limit: PAGE_SIZE },
+        params: {
+          status,
+          q: query || undefined,
+          post_id: postFilter ?? undefined,
+          ...(focusing ? { focus: highlightId } : { skip: (page ?? 0) * PAGE_SIZE }),
+          limit: PAGE_SIZE,
+        },
       })).data,
     enabled: !!blogId,
     placeholderData: keepPreviousData,
   });
+  // The page the API actually returned — with `focus` it picks it.
+  const currentPage = page ?? (data ? Math.floor(data.skip / PAGE_SIZE) : 0);
+
+  // Bring the highlighted comment into view once, when it first arrives.
+  const scrolledTo = useRef<number | null>(null);
+  useEffect(() => {
+    if (!highlightId || scrolledTo.current === highlightId) return;
+    const element = document.getElementById(`admin-comment-${highlightId}`);
+    if (!element) return;
+    scrolledTo.current = highlightId;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    element.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, [highlightId, data]);
+
+  const clearPostFilter = () => {
+    setSearchParams({});
+    setPage(0);
+  };
+  const filteredPostTitle = postFilter ? data?.items[0]?.post.title : undefined;
 
   const { data: bans } = useQuery<CommentBan[]>({
     queryKey: ['commentBans', blogId],
@@ -182,8 +222,8 @@ export const CommentManager = () => {
   };
 
   const total = data?.total ?? 0;
-  const firstShown = total === 0 ? 0 : page * PAGE_SIZE + 1;
-  const lastShown = Math.min(total, (page + 1) * PAGE_SIZE);
+  const firstShown = total === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const lastShown = Math.min(total, (currentPage + 1) * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -222,6 +262,24 @@ export const CommentManager = () => {
           />
         </label>
       </div>
+
+      {postFilter && (
+        <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <span>
+            Showing comments on{' '}
+            <span className="font-semibold text-zinc-900 dark:text-white">
+              {filteredPostTitle ? `“${filteredPostTitle}”` : 'one post'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={clearPostFilter}
+            className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-2.5 py-0.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            <X size={12} /> Show all posts
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-6 animate-pulse">
@@ -318,6 +376,8 @@ export const CommentManager = () => {
                       return (
                         <div
                           key={comment.id}
+                          id={`admin-comment-${comment.id}`}
+                          style={comment.id === highlightId ? { animation: 'admin-comment-highlight 3.5s ease-out both' } : undefined}
                           className={`flex flex-col justify-between gap-4 p-6 transition-colors sm:flex-row sm:items-start ${
                             comment.is_deleted ? 'bg-zinc-50/50 dark:bg-zinc-900/30' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
                           }`}
@@ -366,6 +426,19 @@ export const CommentManager = () => {
                                 </p>
                               )}
                             </div>
+                            {!comment.is_deleted && activeBlog && (
+                              // Replying happens on the public blog. A reply links to its
+                              // parent: the blog collapses long reply lists, the parent is
+                              // always on show.
+                              <a
+                                href={`${getPostUrl(activeBlog, comment.post.slug)}#comment-${comment.parent_id ?? comment.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:underline dark:text-violet-400"
+                              >
+                                Reply on blog <ExternalLink size={12} />
+                              </a>
+                            )}
                           </div>
 
                           <div className="flex shrink-0 flex-wrap gap-2 sm:mt-11 sm:flex-col">
@@ -428,14 +501,14 @@ export const CommentManager = () => {
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
+              onClick={() => setPage(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
               className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <ChevronLeft size={16} /> Previous
             </button>
             <button
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage(currentPage + 1)}
               disabled={!data?.has_more}
               className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900"
             >

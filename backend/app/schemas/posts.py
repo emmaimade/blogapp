@@ -85,6 +85,7 @@ class PostDetailRead(PostRead):
 class PostShort(BaseModel):
     id: int
     title: str
+    slug: str
     blog_id: int
     class Config:
         from_attributes = True

@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import {
   ArrowLeft, Edit, Calendar, Tag as TagIcon,
-  Eye, Clock, CheckCircle2, FileText, Star,
+  Eye, Clock, CheckCircle2, FileText, Star, MessageSquare,
 } from 'lucide-react';
 import 'highlight.js/styles/atom-one-dark.css';
 import api from '../../../shared/api/client';
@@ -14,6 +14,9 @@ import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { type Post } from '../../../shared/types';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+
+// The single-post endpoint also returns how many live comments it has.
+type PostWithCommentCount = Post & { comment_count?: number };
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status, publishedAt }: { status: string; publishedAt?: string | null }) => {
@@ -91,7 +94,7 @@ export const PostView = () => {
   const navigate = useNavigate();
   const { activeBlog } = useBlog();
 
-  const { data: post, isLoading, isError } = useQuery<Post>({
+  const { data: post, isLoading, isError } = useQuery<PostWithCommentCount>({
     queryKey: ['post', id, activeBlog?.id],
     queryFn: async () =>
       (await api.get(`/blogs/${activeBlog!.id}/posts/${id}`)).data,
@@ -214,6 +217,20 @@ export const PostView = () => {
               <Eye size={14} />
               <span>{post.views.toLocaleString()} view{post.views !== 1 ? 's' : ''}</span>
             </div>
+          )}
+
+          {/* Comments — opens the Comments page filtered to this post */}
+          {(post.comment_count ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate(toWorkspace(`/comments?post=${post.id}`))}
+              className="flex items-center gap-1.5 font-semibold text-violet-600 hover:underline dark:text-violet-400"
+            >
+              <MessageSquare size={14} />
+              <span>
+                {(post.comment_count ?? 0).toLocaleString()} comment{post.comment_count !== 1 ? 's' : ''} →
+              </span>
+            </button>
           )}
         </div>
 
