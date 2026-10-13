@@ -59,26 +59,30 @@ const SaveBar = ({ isDirty, isSaving, onDiscard }: SaveBarProps) => (
     }`}
   >
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/95 py-2.5 pl-4 pr-2.5 shadow-lg backdrop-blur-xl dark:border-zinc-700 dark:bg-zinc-900/95">
-      <p role="status" className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
+      <p role="status" className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-zinc-700 dark:text-zinc-200">
         <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-        {isDirty ? 'Unsaved changes' : ''}
+        {isDirty && (
+          <>
+            Unsaved<span className="hidden sm:inline">&nbsp;changes</span>
+          </>
+        )}
       </p>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onDiscard}
           disabled={isSaving}
-          className="rounded-xl px-3.5 py-2 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Discard
         </button>
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+          className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
         >
           {isSaving && <Loader2 className="animate-spin" size={14} aria-hidden="true" />}
-          {isSaving ? 'Saving…' : 'Save changes'}
+          {isSaving ? 'Saving…' : <>Save<span className="hidden sm:inline">&nbsp;changes</span></>}
         </button>
       </div>
     </div>

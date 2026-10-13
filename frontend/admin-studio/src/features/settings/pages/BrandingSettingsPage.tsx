@@ -319,7 +319,7 @@ export const BrandingSettings: React.FC = () => {
 
           <div>
             <p className={`mb-2 ${labelClass}`}>In your navigation bar</p>
-            <div className="flex min-h-33 items-center justify-center rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700">
+            <div className="flex min-h-33 items-center justify-center rounded-2xl border border-zinc-200 bg-[#ffffff] p-6 dark:border-zinc-700">
               {values.logo_url ? (
                 <img src={values.logo_url} alt="Logo preview" className="max-h-14 object-contain" />
               ) : (
@@ -438,8 +438,9 @@ export const BrandingSettings: React.FC = () => {
         )}
       </SettingsCard>
 
-      {/* The previews show the blog's light theme, so their text colours are
-          fixed rather than following the studio's dark mode. */}
+      {/* The previews show the blog's light theme, so their colours are fixed
+          values: the studio's dark mode overrides bg-white and the zinc text
+          classes with !important. */}
       <SettingsCard title="Fonts" icon={Type}>
         <div className="grid gap-6 md:grid-cols-2">
           <Field label="Headings" hint="Post titles and section headings.">
@@ -467,7 +468,7 @@ export const BrandingSettings: React.FC = () => {
             )}
           </Field>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700" aria-label="Font preview">
+        <div className="rounded-xl border border-zinc-200 bg-[#ffffff] p-6 dark:border-zinc-700" aria-label="Font preview">
           <p className="mb-2 text-3xl font-black text-[#18181b]" style={{ fontFamily: `"${values.font_heading}", sans-serif` }}>
             The quiet craft of writing
           </p>

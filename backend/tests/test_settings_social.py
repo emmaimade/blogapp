@@ -149,3 +149,32 @@ def test_og_image_upload_rejects_svg_with_its_own_message():
         settings_router.upload_og_image(blog_id=1, file=_FakeUploadFile("image/svg+xml"))
     assert excinfo.value.code == "INVALID_FILE_TYPE"
     assert "SVG" not in excinfo.value.message
+
+
+# ── Footer on the Free plan ───────────────────────────────────────────────────
+
+def test_free_blog_can_save_a_footer_it_never_saved(client, owner):
+    """The footer it was shown carries the blog's default copyright; sending
+    that back unchanged isn't an edit, so the Free plan doesn't block it."""
+    token, blog_id = owner
+    footer = client.get(f"/blogs/{blog_id}/settings/footer").json()
+
+    res = client.post(
+        f"/blogs/{blog_id}/settings/footer",
+        json={**footer, "show_categories": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200, res.text
+    assert client.get(f"/blogs/{blog_id}/settings/footer").json()["show_categories"] is False
+
+
+def test_free_blog_still_cannot_change_the_copyright(client, owner):
+    token, blog_id = owner
+    footer = client.get(f"/blogs/{blog_id}/settings/footer").json()
+
+    res = client.post(
+        f"/blogs/{blog_id}/settings/footer",
+        json={**footer, "copyright_text": "© Ada"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403, res.text

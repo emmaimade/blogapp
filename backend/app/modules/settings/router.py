@@ -329,13 +329,18 @@ def get_footer_settings(
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
 ):
-    # No saved (or readable) footer yet — defaults from the blog itself, so the
-    # owner sees their own tagline and blog name instead of generic placeholders.
-    defaults = FooterSettings(
+    return _section_with_social(session, blog_id, "footer", FooterSettings, fallback=footer_defaults(blog))
+
+
+def footer_defaults(blog: Blog) -> FooterSettings:
+    """
+    The footer before one is saved (or when the saved one is unreadable): the
+    blog's own tagline and name rather than generic placeholders.
+    """
+    return FooterSettings(
         footer_text=blog.tagline or f"Thoughts and ideas from {blog.name}.",
         copyright_text=f"© {{year}} {blog.name}. Powered by INKO.",
     )
-    return _section_with_social(session, blog_id, "footer", FooterSettings, fallback=defaults)
 
 
 @router.post("/footer", response_model=FooterSettingsResponse)
@@ -350,8 +355,12 @@ def update_footer_settings(
 ):
     from app.core.plans import get_blog_limits
 
-    # Check if user is trying to modify the copyright text
-    existing_settings = get_setting(session, blog_id, "footer", FooterSettings)
+    # Is the copyright text being changed? Compared with what the owner was
+    # shown — including the blog's own default before a footer is first saved,
+    # or a Free blog could never save its footer at all.
+    existing_settings = get_setting(
+        session, blog_id, "footer", FooterSettings, fallback=footer_defaults(session.get(Blog, blog_id))
+    )
 
     if settings.copyright_text != existing_settings.get("copyright_text"):
         # Follows the plan the workspace is entitled to right now, so an

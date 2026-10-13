@@ -36,7 +36,7 @@ const settingsGroups: readonly SettingsGroup[] = [
     sections: [
       { to: 'about', label: 'About', description: 'Your story and call to action', icon: UserSquare2, roles: ['owner'] },
       { to: 'contact', label: 'Contact', description: 'Email, location and FAQ', icon: Mail, roles: ['owner'] },
-      { to: 'footer', label: 'Footer', description: 'Footer text and newsletter', icon: PanelBottom, roles: ['owner'] },
+      { to: 'footer', label: 'Footer', description: 'Footer text and sections', icon: PanelBottom, roles: ['owner'] },
     ],
   },
   {
