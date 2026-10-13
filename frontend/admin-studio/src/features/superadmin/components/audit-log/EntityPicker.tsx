@@ -72,9 +72,9 @@ export const EntityPicker = ({ kind, value, onChange }: EntityPickerProps) => {
   if (value) {
     const chosen = toOptions(kind, selected)[0];
     return (
-      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pl-3 pr-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
-        <Icon size={14} aria-hidden="true" className="shrink-0 text-zinc-400" />
-        <span className="min-w-0 flex-1 truncate text-zinc-800 dark:text-zinc-100" title={chosen?.secondary ?? undefined}>
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-primary/40 bg-accent py-1.5 pl-3 pr-1.5 text-sm">
+        <Icon size={14} aria-hidden="true" className="shrink-0 text-primary" />
+        <span className="min-w-0 flex-1 truncate font-medium text-zinc-900 dark:text-zinc-100" title={chosen?.secondary ?? undefined}>
           {chosen?.primary ?? `${kind === 'workspace' ? 'Workspace' : 'User'} #${value}`}
         </span>
         <button
@@ -84,7 +84,7 @@ export const EntityPicker = ({ kind, value, onChange }: EntityPickerProps) => {
             requestAnimationFrame(() => inputRef.current?.focus());
           }}
           aria-label={`Clear ${noun} filter`}
-          className="rounded-md p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+          className="rounded-md p-1 text-primary hover:bg-primary/15 hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <X size={14} aria-hidden="true" />
         </button>
