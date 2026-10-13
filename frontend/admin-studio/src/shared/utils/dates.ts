@@ -98,6 +98,75 @@ export const formatAuditTs = (iso: string | null | undefined): string => {
 };
 
 /**
+ * Time of day to the second, for rows already grouped by day — "14:02:11"
+ */
+export const formatTimeOfDay = (iso: string | null | undefined): string => {
+  const d = safeDate(iso);
+  return d ? format(d, 'HH:mm:ss') : '—';
+};
+
+/**
+ * Full local datetime to the second, for investigations — "Oct 13, 2026, 14:02:11"
+ */
+export const formatPreciseDateTime = (iso: string | null | undefined): string => {
+  const d = safeDate(iso);
+  return d ? format(d, 'MMM d, yyyy, HH:mm:ss') : '—';
+};
+
+/**
+ * The same instant in UTC — "2026-10-13T13:02:11.000Z"
+ */
+export const formatUtcIso = (iso: string | null | undefined): string => {
+  const d = safeDate(iso);
+  return d ? d.toISOString() : '—';
+};
+
+/**
+ * Local calendar day, for grouping — "2026-10-13"
+ */
+export const localDayKey = (iso: string | null | undefined): string => {
+  const d = safeDate(iso);
+  return d ? format(d, 'yyyy-MM-dd') : '';
+};
+
+/**
+ * Day heading — "Today · Oct 13", "Yesterday · Oct 12", "Mon, Oct 5, 2026"
+ */
+export const formatDayHeading = (iso: string | null | undefined): string => {
+  const d = safeDate(iso);
+  if (!d) return '—';
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const yesterday = format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const key = format(d, 'yyyy-MM-dd');
+  if (key === today) return `Today · ${format(d, 'MMM d')}`;
+  if (key === yesterday) return `Yesterday · ${format(d, 'MMM d')}`;
+  return format(d, 'EEE, MMM d, yyyy');
+};
+
+/**
+ * A `datetime-local` input value, shifted by some minutes — "2026-10-13T13:47"
+ */
+export const toDateTimeLocalValue = (iso: string | null | undefined, offsetMinutes = 0): string => {
+  const d = safeDate(iso);
+  return d ? format(new Date(d.getTime() + offsetMinutes * 60 * 1000), "yyyy-MM-dd'T'HH:mm") : '';
+};
+
+/**
+ * Short name of the viewer's timezone — "GMT+1", "EDT"
+ */
+export const localTimeZoneLabel = (): string => {
+  try {
+    return (
+      new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+        .formatToParts(new Date())
+        .find((part) => part.type === 'timeZoneName')?.value ?? ''
+    );
+  } catch {
+    return '';
+  }
+};
+
+/**
  * Convert a local Date object to an ISO string for API submission.
  * Always sends UTC so the backend stores it correctly.
  */

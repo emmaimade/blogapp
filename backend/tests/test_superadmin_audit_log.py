@@ -101,6 +101,117 @@ def test_total_count_header_and_paging(client):
     assert len(resp.json()) == 2
 
 
+def _ids(client, headers, **params) -> tuple[list[int], bool, bool]:
+    resp = client.get(URL, params=params, headers=headers)
+    assert resp.status_code == 200, resp.text
+    return (
+        [row["id"] for row in resp.json()],
+        resp.headers["X-Has-Older"] == "true",
+        resp.headers["X-Has-Newer"] == "true",
+    )
+
+
+def _log_at(blog_id, created_at, count=1):
+    with Session(engine) as session:
+        for _ in range(count):
+            session.add(AuditLog(action="tag.create", resource_type="tag", blog_id=blog_id, created_at=created_at))
+        session.commit()
+
+
+def test_cursor_paging_walks_both_ways_without_gaps(client):
+    headers = _superadmin(client)
+    blog_id = _workspace(client)
+    now = datetime.now(timezone.utc)
+    # Three rows sharing one timestamp, so the id tie-break is exercised.
+    _log_at(blog_id, now - timedelta(minutes=10))
+    _log_at(blog_id, now - timedelta(minutes=5), count=3)
+    _log_at(blog_id, now - timedelta(minutes=1))
+    everything, _, _ = _ids(client, headers, blog_id=blog_id, limit=200)
+    assert len(everything) == 5
+
+    pages = [_ids(client, headers, blog_id=blog_id, limit=2)]
+    while pages[-1][1]:
+        pages.append(_ids(client, headers, blog_id=blog_id, limit=2, before_id=pages[-1][0][-1]))
+    assert [ids for ids, _, _ in pages] == [everything[0:2], everything[2:4], everything[4:5]]
+    assert [newer for _, _, newer in pages] == [False, True, True]
+
+    # Back up from the oldest page.
+    ids, has_older, has_newer = _ids(client, headers, blog_id=blog_id, limit=2, after_id=everything[4])
+    assert (ids, has_older, has_newer) == (everything[2:4], True, True)
+    ids, _, has_newer = _ids(client, headers, blog_id=blog_id, limit=2, after_id=everything[2])
+    assert (ids, has_newer) == (everything[0:2], False)
+
+
+def test_cursor_page_does_not_shift_when_new_entries_arrive(client):
+    headers = _superadmin(client)
+    blog_id = _workspace(client)
+    for minutes in (4, 3, 2, 1):
+        _log_at(blog_id, datetime.now(timezone.utc) - timedelta(minutes=minutes))
+    first, _, _ = _ids(client, headers, blog_id=blog_id, limit=2)
+
+    _log(blog_id, "tag.update")
+    second, has_older, _ = _ids(client, headers, blog_id=blog_id, limit=2, before_id=first[-1])
+
+    assert len(second) == 2 and not set(first) & set(second)
+    assert not has_older
+    resp = client.get(URL, params={"blog_id": blog_id, "limit": 2, "before_id": first[-1]}, headers=headers)
+    assert resp.headers["X-Total-Count"] == "5"
+
+
+def test_cursor_edge_cases(client):
+    headers = _superadmin(client)
+    blog_id = _workspace(client)
+    _log(blog_id, "tag.create")
+
+    both = client.get(URL, params={"blog_id": blog_id, "before_id": 1, "after_id": 2}, headers=headers)
+    assert both.status_code == 400
+
+    # An unknown cursor reads as the first page.
+    ids, has_older, has_newer = _ids(client, headers, blog_id=blog_id, before_id=10**9)
+    assert len(ids) == 1 and not has_older and not has_newer
+
+
+def test_jump_to_a_moment(client):
+    headers = _superadmin(client)
+    blog_id = _workspace(client)
+    now = datetime.now(timezone.utc)
+    for hours in (5, 4, 3, 2, 1):
+        _log_at(blog_id, now - timedelta(hours=hours))
+    _log(blog_id, "tag.update")  # another action, for the filter check
+    everything, _, _ = _ids(client, headers, blog_id=blog_id, action="tag.create", limit=200)
+
+    at = (now - timedelta(hours=2, minutes=30)).isoformat()
+    ids, has_older, has_newer = _ids(client, headers, blog_id=blog_id, action="tag.create", at=at, limit=2)
+    assert (ids, has_older, has_newer) == (everything[2:4], True, True)
+
+    # The id cursors carry on from a jump.
+    ids, has_older, _ = _ids(client, headers, blog_id=blog_id, action="tag.create", before_id=ids[-1], limit=2)
+    assert (ids, has_older) == (everything[4:5], False)
+
+    # A moment in the future is the newest page.
+    future = (now + timedelta(days=1)).isoformat()
+    ids, _, has_newer = _ids(client, headers, blog_id=blog_id, action="tag.create", at=future, limit=2)
+    assert (ids, has_newer) == (everything[0:2], False)
+
+    resp = client.get(URL, params={"blog_id": blog_id, "at": at, "before_id": 1}, headers=headers)
+    assert resp.status_code == 400
+
+
+def test_single_entry(client):
+    headers = _superadmin(client)
+    blog_id = _workspace(client)
+    _log(blog_id, "tag.create", ip="10.1.2.3")
+    (entry_id,), _, _ = _ids(client, headers, blog_id=blog_id)
+
+    resp = client.get(f"{URL}/{entry_id}", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert (body["id"], body["action"], body["ip_address"], body["blog_id"]) == (entry_id, "tag.create", "10.1.2.3", blog_id)
+    assert body["label"] and body["severity"]
+
+    assert client.get(f"{URL}/{10**9}", headers=headers).status_code == 404
+
+
 def test_sign_ins_hidden_unless_asked_for(client):
     headers = _superadmin(client)
     blog_id = _workspace(client)
@@ -208,7 +319,7 @@ def test_export_says_when_it_was_cut_short(client, monkeypatch):
     assert len(list(csv.DictReader(io.StringIO(resp.text)))) == 2
 
 
-@pytest.mark.parametrize("path", ["", "/summary", "/lookup", "/export"])
+@pytest.mark.parametrize("path", ["", "/summary", "/lookup", "/export", "/1"])
 def test_superadmin_only(client, path):
     headers, _, _, _ = _register(client)
     assert client.get(f"{URL}{path}", headers=headers).status_code == 403

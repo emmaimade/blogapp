@@ -1,7 +1,8 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, ChevronDown } from 'lucide-react';
-import { formatLocalDateTime, formatRelative } from '../../../../shared/utils/dates';
+import { ArrowUpRight, Check, ChevronDown, Clock, Copy, Filter, Link2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { formatPreciseDateTime, formatRelative, formatTimeOfDay, formatUtcIso } from '../../../../shared/utils/dates';
 import { getActionStyle } from '../../../audit-log/lib/actionStyle';
 import { formatChangeValue, getFieldChanges, humanizeField } from '../../../audit-log/lib/entryDetails';
 import { ChangeTable } from '../../../audit-log/components/ChangeTable';
@@ -19,54 +20,85 @@ const SEVERITY_ICON: Record<Severity, string> = {
   info: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
 };
 
+/** A left edge so critical rows stand out while scrolling. */
+const SEVERITY_EDGE: Record<Severity, string> = {
+  critical: 'border-l-red-500 dark:border-l-red-500',
+  warning: 'border-l-transparent',
+  info: 'border-l-transparent',
+};
+
 const SEVERITY_LABEL: Record<Severity, string> = { critical: 'Critical', warning: 'Warning', info: 'Info' };
 
 /** Keys shown elsewhere in the expanded view, so not repeated as "other details". */
 const SHOWN_DETAIL_KEYS = new Set(['changes', 'from', 'to']);
 
-export type FilterKey = 'actor' | 'workspace' | 'action';
+/** `q` is the free-text search, which is how an IP address is filtered. */
+export type FilterKey = 'actor' | 'workspace' | 'action' | 'q';
 
 interface AuditRowProps {
   log: PlatformAuditEntry;
   onFilter: (key: FilterKey, value: string) => void;
+  /** The entry a shared link points at: opened, scrolled to and highlighted. */
+  linked?: boolean;
+  /** Switch to everything around this entry: same person (or IP), 15 minutes either side. */
+  onShowSurrounding: (log: PlatformAuditEntry) => void;
 }
 
 const actorText = (log: PlatformAuditEntry) => log.actor_name || log.actor_email || 'System';
+const workspaceText = (log: PlatformAuditEntry) => log.blog_name ?? `Workspace #${log.blog_id}`;
 
-export const AuditRow = ({ log, onFilter }: AuditRowProps) => {
-  const [expanded, setExpanded] = useState(false);
+export const AuditRow = ({ log, onFilter, linked = false, onShowSurrounding }: AuditRowProps) => {
+  const [expanded, setExpanded] = useState(linked);
   const panelId = useId();
+  const rowRef = useRef<HTMLLIElement>(null);
   // Shape from the kind of action; colour from severity, which is what this page sorts by.
   const { Icon } = getActionStyle(log.action);
 
-  const actorButton = log.actor_user_id ? (
-    <FilterButton onClick={() => onFilter('actor', String(log.actor_user_id))} title={`Only show activity by ${actorText(log)}`}>
-      {actorText(log)}
-    </FilterButton>
-  ) : (
-    <span>{actorText(log)}</span>
+  useEffect(() => {
+    if (linked) rowRef.current?.scrollIntoView({ block: 'center' });
+  }, [linked]);
+
+  // The whole row toggles, except clicks on its own controls or when selecting text to copy.
+  const handleRowClick = (e: MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button, a')) return;
+    if (window.getSelection()?.toString()) return;
+    setExpanded((open) => !open);
+  };
+
+  const actor = (
+    <Filterable
+      label={actorText(log)}
+      filterLabel={log.actor_user_id ? `Only show activity by ${actorText(log)}` : undefined}
+      onFilter={() => onFilter('actor', String(log.actor_user_id))}
+    />
   );
 
-  const workspaceButton = log.blog_id ? (
-    <FilterButton
-      onClick={() => onFilter('workspace', String(log.blog_id))}
-      title={`Only show activity in ${log.blog_name ?? `workspace #${log.blog_id}`}`}
-    >
-      {log.blog_name ?? `Workspace #${log.blog_id}`}
-    </FilterButton>
+  const workspace = log.blog_id ? (
+    <Filterable
+      label={workspaceText(log)}
+      filterLabel={`Only show activity in ${workspaceText(log)}`}
+      onFilter={() => onFilter('workspace', String(log.blog_id))}
+    />
   ) : (
-    <span className="text-zinc-400">Platform</span>
+    <span className="text-zinc-400">Platform-wide</span>
   );
 
+  // Rows are grouped under a day heading, so the time of day is enough here.
   const time = (
-    <time dateTime={log.created_at} title={formatLocalDateTime(log.created_at)}>
-      {formatRelative(log.created_at)}
+    <time dateTime={log.created_at} title={formatPreciseDateTime(log.created_at)} className="tabular-nums">
+      {formatTimeOfDay(log.created_at)}
     </time>
   );
 
   return (
-    <li>
-      <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-start gap-x-3 px-4 py-3 md:grid-cols-[2rem_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_2rem] md:items-center">
+    <li
+      ref={rowRef}
+      className={`border-l-2 ${SEVERITY_EDGE[log.severity]} ${linked ? 'bg-accent' : ''}`}
+    >
+      <div
+        onClick={handleRowClick}
+        className="group grid cursor-pointer grid-cols-[2rem_minmax(0,1fr)_2rem] items-start gap-x-3 py-3 pl-3.5 pr-4 hover:bg-zinc-50/80 md:grid-cols-[2rem_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_2rem] md:items-center dark:hover:bg-zinc-900/40"
+      >
         <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-lg ${SEVERITY_ICON[log.severity]}`}>
           <Icon size={15} />
         </span>
@@ -74,14 +106,13 @@ export const AuditRow = ({ log, onFilter }: AuditRowProps) => {
         <div className="min-w-0">
           {/* Phones wrap the event name; wider screens keep each row to one line. */}
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 md:flex-nowrap">
-            <FilterButton
-              onClick={() => onFilter('action', log.action)}
-              title={`Only show "${log.label}" events`}
+            <Filterable
+              label={log.label}
+              filterLabel={`Only show "${log.label}" events`}
+              onFilter={() => onFilter('action', log.action)}
               wrap
-              className="min-w-0 text-sm font-semibold text-zinc-900 md:truncate dark:text-zinc-100"
-            >
-              {log.label}
-            </FilterButton>
+              className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+            />
             {log.severity !== 'info' && (
               <span className={`shrink-0 rounded-full px-2 py-px text-[10px] font-semibold ring-1 ring-inset ${SEVERITY_BADGE[log.severity]}`}>
                 {SEVERITY_LABEL[log.severity]}
@@ -95,25 +126,28 @@ export const AuditRow = ({ log, onFilter }: AuditRowProps) => {
           )}
           {/* On narrow screens the actor, workspace and time columns fold in here. */}
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 md:hidden dark:text-zinc-400">
-            {actorButton}
+            {actor}
             <span aria-hidden="true">·</span>
-            {workspaceButton}
+            {workspace}
             <span aria-hidden="true">·</span>
             {time}
           </p>
         </div>
 
-        <div className="hidden min-w-0 truncate text-xs text-zinc-600 md:block dark:text-zinc-300">{actorButton}</div>
-        <div className="hidden min-w-0 truncate text-xs text-zinc-600 md:block dark:text-zinc-300">{workspaceButton}</div>
-        <div className="hidden whitespace-nowrap text-xs text-zinc-500 md:block dark:text-zinc-400">{time}</div>
+        <div className="hidden min-w-0 text-xs text-zinc-600 md:block dark:text-zinc-300">{actor}</div>
+        <div className="hidden min-w-0 text-xs text-zinc-600 md:block dark:text-zinc-300">{workspace}</div>
+        <div className="hidden whitespace-nowrap text-xs md:block">
+          <span className="block font-medium text-zinc-700 dark:text-zinc-200">{time}</span>
+          <span className="block text-[11px] text-zinc-400 dark:text-zinc-500">{formatRelative(log.created_at)}</span>
+        </div>
 
         <button
           type="button"
           onClick={() => setExpanded((open) => !open)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          aria-label={expanded ? 'Hide details' : 'Show details'}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+          aria-label={`${expanded ? 'Hide' : 'Show'} details: ${log.label} by ${actorText(log)}`}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
           <ChevronDown size={16} aria-hidden="true" className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
@@ -121,44 +155,135 @@ export const AuditRow = ({ log, onFilter }: AuditRowProps) => {
 
       {expanded && (
         <div id={panelId}>
-          <ExpandedLog log={log} />
+          <ExpandedLog log={log} onFilter={onFilter} onShowSurrounding={onShowSurrounding} />
         </div>
       )}
     </li>
   );
 };
 
-const FilterButton = ({
-  onClick,
-  title,
+/**
+ * A name with a filter icon that appears when the row is hovered or the
+ * icon is focused. Without `filterLabel` it's plain text.
+ */
+const Filterable = ({
+  label,
+  filterLabel,
+  onFilter,
   className = '',
   wrap = false,
-  children,
 }: {
-  onClick: () => void;
-  title: string;
+  label: string;
+  filterLabel?: string;
+  onFilter: () => void;
   className?: string;
   /** Let the text wrap instead of cutting it off with an ellipsis. */
   wrap?: boolean;
-  children: ReactNode;
 }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    title={title}
-    className={`max-w-full ${wrap ? '' : 'truncate'} text-left underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 ${className}`}
-  >
-    {children}
-  </button>
+  <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+    <span className={`min-w-0 ${wrap ? 'md:truncate' : 'truncate'} ${className}`} title={wrap ? undefined : label}>
+      {label}
+    </span>
+    {filterLabel && (
+      <button
+        type="button"
+        onClick={onFilter}
+        aria-label={filterLabel}
+        title={filterLabel}
+        // Touch screens can't hover, so an invisible icon would be a hidden tap target;
+        // there the expanded panel's filter buttons do this job instead.
+        className="hidden shrink-0 rounded p-0.5 text-zinc-400 opacity-0 transition [@media(hover:hover)]:inline-flex hover:bg-accent hover:text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group-hover:opacity-100"
+      >
+        <Filter size={12} aria-hidden="true" />
+      </button>
+    )}
+  </span>
 );
 
-const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
+const copyText = async (value: string, what: string) => {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(`Copied ${what}.`);
+    return true;
+  } catch {
+    toast.error(`Couldn't copy the ${what}.`);
+    return false;
+  }
+};
+
+const CopyButton = ({ value, what }: { value: string; what: string }) => {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const handle = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(handle);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      onClick={async () => setCopied(await copyText(value, what))}
+      aria-label={`Copy ${what}`}
+      title={`Copy ${what}`}
+      className="ml-1 inline-flex rounded p-0.5 align-middle text-zinc-400 hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+    </button>
+  );
+};
+
+/** The current view's URL pointing at one entry; the page opens and highlights it. */
+const entryLink = (id: number) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set('entry', String(id));
+  return url.toString();
+};
+
+/** What "around this time" narrows to, most specific first. */
+const surroundingScope = (log: PlatformAuditEntry) =>
+  log.actor_user_id ? 'by this person' : log.ip_address ? 'from this IP' : log.blog_id ? 'in this workspace' : 'platform-wide';
+
+const ExpandedLog = ({
+  log,
+  onFilter,
+  onShowSurrounding,
+}: Pick<AuditRowProps, 'log' | 'onFilter' | 'onShowSurrounding'>) => {
   const [showRaw, setShowRaw] = useState(false);
   const changes = getFieldChanges(log);
   const otherDetails = Object.entries(log.details ?? {}).filter(([key]) => !SHOWN_DETAIL_KEYS.has(key));
 
   return (
     <div className="border-t border-zinc-100 bg-zinc-50/70 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/30">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {log.actor_user_id && (
+          <ActionButton onClick={() => onFilter('actor', String(log.actor_user_id))}>
+            <Filter size={12} aria-hidden="true" /> Only this person
+          </ActionButton>
+        )}
+        {log.blog_id && (
+          <ActionButton onClick={() => onFilter('workspace', String(log.blog_id))}>
+            <Filter size={12} aria-hidden="true" /> Only this workspace
+          </ActionButton>
+        )}
+        <ActionButton onClick={() => onFilter('action', log.action)}>
+          <Filter size={12} aria-hidden="true" /> Only this event
+        </ActionButton>
+        {log.ip_address && (
+          <ActionButton onClick={() => onFilter('q', log.ip_address!)}>
+            <Filter size={12} aria-hidden="true" /> Only this IP
+          </ActionButton>
+        )}
+        <ActionButton
+          onClick={() => onShowSurrounding(log)}
+          title={`Everything ${surroundingScope(log)}, 15 minutes either side, sign-ins included`}
+        >
+          <Clock size={12} aria-hidden="true" /> Activity around this time
+        </ActionButton>
+        <ActionButton onClick={() => copyText(entryLink(log.id), 'link to this entry')}>
+          <Link2 size={12} aria-hidden="true" /> Copy link
+        </ActionButton>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <dl className="grid content-start gap-x-4 gap-y-3 text-xs sm:grid-cols-[7rem_minmax(0,1fr)]">
           <Detail label="Who">
@@ -173,7 +298,7 @@ const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
           <Detail label="Workspace">
             {log.blog_id ? (
               <>
-                <span className="text-zinc-900 dark:text-zinc-100">{log.blog_name ?? `Workspace #${log.blog_id}`}</span>
+                <span className="text-zinc-900 dark:text-zinc-100">{workspaceText(log)}</span>
                 <Link to={`/admin/blogs/${log.blog_id}`} className={linkClass}>
                   Open workspace #{log.blog_id} <ArrowUpRight size={12} aria-hidden="true" />
                 </Link>
@@ -189,11 +314,15 @@ const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
             </Detail>
           )}
           <Detail label="When">
-            {formatLocalDateTime(log.created_at)}
-            <span className="block font-mono text-[11px] text-zinc-500">{new Date(log.created_at).toISOString()}</span>
+            {formatPreciseDateTime(log.created_at)}
+            <span className="block font-mono text-[11px] text-zinc-500">
+              {formatUtcIso(log.created_at)}
+              <CopyButton value={formatUtcIso(log.created_at)} what="UTC timestamp" />
+            </span>
           </Detail>
           <Detail label="IP address">
             <span className="font-mono">{log.ip_address || 'Not recorded'}</span>
+            {log.ip_address && <CopyButton value={log.ip_address} what="IP address" />}
           </Detail>
           {log.user_agent && (
             <Detail label="Device">
@@ -202,6 +331,10 @@ const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
           )}
           <Detail label="Event">
             <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">{log.action}</span>
+          </Detail>
+          <Detail label="Entry ID">
+            <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">#{log.id}</span>
+            <CopyButton value={String(log.id)} what="entry ID" />
           </Detail>
         </dl>
 
@@ -248,6 +381,17 @@ const ExpandedLog = ({ log }: { log: PlatformAuditEntry }) => {
     </div>
   );
 };
+
+const ActionButton = ({ onClick, title, children }: { onClick: () => void; title?: string; children: ReactNode }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-primary/40 hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300"
+  >
+    {children}
+  </button>
+);
 
 const linkClass =
   'mt-0.5 flex w-fit items-center gap-0.5 font-medium text-violet-600 hover:underline dark:text-violet-400';

@@ -106,7 +106,8 @@ export const readFilters = (params: URLSearchParams): AuditFilters => ({
   logins: params.get('logins') === '1',
 });
 
-const localToIso = (value: string) => {
+/** A `datetime-local` value as an ISO instant, or undefined if it's empty or invalid. */
+export const localToIso = (value: string) => {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
