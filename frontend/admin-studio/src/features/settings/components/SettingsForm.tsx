@@ -63,7 +63,10 @@ const SaveBar = ({ isDirty, isSaving, onDiscard }: SaveBarProps) => (
         <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
         {isDirty && (
           <>
-            Unsaved<span className="hidden sm:inline">&nbsp;changes</span>
+            {/* One element, so the bar's flex gap doesn't land between the words. */}
+            <span>
+              Unsaved<span className="hidden sm:inline"> changes</span>
+            </span>
           </>
         )}
       </p>
@@ -82,7 +85,7 @@ const SaveBar = ({ isDirty, isSaving, onDiscard }: SaveBarProps) => (
           className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
         >
           {isSaving && <Loader2 className="animate-spin" size={14} aria-hidden="true" />}
-          {isSaving ? 'Saving…' : <>Save<span className="hidden sm:inline">&nbsp;changes</span></>}
+          <span>{isSaving ? 'Saving…' : <>Save<span className="hidden sm:inline"> changes</span></>}</span>
         </button>
       </div>
     </div>
