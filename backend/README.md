@@ -1,233 +1,195 @@
-# Backend API - CMS
+# Backend API
 
-FastAPI-based REST API for the Blog CMS. Handles authentication, content management, user management, and site configuration.
+FastAPI REST API for Inko. It serves the admin studio, the public blog and the
+marketing site: auth, workspaces and members, posts, comments, settings, billing,
+notifications, support, audit logs and platform administration.
 
-**Live API**: [https://blogapp-eta-woad.vercel.app](https://blogapp-eta-woad.vercel.app)
+**Live API**: [https://blogapp-eta-woad.vercel.app](https://blogapp-eta-woad.vercel.app) · [Docs](https://blogapp-eta-woad.vercel.app/docs) · [ReDoc](https://blogapp-eta-woad.vercel.app/redoc)
 
 ## Stack
 
 - **Framework**: FastAPI
-- **Database**: PostgreSQL with SQLModel ORM
-- **Migrations**: Alembic
-- **Authentication**: JWT with bcrypt
-- **Image Storage**: Cloudinary
-- **Python**: 3.10+
+- **Database**: PostgreSQL via SQLModel; Alembic for migrations
+- **Auth**: JWT access and refresh tokens in httpOnly cookies, bcrypt, double-submit CSRF
+- **Background jobs**: APScheduler in-process; Vercel Cron in production
+- **Integrations**: Cloudinary (images), Paystack (billing), SMTP (email)
+- **Python**: 3.12+, managed with [uv](https://docs.astral.sh/uv/)
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- PostgreSQL 12+
-- uv package manager
-
-### Installation
-
-1. **Environment Setup**
-
 ```bash
 cd backend
-python -m venv .venv
-
-# Windows
-.venv\Scripts\Activate
-
-# macOS/Linux
-source .venv/bin/activate
-```
-
-2. **Install Dependencies**
-
-```bash
+cp .env.example .env        # fill in at least the "Required" variables below
 uv sync
-```
-
-3. **Configure Environment**
-
-Create `.env` file in `backend/` directory:
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/blogapp
-
-# JWT
-SECRET_KEY=your-super-secret-key-change-this-in-production
-ALGORITHM=HS256
-
-# Cloudinary (optional, for image uploads)
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-```
-
-4. **Database Setup**
-
-```bash
-# Apply migrations
-alembic upgrade head
-
-# Create admin user (optional)
-python scripts/create_admin.py
-```
-
-5. **Run Development Server**
-
-```bash
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-Server runs locally at `http://localhost:8000`
-- API Docs: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+The API runs at `http://localhost:8000`, with docs at `/docs` and `/redoc`.
 
-**Production API**:
-- Base URL: `https://blogapp-eta-woad.vercel.app`
-- API Docs: [https://blogapp-eta-woad.vercel.app/docs](https://blogapp-eta-woad.vercel.app/docs)
-- ReDoc: [https://blogapp-eta-woad.vercel.app/redoc](https://blogapp-eta-woad.vercel.app/redoc)
+To make yourself a platform superadmin, sign up through the studio, then run:
+
+```bash
+uv run python scripts/create_admin.py you@example.com
+```
+
+## Environment Variables
+
+Defined in [app/core/config.py](app/core/config.py); [.env.example](.env.example) lists them all.
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_KEY` | JWT signing secret |
+| `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Image uploads. The app refuses to start without them |
+
+### Auth and security
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ALGORITHM` | `HS256` | JWT algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access-token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `30` | Refresh-token lifetime |
+| `COOKIE_SECURE` | `true` | `Secure` flag on auth cookies (`localhost` works without changing it) |
+| `TRUSTED_PROXY_HOPS` | `1` | Reverse proxies in front of the app, used to read the client IP from `X-Forwarded-For`. Use `0` when nothing proxies it |
+| `CORS_ORIGINS` | prod + `localhost`/`127.0.0.1` on 5173–5175 and 8000 | Comma-separated allowed origins |
+
+### Tenancy and limits
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PUBLIC_BLOG_BASE_DOMAIN` | `inko.blog` | Hosts ending in this resolve as `{slug}.{domain}`; any other host is looked up as a custom domain |
+| `MAX_UPLOAD_SIZE_MB` | `5` | Upload size cap |
+| `MAX_OWNED_WORKSPACES` | `10` | Workspaces one account may own (superadmins exempt) |
+| `WORKSPACE_CREATIONS_PER_HOUR` | `5` | Workspace creation rate limit |
+
+### Billing (Paystack)
+
+Optional. Billing endpoints refuse to run until the secret key and plan codes are set.
+Use `sk_test_` keys outside production.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | — | API keys |
+| `PAYSTACK_PLAN_{PRO,TEAM}_{MONTHLY,YEARLY}` | — | Plan codes (`PLN_...`) from the Paystack dashboard |
+| `TRIAL_DAYS` | `14` | Trial length for new paid plans |
+| `PAST_DUE_GRACE_DAYS` | `3` | How long a failed renewal keeps paid features |
+
+### Email and URLs
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_TLS`, `SMTP_USER`, `SMTP_PASSWORD` | `localhost`, `25`, `true` | Outgoing mail |
+| `EMAILS_FROM_EMAIL` (alias `EMAIL_FROM`), `EMAILS_FROM_NAME` | `no-reply@example.com`, `Inko` | Sender |
+| `CONTACT_NOTIFICATION_EMAIL` | sender address | Recipient for the marketing site's contact form |
+| `PUBLIC_SITE_URL` | `http://localhost:5175` | Marketing site, used in email links |
+| `ADMIN_STUDIO_URL` | `http://localhost:5173` | Studio, used in email links |
+| `PUBLIC_LOGO_URL` | Inko logo | Logo shown in emails |
+
+### Jobs and observability
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CRON_SECRET` | — | Bearer token Vercel Cron sends to `/internal/cron/*`. Unset disables those endpoints (404) |
+| `PURGE_ON_STARTUP` | `false` | Run the deleted-account purge in-process. Leave off when sharing a database |
+| `LOG_LEVEL` | `INFO` | Log level |
+| `SQL_ECHO` | `false` | Log every SQL statement (local debugging only) |
 
 ## Project Structure
 
 ```
 backend/
 ├── app/
-│   ├── main.py              # FastAPI app initialization
-│   ├── dbConfig.py          # Database configuration
-│   ├── models/
-│   │   └── models.py        # SQLModel database models
-│   ├── modules/             # Domain routers and feature slices
-│   │   ├── admin.py
-│   │   ├── comments.py
-│   │   ├── posts.py
-│   │   ├── settings.py
-│   │   ├── tags.py
-│   │   └── users.py
-│   ├── schemas/
-│   │   └── schemas.py       # Pydantic request/response schemas
-│   └── core/                # Config, DB, auth/security
-│       └── auth.py          # Authentication utilities
-├── alembic/                 # Database migrations
-├── scripts/                 # Utility scripts
-├── pyproject.toml          # Python dependencies
-└── README.md               # This file
+│   ├── main.py            # App, middleware stack, router registration
+│   ├── core/              # Config, DB, security, errors, audit, plans, email, scheduler, middleware
+│   ├── models/            # SQLModel tables (user, blog, post, comment, settings, audit, billing…)
+│   ├── modules/           # One package per domain: router.py (+ service.py)
+│   │   ├── auth/  blogs/  posts/  tags/  comments/  settings/  users/
+│   │   ├── billing/  notifications/  support/  contact/
+│   │   ├── superadmin/    # Platform-wide admin and audit log
+│   │   └── cron/          # /internal/cron/* jobs for Vercel Cron
+│   ├── schemas/           # Pydantic request/response models
+│   └── services/          # Cross-cutting logic: auth tokens, throttling, account deletion
+├── alembic/               # Migrations
+├── scripts/               # One-off utilities (see below)
+├── tests/                 # pytest suite
+├── vercel.json            # Deployment + cron schedule
+└── pyproject.toml
 ```
 
-## API Endpoints
+Requests pass through middleware in this order:
+`CORS → RequestContext → AuditLog → RequirePasswordChange → CSRF → routes`.
 
-### Authentication
-- `POST /auth/login` - User login
-- `POST /auth/signup` - User registration
-- `GET /auth/me` - Current user info
+## API Overview
 
-### Posts
-- `GET /posts` - List posts
-- `GET /posts/{id}` - Get post detail
-- `POST /posts` - Create post (admin)
-- `PUT /posts/{id}` - Update post (admin)
-- `DELETE /posts/{id}` - Delete post (admin)
+The complete reference is at `/docs`. Most workspace-scoped routes are nested under
+`/blogs/{blog_id}`.
 
-### Comments
-- `GET /posts/{post_id}/comments` - List post comments
-- `POST /posts/{post_id}/comments` - Add comment
-- `DELETE /comments/{id}` - Delete comment (admin)
-
-### Tags
-- `GET /tags` - List all tags
-- `POST /tags` - Create tag (admin)
-- `DELETE /tags/{id}` - Delete tag (admin)
-
-### Users
-- `GET /users` - List users (admin)
-- `GET /users/{id}` - Get user detail
-- `PUT /users/{id}` - Update user
-- `DELETE /users/{id}` - Delete user (admin)
-
-### Settings
-- `GET /settings` - Get site settings
-- `PUT /settings` - Update settings (admin)
-
-See `http://localhost:8000/docs` for complete API documentation.
-
-## Database Migrations
-
-### Create New Migration
-
-```bash
-# Auto-generate migration from model changes
-alembic revision --autogenerate -m "Description of changes"
-
-# Or create empty migration
-alembic revision -m "Description"
-```
-
-### Apply Migrations
-
-```bash
-# Upgrade to latest
-alembic upgrade head
-
-# Upgrade to specific revision
-alembic upgrade <revision_id>
-
-# Upgrade by number of steps
-alembic upgrade +2
-```
-
-### Rollback Migrations
-
-```bash
-# Downgrade one step
-alembic downgrade -1
-
-# Downgrade to specific revision
-alembic downgrade <revision_id>
-```
-
-### View Migration History
-
-```bash
-alembic history
-alembic current
-```
-
-## Key Models
-
-### User
-- Email-based authentication
-- Bcrypt password hashing
-- Admin role flag
-- Timestamps
-
-### Post
-- Title, content (markdown), excerpt
-- Author relationship
-- Published status
-- SEO fields (slug, meta_description)
-- Tags relationship
-- Timestamps
-
-### Comment
-- Author and post relationship
-- Moderation status
-- Timestamps
-
-### Tag
-- Name and slug
-- Post relationship
-
-### SiteSettings
-- Global configuration (branding, SEO, contact info)
-- Footer content
-- About page content
+| Area | Prefix | What it covers |
+|------|--------|----------------|
+| Auth | `/auth` | Login, refresh, logout, `me`, email verification (link and code), password reset/change, email change |
+| Users | `/users` | Registration, own profile, own activity, account deletion |
+| Workspaces | `/blogs` | Create, resolve by host/subdomain, onboarding steps, members, ownership transfer, dashboard, subscription |
+| Invitations | `/blogs/{id}/invitations`, `/invitations/{token}` | Invite by email, accept (existing or new account) |
+| Posts | `/blogs/{id}/posts` | CRUD, image upload, counts, scheduled, search, stats, by slug, related posts, flagging |
+| Tags | `/blogs/{id}/tags` | CRUD, usage counts, popular tags |
+| Comments | `/comments`, `/blogs/{id}/comments` | Post, edit, delete, flag; workspace moderation, restore and bans |
+| Settings | `/blogs/{id}/settings` | General, about, footer, branding, social, SEO, contact, uploads, public bundle |
+| Billing | `/blogs/{id}/billing`, `/billing/webhook` | Checkout, verify, plan change preview/apply/undo, cancel, Paystack webhook |
+| Activity log | `/blogs/{id}/audit-logs` | Workspace activity with filters |
+| Notifications | `/notifications` | List, unread count, mark read |
+| Support | `/support` | User support tickets and replies |
+| Contact | `/contact` | Marketing-site contact form |
+| Superadmin | `/superadmin` | Stats, workspaces, users, subscriptions, moderation, support, platform settings, audit log (`/superadmin/audit-logs`) |
+| Cron | `/internal/cron` | Purge deleted accounts, trial notices (hidden from the schema) |
 
 ## Authentication
 
-JWT-based authentication with secure password hashing:
+- `POST /auth/login` sets `access_token` and `refresh_token` as httpOnly cookies, plus a
+  readable `csrf_token` cookie.
+- Clients send credentials with every request (`withCredentials`) and echo the
+  `csrf_token` cookie in an `X-CSRF-Token` header on unsafe methods.
+- When the access token expires the client calls `POST /auth/refresh`. Refresh tokens
+  are stored server-side, so logout and deletion can revoke them.
+- Workspace roles are `owner`, `editor` and `author`. Platform superadmins are flagged
+  with `is_super_admin`.
+- Accounts given a temporary password are restricted to the password-change flow
+  until they set a new one.
 
-1. **Login**: POST `/auth/login` → Returns access token
-2. **Request**: Include token in `Authorization: Bearer <token>` header
-3. **Validation**: Token verified on protected endpoints
+## Plans
 
-Protected endpoints require valid JWT token.
+Limits are defined in [app/core/plans.py](app/core/plans.py).
+
+| | Free | Pro | Team |
+|---|---|---|---|
+| Members | 1 | 3 | 15 |
+| Published posts | 30 | Unlimited | Unlimited |
+| Scheduled posts, custom domain, remove branding | — | ✓ | ✓ |
+| Activity log history | 7 days | 90 days | 365 days |
+
+Members over a plan's seat limit are paused rather than removed.
+
+## Background Jobs
+
+- **In-process (APScheduler)**: publishes scheduled posts when they're due. Also purges
+  soft-deleted accounts, but only if `PURGE_ON_STARTUP=true`.
+- **Vercel Cron** (see [vercel.json](vercel.json)): `purge-deleted-accounts` daily at 01:00 UTC
+  and `trial-notices` daily at 08:00 UTC, both authenticated with `CRON_SECRET`.
+
+## Database Migrations
+
+```bash
+uv run alembic revision --autogenerate -m "Describe the change"
+uv run alembic upgrade head
+uv run alembic downgrade -1
+uv run alembic history
+uv run alembic current
+```
+
+If `upgrade` reports multiple heads, create a merge revision
+(`alembic merge -m "..." <rev1> <rev2>`).
 
 ## Error Handling
 
@@ -300,98 +262,47 @@ the whole change: status code, public message, and OpenAPI documentation follow.
 `X-Request-ID` is returned on every response and accepted on requests, so a
 frontend trace can be matched to the backend log line that recorded the failure.
 
-## Development Tips
+## Scripts
 
-### Debug Mode
-Set `DEBUG=True` in code for detailed error messages (not recommended for production).
-
-### Hot Reload
-Run with `--reload` flag automatically restarts server on file changes:
-```bash
-uv run uvicorn app.main:app --reload
-```
-
-### Test Data
-```bash
-python scripts/create_admin.py
-```
-
-Creates test admin user with email `admin@example.com` and password `admin123`.
-
-## Common Issues
-
-### Connection refused (Database)
-- PostgreSQL not running
-- Wrong DATABASE_URL in `.env`
-- Check: `psql -U user -d blogapp`
-
-### Migration errors
-- Ensure `alembic.ini` path points to correct database
-- Check for syntax errors in migration files
-- Try running `alembic current` to see state
-
-### CORS errors
-- Add frontend URL to `origins` list in `app/main.py`
-- Default frontend ports: `5173` (admin), `5174-5175` (blog)
-
-### JWT validation fails
-- Ensure `SECRET_KEY` is consistent between requests
-- Check token expiration
-- Verify `ALGORITHM` matches (default: HS256)
-
-## Environment Variables Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | Required | PostgreSQL connection string |
-| `SECRET_KEY` | Required | JWT signing secret |
-| `ALGORITHM` | `HS256` | JWT algorithm |
-| `CLOUDINARY_CLOUD_NAME` | Optional | For image uploads |
-| `CLOUDINARY_API_KEY` | Optional | Image upload API key |
-| `CLOUDINARY_API_SECRET` | Optional | Image upload API secret |
-
-## Performance
-
-- Database connection pooling via SQLAlchemy
-- Query optimization with proper indexing (see migrations)
-- CORS middleware configured for specific origins
-
-## Security
-
-- ✅ Passwords hashed with bcrypt
-- ✅ JWT for stateless auth
-- ✅ CORS restricted to specific origins
-- ✅ SQL injection prevention via SQLModel parameterized queries
+| Script | Purpose |
+|--------|---------|
+| `scripts/seed_demo.py` | Fills a throwaway **SQLite** database with fictional workspaces, used for marketing screenshots. Refuses to run against anything else. See [tools/marketing-shots](../tools/marketing-shots/README.md) |
+| `scripts/migrate_to_multitenant.py` | One-time migration from the old single-tenant schema. Back up first |
+| `scripts/create_admin.py <email>` | Makes an existing account a platform superadmin. Uses `DATABASE_URL` from `.env` |
 
 ## Testing
 
 ```bash
 uv run pytest
+uv run pytest tests/test_billing.py -q   # one file
 ```
 
 Tests run against a throwaway SQLite file (`tests/conftest.py` pins `DATABASE_URL`
 before the app is imported) and never open SMTP connections, so no live database
 or credentials are needed.
 
-| File | Covers |
-|------|--------|
-| `tests/test_error_handling.py` | Envelope shape, every error category, and a leak scanner asserting no response body contains tracebacks, driver/ORM names, SQL, file paths, or pydantic internals |
-| `tests/test_error_flows.py` | The same guarantees end-to-end on real endpoints, plus proof that success responses are unchanged |
-| `tests/test_posts_endpoints.py` | Post endpoint smoke tests |
+The suite has one file per area: auth and refresh, CSRF, login and content
+throttling, workspaces and onboarding, invitations and membership, plan limits and
+billing, posts and publishing, tags, comments and moderation, settings and uploads,
+notifications, account deletion, superadmin and audit logs, and the error contract
+(`test_error_handling.py` includes a scanner that asserts no response leaks
+tracebacks, SQL, file paths or driver names).
 
 ## Deployment
 
-For production:
-1. Set `SECRET_KEY` to a strong random value
-2. Use PostgreSQL (not SQLite)
-3. Configure proper CORS origins
-4. Use environment variables for all secrets
-5. Run with Gunicorn: `gunicorn app.main:app -w 4`
-6. Set up proper logging and monitoring
+The API deploys to Vercel as a Python function ([vercel.json](vercel.json)). For any
+production environment:
 
-## Additional Resources
+1. Set a strong `SECRET_KEY` and a `CRON_SECRET`.
+2. Point `DATABASE_URL` at PostgreSQL and run `alembic upgrade head`.
+3. Set `CORS_ORIGINS`, `PUBLIC_SITE_URL` and `ADMIN_STUDIO_URL` to the deployed frontends.
+4. Configure SMTP and, if billing is on, the Paystack keys and plan codes. Point the
+   Paystack webhook at `/billing/webhook`.
 
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [SQLModel Documentation](https://sqlmodel.tiangolo.com/)
-- [Alembic Documentation](https://alembic.sqlalchemy.org/)
-- [JWT Best Practices](https://tools.ietf.org/html/rfc8174)
+## Common Issues
+
+- **App exits on startup**: a required variable is missing, usually `CLOUDINARY_*`.
+- **CORS errors**: add the origin to `CORS_ORIGINS`.
+- **403 on POST/PUT/DELETE from a client**: the `X-CSRF-Token` header is missing or doesn't match the `csrf_token` cookie.
+- **Multiple Alembic heads**: see [Database Migrations](#database-migrations).
+- **Emails not arriving locally**: with `SMTP_HOST=localhost` and no mail server, sends fail and are logged, but the request still succeeds. Use a dev SMTP catcher such as Mailpit.
