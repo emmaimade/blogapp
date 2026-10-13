@@ -1,479 +1,429 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Globe, Loader2, AlertCircle, ExternalLink, Copy, CheckCircle2, Lock, Zap, MessageSquare, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Globe, Loader2, ExternalLink, Copy, CheckCircle2, Zap, MessageSquare, Trash2, IdCard, LayoutList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
-import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { toastApiError } from '../../../shared/lib/apiErrors';
+import { getBlogDisplayUrl, getBlogUrl } from '../../../shared/lib/blogUrl';
+import { usePlanAccess } from '../../billing/hooks/usePlanAccess';
+import { SettingsCard } from '../components/SettingsCard';
+import { SettingsForm } from '../components/SettingsForm';
+import {
+  Field,
+  PaidFeatureBadge,
+  SwitchRow,
+  hintClass,
+  inputClass,
+  labelClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../components/SettingsFields';
+import { useSettingsForm } from '../hooks/useSettingsForm';
+import { LANGUAGES, getTimezoneGroups } from '../lib/locales';
 
-const inputClass =
-  'w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-medium text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-violet-500/10 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-violet-500';
+type PostVisibility = 'public' | 'members_only' | 'paid_only';
 
-interface GeneralSettingsData {
+interface GeneralForm {
   site_name: string;
   site_tagline: string;
   site_description: string;
   timezone: string;
   language: string;
-  posts_per_page: number;
+  /** '' while the field is cleared, so typing a new number doesn't fight the input. */
+  posts_per_page: number | '';
+  // Saved on the blog itself rather than in general settings.
+  comments_enabled: boolean;
+  default_post_visibility: PostVisibility;
 }
 
-const defaultGeneralSettings: GeneralSettingsData = {
-  site_name: 'Inko',
-  site_tagline: '',
-  site_description: '',
-  timezone: 'UTC',
-  language: 'en',
-  posts_per_page: 10,
-};
+const GENERAL_FIELDS = ['site_name', 'site_tagline', 'site_description', 'timezone', 'language', 'posts_per_page'] as const;
+const PUBLICATION_FIELDS = ['comments_enabled', 'default_post_visibility'] as const;
+
+// Defaults the platform once saved for every blog. A blog still holding one
+// gets its own value instead, so it never shows the platform's text.
+const LEGACY_DEFAULTS = { site_name: 'Inko', site_tagline: 'Your ideas, amplified' };
+
+const POSTS_PER_PAGE_MAX = 50;
+
+const postsPerPageError = (value: number | '') =>
+  value === '' || !Number.isInteger(value) || value < 1 || value > POSTS_PER_PAGE_MAX
+    ? `Enter a whole number from 1 to ${POSTS_PER_PAGE_MAX}.`
+    : null;
+
+/** blog.example.com from whatever was pasted — a URL, a trailing slash, capitals. */
+const normaliseDomain = (input: string) =>
+  input.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+const DOMAIN_PATTERN = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 export const GeneralSettings: React.FC = () => {
   useDocumentTitle('General settings');
-  const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
-  const toWorkspace = useWorkspacePath();
   const { refreshUser } = useAuth();
-  const [copied, setCopied] = useState(false);
-  const [customDomainInput, setCustomDomainInput] = useState('');
-  const [savingDomain, setSavingDomain] = useState(false);
-  const [commentsEnabled, setCommentsEnabled] = useState(true);
-  const [defaultPostVisibility, setDefaultPostVisibility] = useState<'public' | 'members_only' | 'paid_only'>('public');
-  const [savingPublication, setSavingPublication] = useState(false);
+  const queryClient = useQueryClient();
+  const blogId = activeBlog?.id;
 
-  const { data: subscription } = useQuery({
-    queryKey: ['subscription', activeBlog?.id],
-    queryFn: async () => (await api.get(`/blogs/${activeBlog?.id}/subscription`)).data,
-    enabled: !!activeBlog?.id,
-  });
-  const isPro = subscription?.plan === 'pro' || subscription?.plan === 'team';
-
-  const { data: settings, isLoading } = useQuery<GeneralSettingsData>({
-    queryKey: ['generalSettings', activeBlog?.id],
-    queryFn: async () => {
-      let data: any = {};
-      try {
-        const res = await api.get(`/blogs/${activeBlog!.id}/settings/general`);
-        data = res.data || {};
-      } catch {}
-      
+  const form = useSettingsForm<GeneralForm>({
+    queryKey: ['generalSettings', blogId],
+    empty: {
+      site_name: '',
+      site_tagline: '',
+      site_description: '',
+      timezone: 'UTC',
+      language: 'en',
+      posts_per_page: 10,
+      comments_enabled: true,
+      default_post_visibility: 'public',
+    },
+    enabled: !!blogId,
+    load: async () => {
+      // Publishing defaults live on the blog itself; read them fresh rather than
+      // from the signed-in user's memberships, which lag behind a save.
+      const [settingsRes, blogRes] = await Promise.all([
+        api.get(`/blogs/${blogId}/settings/general`),
+        api.get(`/blogs/${blogId}`),
+      ]);
+      const data = settingsRes.data ?? {};
+      const blog = blogRes.data ?? {};
       return {
-        site_name: (data.site_name && data.site_name !== 'Inko') ? data.site_name : (activeBlog?.name || 'Inko'),
-        site_tagline: (data.site_tagline && data.site_tagline !== 'Your ideas, amplified') ? data.site_tagline : (activeBlog?.tagline || ''),
+        site_name: data.site_name && data.site_name !== LEGACY_DEFAULTS.site_name ? data.site_name : activeBlog?.name ?? '',
+        site_tagline:
+          data.site_tagline && data.site_tagline !== LEGACY_DEFAULTS.site_tagline ? data.site_tagline : activeBlog?.tagline ?? '',
         site_description: data.site_description || activeBlog?.description || '',
-        timezone: (data.timezone && data.timezone !== 'UTC') ? data.timezone : (activeBlog?.timezone || 'UTC'),
-        language: (data.language && data.language !== 'en') ? data.language : (activeBlog?.primary_language || 'en'),
-        posts_per_page: (data.posts_per_page && data.posts_per_page !== 10) ? data.posts_per_page : (activeBlog?.posts_per_page || 10),
+        timezone: data.timezone || activeBlog?.timezone || 'UTC',
+        language: data.language || activeBlog?.primary_language || 'en',
+        posts_per_page: data.posts_per_page || activeBlog?.posts_per_page || 10,
+        comments_enabled: blog.comments_enabled ?? true,
+        default_post_visibility: blog.default_post_visibility ?? 'public',
       };
     },
-    enabled: !!activeBlog?.id,
+    validate: (values) => postsPerPageError(values.posts_per_page),
+    save: async (values, saved) => {
+      if (GENERAL_FIELDS.some((field) => values[field] !== saved[field])) {
+        const general = Object.fromEntries(GENERAL_FIELDS.map((field) => [field, values[field]]));
+        await api.post(`/blogs/${blogId}/settings/general`, general);
+      }
+      if (PUBLICATION_FIELDS.some((field) => values[field] !== saved[field])) {
+        await api.patch(`/blogs/${blogId}`, {
+          comments_enabled: values.comments_enabled,
+          default_post_visibility: values.default_post_visibility,
+        });
+        // Other pages read these from the signed-in user's memberships.
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ['blog', blogId] });
+        queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      }
+    },
+    invalidate: [['allSettings']],
+    successMessage: 'General settings saved',
+    errorMessage: "Couldn't save general settings",
   });
 
-  const [formData, setFormData] = useState<GeneralSettingsData>(defaultGeneralSettings);
-
-  useEffect(() => {
-    if (settings) setFormData(settings);
-  }, [settings]);
-
-  useEffect(() => {
-    if (activeBlog?.custom_domain) setCustomDomainInput(activeBlog.custom_domain);
-    if (activeBlog?.comments_enabled !== undefined) setCommentsEnabled(activeBlog.comments_enabled);
-    if (activeBlog?.default_post_visibility) setDefaultPostVisibility(activeBlog.default_post_visibility);
-  }, [activeBlog]);
-
-  const saveMutation = useMutation({
-    mutationFn: (data: GeneralSettingsData) => api.post(`/blogs/${activeBlog!.id}/settings/general`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['generalSettings'] });
-      queryClient.invalidateQueries({ queryKey: ['allSettings'] });
-      toast.success('General settings saved');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to save settings');
-    },
-  });
-
-  const savePublicationSettings = async () => {
-    if (!activeBlog?.id) return;
-    setSavingPublication(true);
-    try {
-      await api.patch(`/blogs/${activeBlog.id}`, {
-        comments_enabled: commentsEnabled,
-        default_post_visibility: defaultPostVisibility,
-      });
-      queryClient.invalidateQueries({ queryKey: ['blog', activeBlog.id] });
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
-      toast.success('Publication settings saved');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to save publication settings');
-    } finally {
-      setSavingPublication(false);
-    }
-  };
-
-  const saveDomain = async (domain: string = customDomainInput) => {
-    if (!activeBlog?.id) return;
-    setSavingDomain(true);
-    try {
-      await api.patch(`/blogs/${activeBlog.id}`, { custom_domain: domain || null });
-      queryClient.invalidateQueries({ queryKey: ['blog', activeBlog.id] });
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
-      // activeBlog comes from the signed-in user's memberships, not React Query,
-      // so the domain shown here (and on the dashboard) only updates after this.
-      await refreshUser();
-      if (!domain) setCustomDomainInput('');
-      toast.success(domain ? 'Custom domain saved' : 'Custom domain removed');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to save domain');
-    } finally {
-      setSavingDomain(false);
-    }
-  };
-
-  const handleChange = (field: keyof GeneralSettingsData, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const subdomain = activeBlog?.subdomain ?? '';
-  const customDomain = activeBlog?.custom_domain;
-  const liveUrl = customDomain ? `https://${customDomain}` : `https://${subdomain}.inko.blog`;
-  const displayUrl = customDomain ?? `${subdomain}.inko.blog`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(liveUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const isDirty = settings && (
-    formData.site_name !== settings.site_name ||
-    formData.site_tagline !== settings.site_tagline ||
-    formData.site_description !== settings.site_description ||
-    formData.timezone !== settings.timezone ||
-    formData.language !== settings.language ||
-    formData.posts_per_page !== settings.posts_per_page
-  );
-
-  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
-  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
-
-  if (isLoading) {
-    return <SettingsSkeleton cardsCount={3} fieldsPerCard={2} />;
-  }
+  const { values, update } = form;
+  const timezoneGroups = getTimezoneGroups();
+  const timezoneListed = timezoneGroups.some((group) => group.options.some((option) => option.value === values.timezone));
 
   return (
-    <div className="space-y-6 max-w-4xl pb-24 lg:pb-12 relative">
-      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
-      {/* Floating Save Button - Adjusted for mobile bottom tabs */}
-      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Unsaved changes
-            </span>
-          </div>
-          <button
-            onClick={() => saveMutation.mutate(formData)}
-            disabled={saveMutation.isPending}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-          >
-            {saveMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
-            Save
-          </button>
-        </div>
-      </div>
+    <SettingsForm form={form} loadErrorTitle="Couldn't load general settings" skeletonCards={4}>
+      <DomainCard />
 
-      {/* Info Banner */}
-      <div className="flex items-start gap-3 rounded-2xl bg-indigo-50 border border-indigo-100 p-5 dark:bg-indigo-950/30 dark:border-indigo-900/50">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400 mt-0.5">
-          <AlertCircle size={16} />
-        </div>
-        <div className="text-sm text-indigo-900 dark:text-indigo-300">
-          <p className="mb-1 font-bold text-base">Site-wide defaults</p>
-          <p className="opacity-80">These settings apply across your entire workspace and determine how it appears to visitors globally.</p>
-        </div>
-      </div>
-
-      {/* DOMAIN SECTION */}
-      <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
-            <Globe size={18} className="text-violet-500" />
-            Domain
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">Your blog's public address and custom domain settings.</p>
-        </div>
-
-        <div className="p-5 sm:p-6 space-y-6">
-          {/* Current live URL */}
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">
-              Blog address
-            </label>
-            <div className="flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-4 py-2.5">
-              <span className="flex-1 text-sm font-mono font-semibold text-zinc-900 dark:text-white truncate">
-                {displayUrl}
-              </span>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={handleCopy}
-                  className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                  title="Copy URL"
-                >
-                  {copied ? <CheckCircle2 size={15} className="text-green-500" /> : <Copy size={15} />}
-                </button>
-                <a
-                  href={liveUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400"
-                  title="Open blog in new tab"
-                >
-                  <ExternalLink size={15} />
-                </a>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              Your subdomain is <strong className="text-zinc-700 dark:text-zinc-300">{subdomain}.inko.blog</strong> and cannot be changed.
-            </p>
-          </div>
-
-          <div className="border-t border-zinc-100 dark:border-zinc-800" />
-
-          {/* Custom domain */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-zinc-900 dark:text-zinc-300">
-                Custom domain
-              </label>
-              {!isPro && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                  <Lock size={10} /> Pro plan
-                </span>
-              )}
-            </div>
-
-            {isPro ? (
-              <>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={customDomainInput}
-                    onChange={(e) => setCustomDomainInput(e.target.value)}
-                    placeholder="blog.yoursite.com"
-                    className={`${inputClass} flex-1`}
-                  />
-                  <button
-                    onClick={() => saveDomain()}
-                    disabled={savingDomain}
-                    className="flex-shrink-0 flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all disabled:opacity-50"
-                  >
-                    {savingDomain ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
-                    Save
-                  </button>
-                </div>
-                {/* DNS instructions */}
-                <div className="mt-3 rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">DNS setup instructions</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Point a <strong>CNAME</strong> record to <code className="font-mono">{subdomain}.inko.blog</code>
-                  </p>
-                </div>
-              </>
-            ) : customDomain ? (
-              // Connected on a paid plan before a downgrade: it keeps working and
-              // can be removed, but changing it needs Pro or Team again.
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
-                  <span className="flex-1 truncate font-mono text-sm font-semibold text-zinc-900 dark:text-white">{customDomain}</span>
-                  <button
-                    onClick={() => saveDomain('')}
-                    disabled={savingDomain}
-                    className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:border-red-200 hover:text-red-600 transition-all disabled:opacity-50"
-                  >
-                    {savingDomain ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
-                    Remove
-                  </button>
-                </div>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                  Your domain keeps working. Upgrade to Pro to change it.
-                </p>
-                <Link
-                  to={toWorkspace('/settings/billing')}
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all"
-                >
-                  <Zap size={15} /> Upgrade to Pro
-                </Link>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-5">
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                  Upgrade to Pro to connect your own custom domain.
-                </p>
-                <Link
-                  to={toWorkspace('/settings/billing')}
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all"
-                >
-                  <Zap size={15} /> Upgrade to Pro
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* SITE IDENTITY */}
-      <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
-            <Globe size={18} className="text-zinc-400" />
-            Site Identity
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">Configure your basic workspace information.</p>
-        </div>
-
-        <div className="space-y-6 p-5 sm:p-6">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Workspace Name</label>
+      <SettingsCard title="Site identity" icon={IdCard} description="How your blog introduces itself to readers.">
+        <Field label="Blog name">
+          {(control) => (
             <input
+              {...control}
               type="text"
-              value={formData.site_name}
-              onChange={(e) => handleChange('site_name', e.target.value)}
+              value={values.site_name}
+              onChange={(e) => update('site_name', e.target.value)}
               className={inputClass}
             />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Tagline</label>
+          )}
+        </Field>
+        <Field label="Tagline" hint="A short line shown with your blog name.">
+          {(control) => (
             <input
+              {...control}
               type="text"
-              value={formData.site_tagline}
-              onChange={(e) => handleChange('site_tagline', e.target.value)}
+              value={values.site_tagline}
+              onChange={(e) => update('site_tagline', e.target.value)}
+              placeholder="e.g. Notes on design and code"
               className={inputClass}
             />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Description</label>
+          )}
+        </Field>
+        <Field label="Description" hint="A sentence or two about what readers will find here.">
+          {(control) => (
             <textarea
-              value={formData.site_description}
-              onChange={(e) => handleChange('site_description', e.target.value)}
-              rows={4}
-              className={`${inputClass} resize-none`}
+              {...control}
+              value={values.site_description}
+              onChange={(e) => update('site_description', e.target.value)}
+              rows={3}
+              className={`${inputClass} resize-y`}
             />
-          </div>
-        </div>
-      </div>
+          )}
+        </Field>
+      </SettingsCard>
 
-      {/* DISPLAY PREFERENCES */}
-      <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Display Preferences</h2>
-          <p className="mt-1 text-sm text-zinc-500">Customize how content is rendered to visitors.</p>
-        </div>
-
-        <div className="space-y-6 p-5 sm:p-6">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Posts Per Page</label>
+      <SettingsCard title="Display" icon={LayoutList} description="Defaults for how your blog shows posts and dates.">
+        <Field
+          label="Posts per page"
+          hint={`How many posts each page of your blog lists, from 1 to ${POSTS_PER_PAGE_MAX}.`}
+          error={postsPerPageError(values.posts_per_page)}
+        >
+          {(control) => (
             <input
+              {...control}
               type="number"
-              min="1"
-              max="50"
-              value={formData.posts_per_page}
-              onChange={(e) => handleChange('posts_per_page', parseInt(e.target.value, 10))}
-              className={inputClass}
+              inputMode="numeric"
+              min={1}
+              max={POSTS_PER_PAGE_MAX}
+              value={values.posts_per_page}
+              onChange={(e) => update('posts_per_page', e.target.value === '' ? '' : Number(e.target.value))}
+              className={`${inputClass} sm:max-w-48`}
             />
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Timezone</label>
+          )}
+        </Field>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field label="Timezone" hint="Used for post dates and scheduled publishing.">
+            {(control) => (
               <select
-                value={formData.timezone}
-                onChange={(e) => handleChange('timezone', e.target.value)}
+                {...control}
+                value={values.timezone}
+                onChange={(e) => update('timezone', e.target.value)}
                 className={inputClass}
               >
-                {/* options */}
+                {!timezoneListed && <option value={values.timezone}>{values.timezone}</option>}
+                {timezoneGroups.map((group) => (
+                  <optgroup key={group.region} label={group.region}>
+                    {group.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Language</label>
+            )}
+          </Field>
+          <Field label="Language" hint="The language your posts are written in.">
+            {(control) => (
               <select
-                value={formData.language}
-                onChange={(e) => handleChange('language', e.target.value)}
+                {...control}
+                value={values.language}
+                onChange={(e) => update('language', e.target.value)}
                 className={inputClass}
               >
-                {/* options */}
+                {!LANGUAGES.some((language) => language.value === values.language) && (
+                  <option value={values.language}>{values.language}</option>
+                )}
+                {LANGUAGES.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
               </select>
-            </div>
-          </div>
+            )}
+          </Field>
         </div>
-      </div>
+      </SettingsCard>
 
-      {/* PUBLICATION */}
-      <div className="admin-card overflow-hidden rounded-[1.5rem]">
-        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 bg-zinc-50/50 px-5 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900 dark:text-white">
-              <MessageSquare size={18} className="text-violet-500" />
-              Publication
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">Set during onboarding — change them here any time.</p>
-          </div>
-          <button
-            onClick={savePublicationSettings}
-            disabled={savingPublication}
-            className="flex-shrink-0 flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all disabled:opacity-50"
-          >
-            {savingPublication ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
-            Save
-          </button>
-        </div>
-
-        <div className="space-y-6 p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Comments</label>
-              <p className="mt-0.5 text-xs text-zinc-500">Let readers comment on your posts.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={commentsEnabled}
-              onClick={() => setCommentsEnabled((prev) => !prev)}
-              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-                commentsEnabled ? 'bg-violet-600' : 'bg-zinc-300 dark:bg-zinc-700'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  commentsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-zinc-900 dark:text-zinc-300">Default post visibility</label>
+      <SettingsCard title="Publishing" icon={MessageSquare} description="Defaults for new posts and how readers can respond.">
+        <SwitchRow
+          label="Comments"
+          description="Let readers comment on your posts."
+          checked={values.comments_enabled}
+          onChange={(checked) => update('comments_enabled', checked)}
+        />
+        <Field label="Default post visibility" hint="New posts start with this. You can change it on any post.">
+          {(control) => (
             <select
-              value={defaultPostVisibility}
-              onChange={(e) => setDefaultPostVisibility(e.target.value as typeof defaultPostVisibility)}
+              {...control}
+              value={values.default_post_visibility}
+              onChange={(e) => update('default_post_visibility', e.target.value as PostVisibility)}
               className={inputClass}
             >
               <option value="public">Public — anyone can read</option>
               <option value="members_only">Members only — signed-in readers</option>
               <option value="paid_only">Paid only — subscribers</option>
             </select>
-          </div>
+          )}
+        </Field>
+      </SettingsCard>
+    </SettingsForm>
+  );
+};
+
+/**
+ * The blog's address. Connecting a custom domain is its own action rather than
+ * part of the page's save, since it changes where the blog lives.
+ */
+const DomainCard = () => {
+  const { activeBlog } = useBlog();
+  const { refreshUser } = useAuth();
+  const queryClient = useQueryClient();
+  const toWorkspace = useWorkspacePath();
+  const { isPaid } = usePlanAccess();
+
+  const currentDomain = activeBlog?.custom_domain ?? '';
+  const [domainInput, setDomainInput] = useState(currentDomain);
+  const [saving, setSaving] = useState<'connect' | 'remove' | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => setDomainInput(currentDomain), [currentDomain]);
+
+  if (!activeBlog) return null;
+
+  const subdomain = activeBlog.subdomain;
+  const liveUrl = getBlogUrl(activeBlog);
+  const domain = normaliseDomain(domainInput);
+  const domainError = domain && !DOMAIN_PATTERN.test(domain) ? 'Enter a domain like blog.yoursite.com.' : null;
+  const canConnect = !!domain && !domainError && domain !== currentDomain;
+
+  const saveDomain = async (next: string | null) => {
+    setSaving(next ? 'connect' : 'remove');
+    try {
+      await api.patch(`/blogs/${activeBlog.id}`, { custom_domain: next });
+      queryClient.invalidateQueries({ queryKey: ['blog', activeBlog.id] });
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      // The address shown here (and on the dashboard) comes from the signed-in
+      // user's memberships, which only update after this.
+      await refreshUser();
+      toast.success(next ? 'Custom domain connected' : 'Custom domain removed');
+    } catch (error) {
+      toastApiError(error, next ? "Couldn't connect the domain" : "Couldn't remove the domain");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(liveUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy — select the address and copy it instead.");
+    }
+  };
+
+  const removeButton = currentDomain && (
+    <button type="button" onClick={() => saveDomain(null)} disabled={!!saving} className={secondaryButtonClass}>
+      {saving === 'remove' ? <Loader2 className="animate-spin" size={15} aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
+      Remove
+    </button>
+  );
+
+  return (
+    <SettingsCard title="Domain" icon={Globe} description="Where readers find your blog.">
+      <div>
+        <p className={`mb-1.5 ${labelClass}`}>Blog address</p>
+        <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 py-1.5 pl-4 pr-1.5 dark:border-zinc-700 dark:bg-zinc-800">
+          <span className="flex-1 truncate font-mono text-sm font-semibold text-zinc-900 dark:text-white">
+            {getBlogDisplayUrl(activeBlog)}
+          </span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={copied ? 'Address copied' : 'Copy address'}
+            title="Copy address"
+            className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+          >
+            {copied ? <CheckCircle2 size={15} className="text-green-500" aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+          </button>
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open your blog in a new tab"
+            title="Open your blog"
+            className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-violet-600 dark:hover:bg-zinc-700 dark:hover:text-violet-400"
+          >
+            <ExternalLink size={15} aria-hidden="true" />
+          </a>
         </div>
+        <p className={`mt-1.5 ${hintClass}`}>
+          Your Inko address, <strong className="font-semibold">{subdomain}.inko.blog</strong>, always works and can't be changed.
+        </p>
       </div>
-    </div>
+
+      <div className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
+        {isPaid ? (
+          <>
+            <Field
+              label="Custom domain"
+              error={domainError}
+              hint={
+                <>
+                  At your DNS provider, add a <strong className="font-semibold">CNAME</strong> record pointing to{' '}
+                  <code className="font-mono">{subdomain}.inko.blog</code>, then connect it here.
+                </>
+              }
+            >
+              {(control) => (
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <input
+                    {...control}
+                    type="text"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={domainInput}
+                    onChange={(e) => setDomainInput(e.target.value)}
+                    // Enter here connects the domain, rather than saving the rest of the page.
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      if (canConnect && !saving) saveDomain(domain);
+                    }}
+                    placeholder="blog.yoursite.com"
+                    className={`${inputClass} flex-1 font-mono`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => saveDomain(domain)}
+                    disabled={!canConnect || !!saving}
+                    className={primaryButtonClass}
+                  >
+                    {saving === 'connect' && <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
+                    {currentDomain ? 'Update domain' : 'Connect domain'}
+                  </button>
+                  {removeButton}
+                </div>
+              )}
+            </Field>
+          </>
+        ) : (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className={labelClass}>Custom domain</p>
+              <PaidFeatureBadge />
+            </div>
+            {currentDomain ? (
+              // Connected on a paid plan before a downgrade: it keeps working and
+              // can be removed, but changing it needs Pro or Team again.
+              <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-sm font-semibold text-zinc-900 dark:text-white">{currentDomain}</p>
+                  <p className={`mt-0.5 ${hintClass}`}>Still connected. Upgrade to Pro to change it.</p>
+                </div>
+                {removeButton}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-zinc-600 dark:text-zinc-300">Use your own domain, like blog.yoursite.com.</p>
+                <Link to={toWorkspace('/settings/billing')} className={primaryButtonClass}>
+                  <Zap size={15} aria-hidden="true" /> Upgrade to Pro
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </SettingsCard>
   );
 };

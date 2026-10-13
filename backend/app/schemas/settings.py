@@ -34,7 +34,10 @@ class AboutPageSettings(BaseModel):
     bio_content: str = "This is a modern blog CMS. Customize this in your admin panel."
     show_stats: bool = True
     show_contact_cta: bool = True
+    show_social_links: bool = True
     email: Optional[str] = None
+    # Read-only in effect: served from the blog's shared social profiles (the
+    # "social" setting), whatever was saved here. Same for footer and contact.
     social_links: SocialLinks = Field(default_factory=SocialLinks)
 
 

@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { CloudOff, RotateCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import {
@@ -17,7 +18,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: ProtectedRouteProps) => {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, logout, isUnreachable, retrySession } = useAuth();
   const { memberships, activeMembership, isLoading: isBlogLoading } = useBlog();
   const location = useLocation();
   // The access-denied screen below renders outside AdminLayout, which owns the theme.
@@ -28,6 +29,32 @@ export const ProtectedRoute = ({ requiredCapability = 'access_admin_studio' }: P
   // anyone's signed in, show the layout's outline rather than a spinner.
   if (isLoading || isBlogLoading) {
     return <AdminShellSkeleton />;
+  }
+
+  // The server couldn't say who's signed in. That isn't "signed out": the
+  // session cookie is untouched, so trying again picks up where they were.
+  if (isUnreachable) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--admin-bg)] px-4">
+        <div role="alert" className="admin-card w-full max-w-md p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            <CloudOff size={22} aria-hidden="true" />
+          </div>
+          <h1 className="mb-2 text-xl font-bold text-zinc-900 dark:text-white">Can't reach Inko right now</h1>
+          <p className="mb-6 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            This is usually brief. You're still signed in, and nothing has been lost.
+          </p>
+          <button
+            type="button"
+            onClick={retrySession}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            <RotateCw size={15} aria-hidden="true" />
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // 1. Ensure the user is authenticated first

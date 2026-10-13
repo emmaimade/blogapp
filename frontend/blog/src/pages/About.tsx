@@ -83,11 +83,12 @@ export const About: React.FC = () => {
     bio_content,
     show_stats,
     show_contact_cta,
+    show_social_links,
     email,
     social_links
   } = effectiveSettings;
 
-  const socialLinks = getActiveSocialLinks(social_links);
+  const socialLinks = show_social_links === false ? [] : getActiveSocialLinks(social_links);
 
   return (
     <div>

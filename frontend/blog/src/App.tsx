@@ -35,6 +35,40 @@ const applyFontLink = (fontHeading: string, fontBody: string) => {
   link.href = `https://fonts.googleapis.com/css2?${familyQuery}&display=swap`;
 };
 
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+const GA4_MEASUREMENT_ID = /^G-[A-Z0-9]{4,}$/;
+
+/**
+ * Loads Google Analytics 4 once a blog has a Measurement ID in its SEO
+ * settings. GA4 counts page views on in-app navigation by itself (enhanced
+ * measurement follows browser history), so configuring it once is enough.
+ */
+const applyGoogleAnalytics = (measurementId: string | undefined) => {
+  const id = measurementId?.trim().toUpperCase();
+  if (!id || !GA4_MEASUREMENT_ID.test(id) || document.getElementById('google-analytics')) return;
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function gtag() {
+    // gtag.js reads the arguments object itself, not an array.
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer!.push(arguments);
+  };
+  window.gtag('js', new Date());
+  window.gtag('config', id);
+
+  const script = document.createElement('script');
+  script.id = 'google-analytics';
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
+  document.head.appendChild(script);
+};
+
 const applyTypographyRules = () => {
   let style = document.getElementById('dynamic-site-typography') as HTMLStyleElement | null;
   if (!style) {
@@ -82,6 +116,7 @@ function App() {
 
     applyFontLink(branding?.font_heading || 'Inter', branding?.font_body || 'Inter');
     applyTypographyRules();
+    applyGoogleAnalytics(seo?.google_analytics_id);
 
     // Title/description/OG/Twitter content tags are page-owned (via usePageMeta /
     // applyPageMeta) — don't set them here. This effect fires after each page's

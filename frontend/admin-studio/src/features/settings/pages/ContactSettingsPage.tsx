@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Plus, Trash2, AlertCircle, Loader2,  } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowDown, ArrowUp, HelpCircle, Mail, Plus, Share2, Trash2 } from 'lucide-react';
 import api from '../../../shared/api/client';
-import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
-import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { useBlog } from '../../../app/providers/BlogProvider';
-import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
-import { toastApiError } from '../../../shared/lib/apiErrors';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
+import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { SettingsCard } from '../components/SettingsCard';
+import { SettingsForm } from '../components/SettingsForm';
+import { Field, SwitchRow, hintClass, inputClass, secondaryButtonClass } from '../components/SettingsFields';
+import { useSettingsForm } from '../hooks/useSettingsForm';
 
 interface FAQItem {
+  /** Only in the form, so a moved question keeps its inputs and focus. Not saved. */
+  id: number;
   question: string;
   answer: string;
 }
@@ -19,296 +21,292 @@ interface ContactSettingsData {
   contact_email: string;
   location: string;
   response_time: string;
-  phone: string | null;
+  phone: string;
   show_social_links: boolean;
   show_faq: boolean;
-  social_links: {
-    github?: string;
-    twitter?: string;
-    linkedin?: string;
-    instagram?: string;
-    youtube?: string;
-    facebook?: string;
-  };
+  /** Edited under Social profiles; sent back as received. */
+  social_links: Record<string, string | null>;
   faqs: FAQItem[];
 }
 
-const defaultSettings: ContactSettingsData = {
-  contact_email: '',
-  location: '',
-  response_time: '',
-  phone: null,
-  show_social_links: true,
-  show_faq: true,
-  social_links: {},
-  faqs: [],
+// Loaded questions are numbered by position, so a refetch gives the same ids
+// and doesn't read as an unsaved change; added ones count on from far above.
+let lastAddedFaqId = 1_000_000;
+const newFaq = (): FAQItem => ({ id: ++lastAddedFaqId, question: '', answer: '' });
+
+const isBlank = (faq: FAQItem) => !faq.question.trim() && !faq.answer.trim();
+
+// A blank question is just left out on save; a half-written one needs finishing,
+// and the empty half is the one flagged.
+const faqErrors = (faq: FAQItem) => ({
+  question: !isBlank(faq) && !faq.question.trim() ? 'Add the question, or remove this one.' : null,
+  answer: !isBlank(faq) && !faq.answer.trim() ? 'Add an answer, or remove this one.' : null,
+});
+const isIncomplete = (faq: FAQItem) => {
+  const errors = faqErrors(faq);
+  return !!(errors.question || errors.answer);
 };
 
-const normalizeContactSettings = (
-  settings?: Partial<ContactSettingsData> | null
-): ContactSettingsData => ({
-  ...defaultSettings,
-  ...settings,
-  // The API returns null for an unset email; inputs need a string.
-  contact_email: settings?.contact_email ?? '',
-  location: settings?.location ?? '',
-  response_time: settings?.response_time ?? '',
-  phone: settings?.phone ?? null,
-  show_social_links: settings?.show_social_links ?? true,
-  social_links: settings?.social_links ?? {},
-  faqs: settings?.faqs ?? [],
-});
+const iconButtonClass =
+  'rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100';
 
 export const ContactSettings = () => {
   useDocumentTitle('Contact settings');
-  const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+  const toWorkspace = useWorkspacePath();
+  const blogId = activeBlog?.id;
 
-  const { data: settings = defaultSettings, isLoading } = useQuery<ContactSettingsData>({
-    queryKey: ['settings', 'contact', activeBlog?.id],
-    queryFn: async () => normalizeContactSettings((await api.get(`/blogs/${activeBlog!.id}/settings/contact`)).data),
-    enabled: !!activeBlog?.id,
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const [formData, setFormData] = useState<ContactSettingsData>(defaultSettings);
-
-  useEffect(() => {
-    if (settings) setFormData(normalizeContactSettings(settings));
-  }, [settings]);
-
-  const mutation = useMutation({
-    // A blank email is "not set" — the backend validates any non-null value as an address.
-    mutationFn: async (payload: ContactSettingsData) =>
-      (await api.post(`/blogs/${activeBlog!.id}/settings/contact`, { ...payload, contact_email: payload.contact_email.trim() || null })).data,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings', 'contact', activeBlog?.id] });
-      toast.success('Contact settings saved successfully!');
+  const form = useSettingsForm<ContactSettingsData>({
+    queryKey: ['settings', 'contact', blogId],
+    empty: {
+      contact_email: '',
+      location: '',
+      response_time: '',
+      phone: '',
+      show_social_links: true,
+      show_faq: true,
+      social_links: {},
+      faqs: [],
     },
-    onError: (error) => toastApiError(error, 'Failed to save contact settings'),
+    enabled: !!blogId,
+    load: async () => {
+      const data = (await api.get(`/blogs/${blogId}/settings/contact`)).data ?? {};
+      return {
+        // The API returns null for unset fields; inputs need strings.
+        contact_email: data.contact_email ?? '',
+        location: data.location ?? '',
+        response_time: data.response_time ?? '',
+        phone: data.phone ?? '',
+        show_social_links: data.show_social_links ?? true,
+        show_faq: data.show_faq ?? true,
+        social_links: data.social_links ?? {},
+        faqs: (data.faqs ?? []).map((faq: { question: string; answer: string }, index: number) => ({
+          id: index + 1,
+          question: faq.question,
+          answer: faq.answer,
+        })),
+      };
+    },
+    validate: (values) =>
+      values.show_faq && values.faqs.some(isIncomplete) ? 'Finish or remove the incomplete FAQ before saving.' : null,
+    save: (values) =>
+      api.post(`/blogs/${blogId}/settings/contact`, {
+        ...values,
+        // Blank means "not set" — the backend validates any other value as an address.
+        contact_email: values.contact_email.trim() || null,
+        phone: values.phone.trim() || null,
+        faqs: values.faqs
+          .filter((faq) => !isBlank(faq))
+          .map(({ question, answer }) => ({ question: question.trim(), answer: answer.trim() })),
+      }),
+    successMessage: 'Contact page saved',
+    errorMessage: "Couldn't save the Contact page",
   });
 
-  const handleSave = () => {
-    mutation.mutate(formData);
-  };
+  const { values, update, setValues } = form;
 
-  const updateSocial = (key: keyof ContactSettingsData['social_links'], value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      social_links: { ...prev.social_links, [key]: value || undefined },
-    }));
-  };
+  // Puts the cursor in a newly added question, and keeps focus on a moved item's button.
+  const faqListRef = useRef<HTMLOListElement>(null);
+  const pendingFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    const target = faqListRef.current?.querySelector<HTMLButtonElement | HTMLInputElement>(pendingFocus.current);
+    // A question moved to the top or bottom has that move button disabled;
+    // keep focus on the same question's other one.
+    const fallback = target?.closest('li')?.querySelector<HTMLButtonElement>('[data-faq-move]:not(:disabled)');
+    (target && !target.disabled ? target : fallback)?.focus();
+    pendingFocus.current = null;
+  });
+
+  const setFaqs = (next: (faqs: FAQItem[]) => FAQItem[]) => setValues((current) => ({ ...current, faqs: next(current.faqs) }));
 
   const addFaq = () => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: [...prev.faqs, { question: '', answer: '' }],
-    }));
+    const faq = newFaq();
+    pendingFocus.current = `[data-faq-question="${faq.id}"]`;
+    setFaqs((faqs) => [...faqs, faq]);
   };
 
-  const updateFaq = (index: number, field: 'question' | 'answer', value: string) => {
-    setFormData(prev => {
-      const newFaqs = [...prev.faqs];
-      newFaqs[index] = { ...newFaqs[index], [field]: value };
-      return { ...prev, faqs: newFaqs };
+  const updateFaq = (id: number, field: 'question' | 'answer', value: string) =>
+    setFaqs((faqs) => faqs.map((faq) => (faq.id === id ? { ...faq, [field]: value } : faq)));
+
+  const moveFaq = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    pendingFocus.current = `[data-faq-move="${values.faqs[index].id}:${direction}"]`;
+    setFaqs((faqs) => {
+      const next = [...faqs];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
     });
   };
 
-  const removeFaq = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: prev.faqs.filter((_, i) => i !== index),
-    }));
-  };
-
-  const isDirty = JSON.stringify(formData) !== JSON.stringify(settings);
-
-  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
-  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
-
-if (isLoading) {
-  return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
-}
-
+  const removeFaq = (id: number) => setFaqs((faqs) => faqs.filter((faq) => faq.id !== id));
 
   return (
-    <div className="max-w-4xl pb-24 lg:pb-12 relative">
-      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
-      {/* Floating Action Bar - Matching AboutPage style */}
-      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
-          <div className="flex items-center gap-2 pr-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Unsaved changes
-            </span>
-          </div>
-          
-          <button
-            onClick={handleSave}
-            disabled={mutation.isPending}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-          >
-            {mutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
-            Save
-          </button>
-        </div>
-      </div>
-
-      <div className="admin-note mb-8 flex items-start gap-3 p-4">
-        <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
-        <div className="text-sm text-zinc-700 dark:text-zinc-200">
-          <p className="font-bold mb-1">Contact Page Settings</p>
-          <p>Control what visitors see on your public contact page and how they can reach you.</p>
-        </div>
-      </div>
-
-      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-6">
-        {/* Basic Contact Info */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4 flex items-center gap-2">
-            <Mail size={20} className="text-zinc-900" /> Contact Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Contact Email</label>
+    <SettingsForm form={form} loadErrorTitle="Couldn't load contact settings" skeletonCards={3}>
+      <SettingsCard
+        title="Contact details"
+        icon={Mail}
+        description="Shown on your Contact page. Leave any of them blank to hide it."
+      >
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Email" hint="Messages from the contact form go to your account email if this is blank.">
+            {(control) => (
               <input
+                {...control}
                 type="email"
-                value={formData.contact_email}
-                onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={values.contact_email}
+                onChange={(e) => update('contact_email', e.target.value)}
                 placeholder="you@yourdomain.com"
+                className={inputClass}
               />
-              <p className="text-xs text-zinc-500 mt-1">
-                Shown on your contact page. Leave blank to hide it — messages will still reach your account email.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Phone (optional)</label>
+            )}
+          </Field>
+          <Field label="Phone">
+            {(control) => (
               <input
+                {...control}
                 type="tel"
-                value={formData.phone || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value || null }))}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                placeholder="+1 (555) 123-4567"
+                value={values.phone}
+                onChange={(e) => update('phone', e.target.value)}
+                placeholder="+234 800 000 0000"
+                className={inputClass}
               />
-              <p className="text-xs text-zinc-500 mt-1">Optional phone number for direct contact.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Location</label>
+            )}
+          </Field>
+          <Field label="Location" hint="A city, a region, or “Remote”.">
+            {(control) => (
               <input
+                {...control}
                 type="text"
-                value={formData.location}
-                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                placeholder="e.g. Lagos, Nigeria · or Remote"
+                value={values.location}
+                onChange={(e) => update('location', e.target.value)}
+                placeholder="Lagos, Nigeria"
+                className={inputClass}
               />
-              <p className="text-xs text-zinc-500 mt-1">City, region, or remote availability. Leave blank to hide it.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">Expected Response Time</label>
+            )}
+          </Field>
+          <Field label="Response time" hint="How soon you usually reply.">
+            {(control) => (
               <input
+                {...control}
                 type="text"
-                value={formData.response_time}
-                onChange={(e) => setFormData(prev => ({ ...prev, response_time: e.target.value }))}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                placeholder="e.g. Usually within 24-48 hours"
+                value={values.response_time}
+                onChange={(e) => update('response_time', e.target.value)}
+                placeholder="Usually within 1–2 days"
+                className={inputClass}
               />
-              <p className="text-xs text-zinc-500 mt-1">How quickly you usually reply. Leave blank to hide it.</p>
-            </div>
-          </div>
+            )}
+          </Field>
         </div>
+      </SettingsCard>
 
-        {/* Social Links */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-zinc-900">Social Links</h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.show_social_links}
-                onChange={(e) => setFormData(prev => ({ ...prev, show_social_links: e.target.checked }))}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-zinc-700">Show Social Links</span>
-            </label>
-          </div>
-          {formData.show_social_links && (
-            <div className="grid md:grid-cols-2 gap-4">
-              {(['github', 'twitter', 'linkedin', 'instagram', 'youtube', 'facebook'] as const).map((platform) => (
-                <div key={platform}>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 capitalize">{platform}</label>
-                  <input
-                    type="url"
-                    value={formData.social_links[platform] || ''}
-                    onChange={(e) => updateSocial(platform, e.target.value)}
-                    placeholder={`https://www.${platform}.com/yourusername`}
-                    className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* FAQ Section */}
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-zinc-900">FAQ Section</h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.show_faq}
-                onChange={(e) => setFormData(prev => ({ ...prev, show_faq: e.target.checked }))}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-zinc-700">Show FAQ on Contact page</span>
-            </label>
-          </div>
-
-          {formData.show_faq && (
+      <SettingsCard title="Social links" icon={Share2}>
+        <SwitchRow
+          label="Show social links"
+          description={
             <>
-              <button
-                type="button"
-                onClick={addFaq}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg font-bold hover:bg-primary-hover transition-all mb-6"
-              >
-                <Plus size={18} /> Add FAQ Item
-              </button>
-
-              <div className="space-y-4">
-                {formData.faqs.map((faq, index) => (
-                  <div key={index} className="flex gap-4 rounded-xl border border-zinc-200 p-5">
-                    <div className="flex-1 space-y-3">
-                      <input
-                        type="text"
-                        value={faq.question}
-                        onChange={(e) => updateFaq(index, 'question', e.target.value)}
-                        placeholder="Question (e.g. Open for freelance?)"
-                        className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                      />
-                      <textarea
-                        value={faq.answer}
-                        onChange={(e) => updateFaq(index, 'answer', e.target.value)}
-                        placeholder="Answer"
-                        rows={3}
-                        className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-y"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFaq(index)}
-                      className="text-red-500 hover:text-red-700 self-start mt-2"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              Your links from{' '}
+              <Link to={toWorkspace('/settings/social')} className="font-semibold text-violet-600 hover:underline dark:text-violet-400">
+                Social profiles
+              </Link>
+              .
             </>
-          )}
-        </div>
-      </form>
-    </div>
+          }
+          checked={values.show_social_links}
+          onChange={(checked) => update('show_social_links', checked)}
+        />
+      </SettingsCard>
+
+      <SettingsCard
+        title="FAQ"
+        icon={HelpCircle}
+        description="Answer common questions before readers have to ask."
+        toggle={{ checked: values.show_faq, onChange: (checked) => update('show_faq', checked), label: 'Show' }}
+      >
+        {values.show_faq && (
+          <>
+            {values.faqs.length === 0 ? (
+              <p className={hintClass}>No questions yet. Readers won't see this section until you add one.</p>
+            ) : (
+              <ol ref={faqListRef} className="space-y-4">
+                {values.faqs.map((faq, index) => {
+                  const errors = faqErrors(faq);
+                  return (
+                    <li key={faq.id} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700 sm:p-5">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                          Question {index + 1}
+                        </p>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            data-faq-move={`${faq.id}:-1`}
+                            onClick={() => moveFaq(index, -1)}
+                            disabled={index === 0}
+                            aria-label={`Move question ${index + 1} up`}
+                            className={iconButtonClass}
+                          >
+                            <ArrowUp size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            data-faq-move={`${faq.id}:1`}
+                            onClick={() => moveFaq(index, 1)}
+                            disabled={index === values.faqs.length - 1}
+                            aria-label={`Move question ${index + 1} down`}
+                            className={iconButtonClass}
+                          >
+                            <ArrowDown size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeFaq(faq.id)}
+                            aria-label={`Remove question ${index + 1}`}
+                            className={`${iconButtonClass} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400`}
+                          >
+                            <Trash2 size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <Field label="Question" error={errors.question}>
+                          {(control) => (
+                            <input
+                              {...control}
+                              data-faq-question={faq.id}
+                              type="text"
+                              value={faq.question}
+                              onChange={(e) => updateFaq(faq.id, 'question', e.target.value)}
+                              placeholder="e.g. Are you open to freelance work?"
+                              className={inputClass}
+                            />
+                          )}
+                        </Field>
+                        <Field label="Answer" error={errors.answer}>
+                          {(control) => (
+                            <textarea
+                              {...control}
+                              value={faq.answer}
+                              onChange={(e) => updateFaq(faq.id, 'answer', e.target.value)}
+                              rows={3}
+                              className={`${inputClass} resize-y`}
+                            />
+                          )}
+                        </Field>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            <button type="button" onClick={addFaq} className={secondaryButtonClass}>
+              <Plus size={16} aria-hidden="true" /> Add question
+            </button>
+          </>
+        )}
+      </SettingsCard>
+    </SettingsForm>
   );
 };

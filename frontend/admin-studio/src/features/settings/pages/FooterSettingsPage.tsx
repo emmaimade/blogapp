@@ -1,377 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, Lock } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import { PanelBottom, SlidersHorizontal } from 'lucide-react';
 import api from '../../../shared/api/client';
-import { SettingsSkeleton } from '../../../shared/ui/SettingsSkeleton';
 import { useBlog } from '../../../app/providers/BlogProvider';
+import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
-import { billingPath, toastApiError } from '../../../shared/lib/apiErrors';
-import { useBillingOverview } from '../../billing/hooks/useBilling';
-import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesDialog } from '../../../shared/components/UnsavedChangesDialog';
+import { usePlanAccess } from '../../billing/hooks/usePlanAccess';
+import { SettingsCard } from '../components/SettingsCard';
+import { SettingsForm } from '../components/SettingsForm';
+import { Field, PaidFeatureBadge, SwitchRow, inputClass } from '../components/SettingsFields';
+import { useSettingsForm } from '../hooks/useSettingsForm';
 
 interface FooterSettingsData {
   footer_text: string;
-  show_newsletter: boolean;
-  newsletter_title: string;
-  newsletter_description: string;
   show_social_links: boolean;
-  social_links: {
-    github: string;
-    twitter: string;
-    linkedin: string;
-    instagram: string;
-    youtube: string;
-    facebook: string;
-  };
   copyright_text: string;
   show_categories: boolean;
+  // Anything else the API sends (social links, show_quick_links, the unused
+  // newsletter fields) is sent back unchanged, since the endpoint replaces the
+  // whole object.
+  [other: string]: unknown;
 }
-
-const defaultFooterSettings: FooterSettingsData = {
-  footer_text: 'Your ideas, amplified.',
-  show_newsletter: true,
-  newsletter_title: 'Newsletter',
-  newsletter_description: 'Get the latest posts delivered to your inbox.',
-  show_social_links: true,
-  social_links: {
-    github: '',
-    twitter: '',
-    linkedin: '',
-    instagram: '',
-    youtube: '',
-    facebook: '',
-  },
-  copyright_text: 'Powered by INKO',
-  show_categories: true,
-};
 
 export const FooterSettings: React.FC = () => {
   useDocumentTitle('Footer settings');
-  const queryClient = useQueryClient();
   const { activeBlog } = useBlog();
+  const toWorkspace = useWorkspacePath();
+  const { isPaid } = usePlanAccess();
+  const blogId = activeBlog?.id;
 
-  // The plan in effect right now — an expired trial or lapsed payment counts
-  // as Free, which is what the backend checks when saving.
-  const { data: billing } = useBillingOverview();
-  const isFreePlan = (billing?.effective_plan ?? 'free') === 'free';
-
-  const { data: settings, isLoading } = useQuery<FooterSettingsData>({
-    queryKey: ['footerSettings', activeBlog?.id],
-    queryFn: async () => {
-      const res = await api.get(`/blogs/${activeBlog!.id}/settings/footer`);
-      const data = res.data || {};
-
-      const defaultTagline = activeBlog?.tagline || "Your ideas, amplified.";
-
+  const form = useSettingsForm<FooterSettingsData>({
+    queryKey: ['footerSettings', blogId],
+    empty: {
+      footer_text: '',
+      show_social_links: true,
+      copyright_text: '',
+      show_categories: true,
+    },
+    enabled: !!blogId,
+    load: async () => {
+      const data = (await api.get(`/blogs/${blogId}/settings/footer`)).data ?? {};
       return {
-        footer_text: data.footer_text ?? defaultTagline,
-        show_newsletter: data.show_newsletter ?? true,
-        newsletter_title: data.newsletter_title ?? 'Newsletter',
-        newsletter_description: data.newsletter_description ?? 'Get the latest posts delivered to your inbox.',
+        ...data,
+        footer_text: data.footer_text ?? '',
         show_social_links: data.show_social_links ?? true,
-        social_links: {
-          github: data.social_links?.github ?? '',
-          twitter: data.social_links?.twitter ?? '',
-          linkedin: data.social_links?.linkedin ?? '',
-          instagram: data.social_links?.instagram ?? '',
-          youtube: data.social_links?.youtube ?? '',
-          facebook: data.social_links?.facebook ?? '',
-        },
-        copyright_text: data.copyright_text ?? 'Powered by INKO',
+        copyright_text: data.copyright_text ?? '',
         show_categories: data.show_categories ?? true,
       };
     },
-    enabled: !!activeBlog?.id,
+    save: (values) => api.post(`/blogs/${blogId}/settings/footer`, values),
+    successMessage: 'Footer saved',
+    errorMessage: "Couldn't save the footer",
   });
 
-  const [formData, setFormData] = useState<FooterSettingsData>(defaultFooterSettings);
-
-  useEffect(() => {
-    if (settings) {
-      setFormData(settings);
-    }
-  }, [settings]);
-
-  const saveMutation = useMutation({
-    mutationFn: (data: FooterSettingsData) =>
-      api.post(`/blogs/${activeBlog!.id}/settings/footer`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['footerSettings', activeBlog?.id] });
-      toast.success('Footer settings saved successfully!');
-    },
-    onError: (error: any) => toastApiError(error, 'Failed to save settings'),
-  });
-
-  const handleSave = () => {
-    saveMutation.mutate(formData);
-  };
-
-  const handleChange = (field: keyof FooterSettingsData, value: FooterSettingsData[keyof FooterSettingsData]) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSocialChange = (platform: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      social_links: {
-        ...prev.social_links,
-        [platform]: value
-      }
-    }));
-  };
-
-  const isDirty = settings && JSON.stringify(formData) !== JSON.stringify(settings);
-
-  // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
-  const unsavedChangesBlocker = useUnsavedChangesGuard(!!isDirty);
-
-  if (isLoading) {
-    return <SettingsSkeleton cardsCount={4} fieldsPerCard={2} />;
-  }
-
+  const { values, update } = form;
 
   return (
-    <div className="max-w-4xl pb-24 lg:pb-12 relative">
-      <UnsavedChangesDialog blocker={unsavedChangesBlocker} />
-      {/* Floating Save Button - Mobile Optimized */}
-      <div className={`fixed right-4 bottom-20 lg:top-[76px] lg:right-10 z-50 transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 rounded-full border border-zinc-200/50 bg-white/80 p-1.5 pl-4 shadow-lg backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-900/80">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-              Unsaved changes
-            </span>
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-full bg-zinc-900 px-4 text-sm font-medium text-white transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
-          >
-            {saveMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
-            Save
-          </button>
-        </div>
-      </div>
-
-      <div className="admin-note mb-8 flex items-start gap-3 p-4">
-        <AlertCircle className="mt-0.5 shrink-0 text-zinc-900 dark:text-zinc-900" size={20} />
-        <div className="text-sm text-zinc-700 dark:text-zinc-200">
-          Configure footer copy, newsletter prompts, and social links shown on your public blog.
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-zinc-200 p-5 sm:p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Footer Branding</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Footer Text / Tagline
-              </label>
-              <input
-                type="text"
-                value={formData.footer_text || ''}
-                onChange={(e) => handleChange('footer_text', e.target.value)}
-                placeholder={activeBlog?.tagline || "Your ideas, amplified."}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                Copyright Text
-                {isFreePlan && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                    <Lock size={12} />
-                    Pro Feature
-                  </span>
-                )}
-                {isFreePlan && (
-                  <Link to={billingPath()} className="ml-2 text-xs font-semibold text-violet-600 underline underline-offset-2">
-                    Upgrade
-                  </Link>
-                )}
-              </label>
-              <input
-                type="text"
-                value={formData.copyright_text || ''}
-                onChange={(e) => handleChange('copyright_text', e.target.value)}
-                placeholder="Powered by INKO"
-                disabled={isFreePlan}
-                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-zinc-900">Newsletter Section</h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.show_newsletter !== false}
-                onChange={(e) => handleChange('show_newsletter', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-zinc-700">Show Newsletter</span>
-            </label>
-          </div>
-          
-          {formData.show_newsletter !== false && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Newsletter Title
-                </label>
-                <input
-                  type="text"
-                  value={formData.newsletter_title || ''}
-                  onChange={(e) => handleChange('newsletter_title', e.target.value)}
-                  placeholder="Newsletter"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Newsletter Description
-                </label>
-                <textarea
-                  value={formData.newsletter_description || ''}
-                  onChange={(e) => handleChange('newsletter_description', e.target.value)}
-                  placeholder="Get the latest posts delivered to your inbox."
-                  rows={2}
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-            </div>
+    <SettingsForm form={form} loadErrorTitle="Couldn't load footer settings" skeletonCards={3}>
+      <SettingsCard title="Footer text" icon={PanelBottom} description="The text at the bottom of every page.">
+        <Field label="Tagline" hint="A line under your blog name. Leave blank to hide it.">
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              value={values.footer_text}
+              onChange={(e) => update('footer_text', e.target.value)}
+              placeholder={activeBlog?.tagline || 'Thoughts and ideas from my blog.'}
+              className={inputClass}
+            />
           )}
-        </div>
-
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-zinc-900">Social Media Links</h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.show_social_links !== false}
-                onChange={(e) => handleChange('show_social_links', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-zinc-700">Show Social Links</span>
-            </label>
-          </div>
-          
-          {formData.show_social_links !== false && (
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  GitHub
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.github || ''}
-                  onChange={(e) => handleSocialChange('github', e.target.value)}
-                  placeholder="https://github.com/username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Twitter
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.twitter || ''}
-                  onChange={(e) => handleSocialChange('twitter', e.target.value)}
-                  placeholder="https://twitter.com/username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  LinkedIn
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.linkedin || ''}
-                  onChange={(e) => handleSocialChange('linkedin', e.target.value)}
-                  placeholder="https://linkedin.com/in/username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Instagram
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.instagram || ''}
-                  onChange={(e) => handleSocialChange('instagram', e.target.value)}
-                  placeholder="https://instagram.com/username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  YouTube
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.youtube || ''}
-                  onChange={(e) => handleSocialChange('youtube', e.target.value)}
-                  placeholder="https://youtube.com/@username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2">
-                  Facebook
-                </label>
-                <input
-                  type="url"
-                  value={formData.social_links?.facebook || ''}
-                  onChange={(e) => handleSocialChange('facebook', e.target.value)}
-                  placeholder="https://facebook.com/username"
-                  className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                />
-              </div>
-            </div>
+        </Field>
+        <Field
+          label="Copyright"
+          aside={!isPaid && <PaidFeatureBadge />}
+          hint={
+            isPaid
+              ? 'Write {year} for the current year. Remove "Powered by INKO" to drop the Inko credit.'
+              : 'On the Free plan, your footer credits Inko. Upgrade to write your own.'
+          }
+        >
+          {(control) => (
+            <input
+              {...control}
+              type="text"
+              value={values.copyright_text}
+              onChange={(e) => update('copyright_text', e.target.value)}
+              placeholder={`© {year} ${activeBlog?.name ?? 'My blog'}`}
+              disabled={!isPaid}
+              className={inputClass}
+            />
           )}
-        </div>
+        </Field>
+      </SettingsCard>
 
-        <div className="bg-white rounded-xl border border-zinc-200 p-6">
-          <h2 className="text-lg font-bold text-zinc-900 mb-4">Footer Sections</h2>
-          
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer p-3 hover:bg-zinc-50 rounded-lg transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.show_categories !== false}
-                onChange={(e) => handleChange('show_categories', e.target.checked)}
-                className="w-5 h-5 text-zinc-900 rounded border-zinc-300 focus:ring-primary mt-0.5"
-              />
-              <div>
-                <div className="font-bold text-zinc-900">Show Popular Topics</div>
-                <div className="text-sm text-zinc-600">Shows your most-used tags from published posts. Hidden until at least one published post has a tag.</div>
-              </div>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
+      <SettingsCard title="Sections" icon={SlidersHorizontal} description="What else your footer shows.">
+        <SwitchRow
+          label="Social links"
+          description={
+            <>
+              Your links from{' '}
+              <Link to={toWorkspace('/settings/social')} className="font-semibold text-violet-600 hover:underline dark:text-violet-400">
+                Social profiles
+              </Link>
+              .
+            </>
+          }
+          checked={values.show_social_links}
+          onChange={(checked) => update('show_social_links', checked)}
+        />
+        <SwitchRow
+          label="Popular topics"
+          description="Your most-used tags. Hidden until a published post has a tag."
+          checked={values.show_categories}
+          onChange={(checked) => update('show_categories', checked)}
+        />
+      </SettingsCard>
+
+    </SettingsForm>
   );
 };

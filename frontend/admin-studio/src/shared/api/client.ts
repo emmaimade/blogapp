@@ -35,6 +35,16 @@ api.interceptors.request.use((config) => {
 const SILENT_401_PATHS = ['/auth/me', '/users/me'];
 const isSilentPath = (url?: string) => !!url && SILENT_401_PATHS.some((p) => url.includes(p));
 
+/**
+ * The server saying this session is over. Anything else that fails — a 503
+ * while the database reconnects, a timeout, no network — says nothing about
+ * the session, so it must never sign anyone out.
+ */
+export const isSessionRejected = (error: unknown): boolean => {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status;
+  return status === 401 || status === 403;
+};
+
 let refreshInFlight: Promise<void> | null = null;
 
 async function refreshAccessToken(): Promise<void> {
@@ -60,7 +70,13 @@ api.interceptors.response.use(
       try {
         await refreshAccessToken();
         return api(originalRequest);
-      } catch {
+      } catch (refreshError) {
+        // A refresh that couldn't reach the server isn't a refused session:
+        // fail this request like any other server error and keep the user
+        // where they are (with whatever they were typing).
+        if (!isSessionRejected(refreshError)) {
+          return Promise.reject(refreshError);
+        }
         if (!isSilentPath(originalRequest?.url)) {
           window.location.href = '/admin/login';
         }
