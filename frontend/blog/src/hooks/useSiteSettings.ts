@@ -30,6 +30,7 @@ const buildDefaultSiteSettings = (siteName: string) => ({
     bio_content: '',
     show_stats: true,
     show_contact_cta: true,
+    show_social_links: true,
     email: null,
     social_links: {
       github: null,

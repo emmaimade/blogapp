@@ -37,6 +37,7 @@ from app.schemas import (
     SEOSettings,
     SEOSettingsResponse,
 )
+from app.schemas.settings import SocialLinks
 
 load_dotenv()
 
@@ -69,15 +70,19 @@ def get_settings(
     sections must not fetch them one by one. Per-key behaviour matches get_setting.
     """
     fallbacks = fallbacks or {}
-    statement = select(SiteSettings).where(
-        SiteSettings.blog_id == blog_id,
-        SiteSettings.setting_key.in_(list(sections)),
-    )
-    rows = {row.setting_key: row for row in session.exec(statement).all()}
+    rows = _fetch_rows(session, blog_id, list(sections))
     return {
         key: _parse_setting(rows.get(key), blog_id, key, model, fallbacks.get(key))
         for key, model in sections.items()
     }
+
+
+def _fetch_rows(session: Session, blog_id: int, keys: list[str]) -> Dict[str, SiteSettings]:
+    statement = select(SiteSettings).where(
+        SiteSettings.blog_id == blog_id,
+        SiteSettings.setting_key.in_(keys),
+    )
+    return {row.setting_key: row for row in session.exec(statement).all()}
 
 
 def _parse_setting(
@@ -137,9 +142,50 @@ _ALL_SECTIONS = {
 }
 
 
+# The sections that show social links. Each used to keep its own copy; the
+# shared "social" setting replaces them, and until a blog saves it, the links
+# are merged from these copies — earlier sections win per network.
+_SOCIAL_SOURCES = ("contact", "footer", "about_page")
+
+
+def _social_from_rows(rows: Dict[str, SiteSettings], blog_id: int) -> Dict:
+    if "social" in rows:
+        return _parse_setting(rows["social"], blog_id, "social", SocialLinks, None)
+
+    merged: Dict[str, str] = {}
+    for key in _SOCIAL_SOURCES:
+        links = _parse_setting(rows.get(key), blog_id, key, _ALL_SECTIONS[key], None).get("social_links") or {}
+        for network, url in links.items():
+            if url and not merged.get(network):
+                merged[network] = url
+    return SocialLinks(**merged).model_dump()
+
+
+def social_profiles_for(session: Session, blog_id: int) -> Dict:
+    return _social_from_rows(_fetch_rows(session, blog_id, ["social", *_SOCIAL_SOURCES]), blog_id)
+
+
+def _section_with_social(
+    session: Session, blog_id: int, key: str, model: Any, fallback: Optional[BaseModel] = None
+) -> Dict:
+    """One social-link section, with the blog's shared social profiles in place of its own copy."""
+    rows = _fetch_rows(session, blog_id, ["social", *_SOCIAL_SOURCES])
+    section = _parse_setting(rows.get(key), blog_id, key, model, fallback)
+    section["social_links"] = _social_from_rows(rows, blog_id)
+    return section
+
+
 def all_settings_for(session: Session, blog: Blog) -> AllSiteSettings:
     """Every settings section for a blog, fetched in a single query."""
-    s = get_settings(session, blog.id, _ALL_SECTIONS, fallbacks={"general": blog_general_defaults(blog)})
+    fallbacks = {"general": blog_general_defaults(blog)}
+    rows = _fetch_rows(session, blog.id, [*_ALL_SECTIONS, "social"])
+    s = {
+        key: _parse_setting(rows.get(key), blog.id, key, model, fallbacks.get(key))
+        for key, model in _ALL_SECTIONS.items()
+    }
+    social = _social_from_rows(rows, blog.id)
+    for key in _SOCIAL_SOURCES:
+        s[key]["social_links"] = social
     return AllSiteSettings(
         general=_finalize_general(s["general"], blog),
         about=s["about_page"],
@@ -216,13 +262,15 @@ def update_setting(
     return values
 
 
-def upload_branding_asset(file: UploadFile, folder: str, allowed_types: tuple[str, ...]) -> Dict[str, str]:
+def upload_branding_asset(
+    file: UploadFile,
+    folder: str,
+    allowed_types: tuple[str, ...],
+    type_message: str = "Please upload a PNG, JPEG, WebP, or SVG image.",
+) -> Dict[str, str]:
     content_type = file.content_type or ""
     if content_type not in allowed_types:
-        raise BadRequestError(
-            ErrorCode.INVALID_FILE_TYPE,
-            "Please upload a PNG, JPEG, WebP, or SVG image.",
-        )
+        raise BadRequestError(ErrorCode.INVALID_FILE_TYPE, type_message)
     if file.size and file.size > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
         raise BadRequestError(
             ErrorCode.FILE_TOO_LARGE,
@@ -259,7 +307,7 @@ def update_general_settings(
 
 @router.get("/about", response_model=AboutPageSettingsResponse)
 def get_about_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
-    return get_setting(session, blog_id, "about_page", AboutPageSettings)
+    return _section_with_social(session, blog_id, "about_page", AboutPageSettings)
 
 
 @router.post("/about", response_model=AboutPageSettingsResponse)
@@ -281,30 +329,13 @@ def get_footer_settings(
     session: Session = Depends(get_session),
     blog: Blog = Depends(get_public_blog),
 ):
-    statement = select(SiteSettings).where(
-        SiteSettings.setting_key == "footer",
-        SiteSettings.blog_id == blog_id,
-    )
-    setting = session.exec(statement).first()
-
-    if setting:
-        try:
-            data = FooterSettings.model_validate(json.loads(setting.setting_value))
-            return data.model_dump()
-        except Exception:
-            logger.warning(
-                "Stored footer settings for blog %s are unreadable; using defaults",
-                blog_id,
-                exc_info=True,
-            )
-
-    # No saved footer yet — hydrate sensible defaults from the blog model
-    # so the user sees their own tagline and blog name instead of generic placeholders
+    # No saved (or readable) footer yet — defaults from the blog itself, so the
+    # owner sees their own tagline and blog name instead of generic placeholders.
     defaults = FooterSettings(
         footer_text=blog.tagline or f"Thoughts and ideas from {blog.name}.",
         copyright_text=f"© {{year}} {blog.name}. Powered by INKO.",
     )
-    return defaults.model_dump()
+    return _section_with_social(session, blog_id, "footer", FooterSettings, fallback=defaults)
 
 
 @router.post("/footer", response_model=FooterSettingsResponse)
@@ -381,6 +412,41 @@ def upload_favicon(
     )
 
 
+@router.get("/social", response_model=SocialLinks)
+def get_social_profiles(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
+    """The blog's social links, shared by the About, Contact and footer sections."""
+    return social_profiles_for(session, blog_id)
+
+
+@router.post("/social", response_model=SocialLinks)
+def update_social_profiles(
+    blog_id: int,
+    settings: SocialLinks,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_blog_owner),
+    __: None = Depends(require_completed_onboarding),
+):
+    return update_setting(session, blog_id, "social", settings, current_user, request=request)
+
+
+@router.post("/seo/upload-og-image")
+def upload_og_image(
+    blog_id: int,
+    file: UploadFile = File(...),
+    _: None = Depends(require_blog_owner),
+    __: None = Depends(require_completed_onboarding),
+):
+    return upload_branding_asset(
+        file,
+        folder="seo/og-images",
+        allowed_types=("image/png", "image/jpeg", "image/webp"),
+        # Social networks don't show SVG previews.
+        type_message="Please upload a PNG, JPEG, or WebP image.",
+    )
+
+
 @router.get("/seo", response_model=SEOSettingsResponse)
 def get_seo_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
     return get_setting(session, blog_id, "seo", SEOSettings)
@@ -401,7 +467,7 @@ def update_seo_settings(
 
 @router.get("/contact", response_model=ContactSettingsResponse)
 def get_contact_settings(blog_id: int, session: Session = Depends(get_session), blog: Blog = Depends(get_public_blog)):
-    return get_setting(session, blog_id, "contact", ContactSettings)
+    return _section_with_social(session, blog_id, "contact", ContactSettings)
 
 
 @router.post("/contact", response_model=ContactSettingsResponse)

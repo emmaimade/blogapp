@@ -28,6 +28,7 @@ export interface AboutDraft {
   bio_content?: string;
   show_stats?: boolean;
   show_contact_cta?: boolean;
+  show_social_links?: boolean;
   email?: string | null;
   social_links?: Record<string, string>;
 }
@@ -61,6 +62,7 @@ const toDraft = (raw: unknown): AboutDraft | null => {
     bio_content: text('bio_content'),
     show_stats: flag('show_stats'),
     show_contact_cta: flag('show_contact_cta'),
+    show_social_links: flag('show_social_links'),
     email: text('email') ?? null,
     social_links: socialLinks,
   };
