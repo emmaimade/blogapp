@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.core.db import engine
 from app.core.scheduler import publish_scheduled_posts
 from app.core.security import ACCESS_TOKEN_COOKIE_NAME
@@ -118,3 +119,47 @@ def test_publish_scheduled_posts_leaves_future_posts_alone(client):
 def test_publish_scheduled_posts_is_a_no_op_with_nothing_due(client):
     """Guards against the early-return branch raising when due_posts is empty."""
     publish_scheduled_posts()
+
+
+# ── /internal/cron/publish-scheduled ─────────────────────────────────────────
+# What production relies on: an external pinger calls this every few minutes,
+# since the in-process scheduler doesn't run on Vercel between requests.
+
+def test_publish_cron_is_hidden_without_a_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, "CRON_SECRET", None)
+
+    assert client.get("/internal/cron/publish-scheduled").status_code == 404
+
+
+def test_publish_cron_needs_the_right_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, "CRON_SECRET", "s3cret")
+
+    resp = client.get("/internal/cron/publish-scheduled", headers={"Authorization": "Bearer wrong"})
+    assert resp.status_code == 401
+
+
+def test_publish_cron_publishes_due_posts_once(client, monkeypatch):
+    monkeypatch.setattr(settings, "CRON_SECRET", "s3cret")
+    headers = {"Authorization": "Bearer s3cret"}
+    _, blog_id, user_id = _register_owner(client)
+    now = datetime.now(timezone.utc)
+    due_id = _create_scheduled_post(blog_id, user_id, now - timedelta(minutes=5))
+    future_id = _create_scheduled_post(blog_id, user_id, now + timedelta(days=1))
+
+    first = client.get("/internal/cron/publish-scheduled", headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["published"] >= 1
+
+    second = client.get("/internal/cron/publish-scheduled", headers=headers)
+    assert second.json() == {"published": 0}
+
+    with Session(engine) as session:
+        assert session.get(Post, due_id).status == PostStatus.PUBLISHED
+        assert session.get(Post, future_id).status == PostStatus.SCHEDULED
+        notifications = session.exec(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.type == "post_published",
+            )
+        ).all()
+        assert len(notifications) == 1

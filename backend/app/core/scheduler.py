@@ -25,59 +25,73 @@ logger = logging.getLogger(__name__)
 _scheduler = AsyncIOScheduler()
 
 
-def publish_scheduled_posts() -> None:
+def publish_due_posts(session: Session) -> int:
     """
-    Find all posts where status=scheduled AND published_at <= now (UTC).
-    Promote each one to published=True, status=published.
-    Runs every 60 seconds.
+    Find all posts where status=scheduled AND published_at <= now (UTC),
+    promote each one to published=True, status=published, and return how
+    many were published.
+
+    Called by the in-process scheduler every 60 seconds and, in production,
+    by an external pinger through /internal/cron/publish-scheduled. The rows
+    are locked (skipping ones already locked) so the two running at once
+    can't publish — and notify about — the same post twice. SQLite ignores
+    the lock.
     """
     now = datetime.now(timezone.utc)
 
-    with Session(engine) as session:
-        due_posts = session.exec(
-            select(Post).where(
-                Post.status == PostStatus.SCHEDULED,
-                Post.published_at <= now,
-            )
-        ).all()
+    due_posts = session.exec(
+        select(Post)
+        .where(
+            Post.status == PostStatus.SCHEDULED,
+            Post.published_at <= now,
+        )
+        .with_for_update(skip_locked=True)
+    ).all()
 
-        if not due_posts:
-            return
+    if not due_posts:
+        return 0
 
-        logger.info(f"[scheduler] Publishing {len(due_posts)} scheduled post(s).")
+    logger.info(f"[scheduler] Publishing {len(due_posts)} scheduled post(s).")
 
-        for post in due_posts:
-            post.status    = PostStatus.PUBLISHED
-            post.published = True
-            session.add(post)
+    for post in due_posts:
+        post.status    = PostStatus.PUBLISHED
+        post.published = True
+        session.add(post)
 
-            add_audit_log(
+        add_audit_log(
+            session,
+            action="post.published",
+            resource_type="post",
+            resource_id=post.id,
+            blog_id=post.blog_id,
+            actor=None,            # system action — no human actor
+            details={
+                "title":        post.title,
+                "scheduled_at": post.published_at.isoformat(),
+                "source":       "scheduler",
+            },
+        )
+
+        if post.author_id:
+            add_notification(
                 session,
-                action="post.published",
-                resource_type="post",
-                resource_id=post.id,
+                user_id=post.author_id,
                 blog_id=post.blog_id,
-                actor=None,            # system action — no human actor
-                details={
-                    "title":        post.title,
-                    "scheduled_at": post.published_at.isoformat(),
-                    "source":       "scheduler",
-                },
+                type="post_published",
+                title=f'"{post.title}" is now live',
+                body="Your scheduled post has been published.",
+                link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
             )
 
-            if post.author_id:
-                add_notification(
-                    session,
-                    user_id=post.author_id,
-                    blog_id=post.blog_id,
-                    type="post_published",
-                    title=f'"{post.title}" is now live',
-                    body="Your scheduled post has been published.",
-                    link=f"/admin/posts/view/{post.id}?blog={post.blog_id}",
-                )
+    session.commit()
+    logger.info(f"[scheduler] Done — {len(due_posts)} post(s) published.")
+    return len(due_posts)
 
-        session.commit()
-        logger.info(f"[scheduler] Done — {len(due_posts)} post(s) published.")
+
+def publish_scheduled_posts() -> None:
+    """The in-process scheduler's entry point: publish_due_posts in its own session."""
+    with Session(engine) as session:
+        publish_due_posts(session)
 
 
 def _register_purge_jobs(scheduler: AsyncIOScheduler) -> None:
