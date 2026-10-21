@@ -11,7 +11,7 @@ notifications, support, audit logs and platform administration.
 - **Framework**: FastAPI
 - **Database**: PostgreSQL via SQLModel; Alembic for migrations
 - **Auth**: JWT access and refresh tokens in httpOnly cookies, bcrypt, double-submit CSRF
-- **Background jobs**: APScheduler in-process; Vercel Cron in production
+- **Background jobs**: APScheduler in-process; Vercel Cron and an external pinger in production
 - **Integrations**: Cloudinary (images), Paystack (billing), SMTP (email)
 - **Python**: 3.12+, managed with [uv](https://docs.astral.sh/uv/)
 
@@ -92,7 +92,7 @@ Use `sk_test_` keys outside production.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CRON_SECRET` | — | Bearer token Vercel Cron sends to `/internal/cron/*`. Unset disables those endpoints (404) |
+| `CRON_SECRET` | — | Bearer token Vercel Cron and the external pinger send to `/internal/cron/*`. Unset disables those endpoints (404) |
 | `PURGE_ON_STARTUP` | `false` | Run the deleted-account purge in-process. Leave off when sharing a database |
 | `LOG_LEVEL` | `INFO` | Log level |
 | `SQL_ECHO` | `false` | Log every SQL statement (local debugging only) |
@@ -143,7 +143,7 @@ The complete reference is at `/docs`. Most workspace-scoped routes are nested un
 | Support | `/support` | User support tickets and replies |
 | Contact | `/contact` | Marketing-site contact form |
 | Superadmin | `/superadmin` | Stats, workspaces, users, subscriptions, moderation, support, platform settings, audit log (`/superadmin/audit-logs`) |
-| Cron | `/internal/cron` | Purge deleted accounts, trial notices (hidden from the schema) |
+| Cron | `/internal/cron` | Publish scheduled posts, purge deleted accounts, trial notices (hidden from the schema) |
 
 ## Authentication
 
@@ -174,9 +174,15 @@ Members over a plan's seat limit are paused rather than removed.
 ## Background Jobs
 
 - **In-process (APScheduler)**: publishes scheduled posts when they're due. Also purges
-  soft-deleted accounts, but only if `PURGE_ON_STARTUP=true`.
+  soft-deleted accounts, but only if `PURGE_ON_STARTUP=true`. On Vercel this only runs
+  while a function instance is warm, so production doesn't rely on it.
 - **Vercel Cron** (see [vercel.json](vercel.json)): `purge-deleted-accounts` daily at 01:00 UTC
   and `trial-notices` daily at 08:00 UTC, both authenticated with `CRON_SECRET`.
+- **External pinger** (e.g. [cron-job.org](https://cron-job.org)): calls
+  `GET /internal/cron/publish-scheduled` every 1–5 minutes with the header
+  `Authorization: Bearer <CRON_SECRET>`. Vercel Cron's Hobby plan only runs daily, too
+  rarely for scheduled posts. Safe to run alongside the in-process scheduler: a post is
+  only ever published once.
 
 ## Database Migrations
 

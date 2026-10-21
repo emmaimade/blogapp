@@ -5,6 +5,10 @@ On Vercel the API is serverless, so the in-process APScheduler can't be relied
 on to fire; Vercel Cron calls these instead (see vercel.json). Vercel sends
 `Authorization: Bearer $CRON_SECRET`; without CRON_SECRET configured the
 endpoints don't exist.
+
+publish-scheduled has to run every few minutes, more often than Vercel Cron
+allows on the Hobby plan, so an external pinger (e.g. cron-job.org) calls it
+with the same header.
 """
 
 import hmac
@@ -17,6 +21,7 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthenticationError, NotFoundError
+from app.core.scheduler import publish_due_posts
 from app.core.tasks import purge_expired_soft_deleted_users
 from app.modules.billing.trial_notices import run_trial_notices
 
@@ -43,3 +48,12 @@ def trial_notices(
 ) -> dict:
     _require_cron_secret(authorization)
     return asdict(run_trial_notices(session))
+
+
+@router.get("/publish-scheduled")
+def publish_scheduled(
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_session),
+) -> dict[str, int]:
+    _require_cron_secret(authorization)
+    return {"published": publish_due_posts(session)}
