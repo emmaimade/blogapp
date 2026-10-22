@@ -1,3 +1,5 @@
+import html
+
 from app.core.config import settings
 
 BRAND_NAME = "Inko"
@@ -446,4 +448,32 @@ def get_invitation_cancelled_template_text(blog_name: str) -> str:
     return (
         f"The invitation you received to join {blog_name} on {BRAND_NAME} is no longer available.\n"
         "If you were expecting to join, ask the person who invited you to send a new invitation.\n"
+    )
+
+
+def get_follow_confirmation_template(blog_name: str, confirm_url: str) -> str:
+    # The blog name is chosen by the workspace and lands in an email sent to
+    # someone else, so it's escaped.
+    name = html.escape(blog_name)
+    body = f"""<p style="margin:0 0 24px 0; color:#4b5563;">
+        Someone, hopefully you, asked to follow <strong>{name}</strong> on {BRAND_NAME}.
+        Confirm and you'll get an email when a new post goes up.
+    </p>"""
+    return _base_email(
+        preheader=f"Confirm you want to follow {name}.",
+        heading=f"Follow {name}?",
+        body_html=body,
+        cta_label="Confirm and follow",
+        cta_url=confirm_url,
+        cta_color="#7c3aed",
+        footer_note="This link expires in 7 days. If you didn't ask to follow this blog, ignore this email and nothing will happen.",
+    )
+
+
+def get_follow_confirmation_template_text(blog_name: str, confirm_url: str) -> str:
+    return (
+        f"Someone, hopefully you, asked to follow {blog_name} on {BRAND_NAME}.\n"
+        "Confirm and you'll get an email when a new post goes up:\n"
+        f"{confirm_url}\n\n"
+        "This link expires in 7 days. If you didn't ask to follow this blog, ignore this email and nothing will happen.\n"
     )

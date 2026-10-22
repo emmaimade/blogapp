@@ -7,6 +7,7 @@ import { countMarkdownHeadings, getPlainExcerpt, slugify } from '../utils/posts'
 import { getThumbnailUrl, handleThumbnailError } from '../utils/images';
 import api from '../api/blogApi';
 import { Comments } from '../components/Comments';
+import { FollowForm } from '../components/FollowForm';
 import { ArticleSkeleton } from '../components/Skeletons';
 import { ArticleHeader } from '../components/post/ArticleHeader';
 import { ArticleBody } from '../components/post/ArticleBody';
@@ -232,6 +233,8 @@ export const PostDetail = () => {
             ) : (
               <RelatedPosts posts={nextPosts} title="Popular posts" subtitle="What other readers are enjoying." />
             )}
+
+            <FollowForm sourcePostId={post.id} className="mt-12" />
 
             <Comments postId={post.id} />
           </div>

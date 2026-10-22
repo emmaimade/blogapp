@@ -1,5 +1,6 @@
 from .analytics import BlogVisitorDaily, PostViewDaily
 from .comment import Comment
+from .follower import BlogFollower, FollowerStatus
 from .comment_ban import BlogCommentBan
 from .audit import AuditLog
 from .moderation import ModerationAction, ModerationItem, ModerationReport
@@ -32,6 +33,8 @@ from .blog import (
 __all__ = [
     "BlogVisitorDaily",
     "PostViewDaily",
+    "BlogFollower",
+    "FollowerStatus",
     "BlogCommentBan",
     "User",
     "AuditLog",
