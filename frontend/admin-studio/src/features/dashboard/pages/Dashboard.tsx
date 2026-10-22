@@ -8,6 +8,7 @@ import { formatRelative } from '../../../shared/utils/dates';
 import { useDashboard } from '../hooks/useDashboard';
 import { StatCard, PublishProgress, QuickAction, DashboardSkeleton } from '../components/DashboardComponents';
 import { SiteCard } from '../components/SiteCard';
+import { ViewsCard } from '../components/ViewsCard';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 
@@ -101,6 +102,8 @@ export const Dashboard = () => {
         scheduled={data.scheduled_posts}
         total={data.posts}
       />
+
+      <ViewsCard isAuthorOnly={isAuthorOnly} />
 
       {/* Main Structural Columns Blocks Layout Grid. `grid-cols-1` matters: with
           no columns defined below lg, the browser sizes one automatic column to

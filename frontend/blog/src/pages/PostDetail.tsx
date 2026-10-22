@@ -14,6 +14,7 @@ import { MobileTableOfContents, TableOfContents, type TocEntry } from '../compon
 import { RelatedPosts } from '../components/post/RelatedPosts';
 import { useSiteName } from '../hooks/useSiteSettings';
 import { useSidebarData } from '../hooks/useSidebarData';
+import { useRecordView } from '../hooks/useRecordView';
 import { applyPageMeta, captureCurrentMeta } from '../utils/seo';
 import type { Post, PostDetail as PostDetailData } from '../types/post';
 
@@ -44,6 +45,8 @@ export const PostDetail = () => {
   const { popularPosts } = useSidebarData();
 
   const siteName = useSiteName();
+
+  useRecordView(post?.id);
 
   React.useEffect(() => {
     if (!post) return;

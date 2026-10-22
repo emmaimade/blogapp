@@ -30,6 +30,7 @@ class PlanLimits:
     can_remove_branding: bool
     can_use_custom_domain: bool
     activity_log_days: int
+    stats_history_days: int
 
 
 PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
@@ -40,6 +41,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_remove_branding=False,
         can_use_custom_domain=False,
         activity_log_days=7,
+        stats_history_days=30,
     ),
     SubscriptionPlan.PRO: PlanLimits(
         max_members=3,
@@ -48,6 +50,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_remove_branding=True,
         can_use_custom_domain=True,
         activity_log_days=90,
+        stats_history_days=365,
     ),
     SubscriptionPlan.TEAM: PlanLimits(
         max_members=15,
@@ -56,6 +59,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_remove_branding=True,
         can_use_custom_domain=True,
         activity_log_days=365,
+        stats_history_days=365,
     ),
 }
 

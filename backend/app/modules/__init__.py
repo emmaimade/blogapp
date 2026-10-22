@@ -16,6 +16,7 @@ from .support.router import router as support_router
 from .notifications.router import router as notifications_router
 from .billing.router import router as billing_router
 from .cron.router import router as cron_router
+from .analytics.router import router as analytics_router
 
 __all__ = [
     "auth_router",
@@ -36,4 +37,5 @@ __all__ = [
     "notifications_router",
     "billing_router",
     "cron_router",
+    "analytics_router",
 ]

@@ -16,6 +16,7 @@ export const pricingPlans = [
     features: [
       { name: 'Just you: 1 member', included: true },
       { name: 'Up to 30 published posts', included: true },
+      { name: '30 days of view stats', included: true },
       { name: '7 days of activity history', included: true },
       { name: 'Community support', included: true },
       { name: 'Scheduled publishing', included: false },
@@ -32,6 +33,7 @@ export const pricingPlans = [
     features: [
       { name: 'Up to 3 team members', included: true },
       { name: 'Unlimited published posts', included: true },
+      { name: '12 months of view stats', included: true },
       { name: '90 days of activity history', included: true },
       { name: 'Email support', included: true },
       { name: 'Scheduled publishing', included: true },
@@ -48,6 +50,7 @@ export const pricingPlans = [
     features: [
       { name: 'Up to 15 team members', included: true },
       { name: 'Unlimited published posts', included: true },
+      { name: '12 months of view stats', included: true },
       { name: '1 year of activity history', included: true },
       { name: 'Priority support', included: true },
       { name: 'Scheduled publishing', included: true },

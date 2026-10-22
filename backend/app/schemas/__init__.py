@@ -1,3 +1,4 @@
+from .analytics import AnalyticsDay, AnalyticsTopPost, BlogAnalyticsRead, PostViewCreate, StatsRange
 from .audit import (AuditLogActor, AuditLogFilters, AuditLogLookup, AuditLogLookupUser, AuditLogLookupWorkspace,
     AuditLogQueryParams, AuditLogRead, AuditLogSummary, MyAuditLogRead, SuperadminAuditLogQueryParams)
 from .errors import ErrorResponse, ValidationErrorResponse
@@ -80,6 +81,11 @@ from .blog import (
 )
 
 __all__ = [
+    "AnalyticsDay",
+    "AnalyticsTopPost",
+    "BlogAnalyticsRead",
+    "PostViewCreate",
+    "StatsRange",
     "UserCreate",
     "ErrorResponse",
     "ValidationErrorResponse",
