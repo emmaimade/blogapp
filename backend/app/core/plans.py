@@ -18,6 +18,7 @@ from app.core.datetimes import as_utc, utc_now
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AuthorizationError
 from app.models.blog import BlogInvitation, BlogMember, BlogRole, BlogSubscription, SubscriptionPlan, SubscriptionStatus
+from app.models.follower import BlogFollower, FollowerStatus
 from app.models.post import Post, PostStatus
 
 
@@ -31,6 +32,7 @@ class PlanLimits:
     can_use_custom_domain: bool
     activity_log_days: int
     stats_history_days: int
+    max_followers: Optional[int]
 
 
 PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
@@ -42,6 +44,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_use_custom_domain=False,
         activity_log_days=7,
         stats_history_days=30,
+        max_followers=500,
     ),
     SubscriptionPlan.PRO: PlanLimits(
         max_members=3,
@@ -51,6 +54,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_use_custom_domain=True,
         activity_log_days=90,
         stats_history_days=365,
+        max_followers=5000,
     ),
     SubscriptionPlan.TEAM: PlanLimits(
         max_members=15,
@@ -60,6 +64,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         can_use_custom_domain=True,
         activity_log_days=365,
         stats_history_days=365,
+        max_followers=None,
     ),
 }
 
@@ -238,3 +243,22 @@ def ensure_can_use_custom_domain(session: Session, blog_id: int) -> None:
         raise _upgrade_required(
             "Custom domains are available on the Pro and Team plans."
         )
+
+
+def ensure_follower_capacity(session: Session, blog_id: int) -> None:
+    """
+    Block a new follower past the plan's limit — checked when someone follows
+    and again when they confirm. Existing followers are never removed.
+    Readers see FOLLOWERS_LIMIT_REACHED, which says nothing about the plan.
+    """
+    limit = get_blog_limits(session, blog_id).max_followers
+    if limit is None:
+        return
+    active = session.exec(
+        select(func.count()).select_from(BlogFollower).where(
+            BlogFollower.blog_id == blog_id,
+            BlogFollower.status == FollowerStatus.ACTIVE,
+        )
+    ).one()
+    if active >= limit:
+        raise AuthorizationError(ErrorCode.FOLLOWERS_LIMIT_REACHED)

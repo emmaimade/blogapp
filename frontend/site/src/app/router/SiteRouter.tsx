@@ -14,6 +14,7 @@ import { NotFoundPage } from '../../pages/NotFoundPage';
 
 import { JoinPage } from '../../pages/JoinPage';
 import { VerifyEmailPage } from '../../pages/VerifyEmailPage';
+import { FollowLinkPage } from '../../pages/FollowLinkPage';
 
 export const SiteRouter = () => {
   return (
@@ -32,6 +33,8 @@ export const SiteRouter = () => {
       <Route element={<AuthLayout />}>
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/follow/confirm" element={<FollowLinkPage kind="confirm" />} />
+        <Route path="/follow/unsubscribe" element={<FollowLinkPage kind="unsubscribe" />} />
       </Route>
       <Route path="/join/:token" element={<JoinPage />} />
     </Routes>
