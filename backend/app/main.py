@@ -32,6 +32,7 @@ from app.modules import (
     notifications_router,
     billing_router,
     cron_router,
+    analytics_router,
 )
 
 # ── Lifespan — replaces deprecated @app.on_event ─────────────────────────────
@@ -120,6 +121,7 @@ app.include_router(support_router)
 app.include_router(notifications_router)
 app.include_router(billing_router)
 app.include_router(cron_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")

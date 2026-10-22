@@ -9,7 +9,7 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 from fastapi import Request, UploadFile
-from sqlalchemy import func, or_, update
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -613,18 +613,8 @@ def read_post_by_slug(
     if not post:
         raise NotFoundError(ErrorCode.POST_NOT_FOUND)
 
-    # Increment views only for published posts. A single UPDATE so concurrent
-    # reads don't lose counts, and it pins updated_at — a read isn't a change,
-    # and the column's onupdate would otherwise bump it on every view.
-    if post.status == PostStatus.PUBLISHED:
-        session.execute(
-            update(Post)
-            .where(Post.id == post.id)
-            .values(views=Post.views + 1, updated_at=Post.updated_at)
-        )
-        session.commit()
-        session.refresh(post)
-
+    # Views aren't counted here: the blog records them separately (see
+    # modules/analytics), so previews and cached navigations don't skew them.
     _ensure_post_visible(post, blog_id, session, current_user)
     return post
 

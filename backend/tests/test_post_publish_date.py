@@ -179,10 +179,13 @@ def test_views_do_not_count_as_edits(client):
         before = session.get(Post, post_id)
         slug, updated_at = before.slug, before.updated_at
 
+    # Views come from readers, not the signed-in owner.
+    client.cookies.clear()
     for _ in range(2):
-        res = client.get(f"/blogs/{blog_id}/posts/slug/{slug}")
-        assert res.status_code == 200, res.text
+        res = client.post(f"/blogs/{blog_id}/posts/{post_id}/view", json={})
+        assert res.status_code == 204, res.text
 
+    res = client.get(f"/blogs/{blog_id}/posts/slug/{slug}")
     body = res.json()
     assert body["views"] == 2
     assert body["edited_at"] is None
