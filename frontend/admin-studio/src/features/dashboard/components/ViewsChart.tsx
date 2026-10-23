@@ -1,39 +1,10 @@
 import React from 'react';
 import type { ChartBucket } from '../lib/bucketDays';
+import { columnPath, compact, niceMax, useWidth } from '../lib/chartUtils';
 
 // Views are columns, visitors a line, on one shared count axis. Colors were
 // checked with the dataviz palette validator against both card surfaces
 // (white, zinc-900): violet-600 / violet-500 for views, teal-600 for visitors.
-
-const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
-
-/** A clean axis maximum (1, 2, 5 × 10ⁿ) at or above the data's peak. */
-const niceMax = (value: number) => {
-  if (value <= 4) return 4;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const step = [1, 2, 5, 10].find((s) => s * magnitude >= value)!;
-  return step * magnitude;
-};
-
-/** Width of the element, kept up to date as the layout changes. */
-const useWidth = () => {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const [width, setWidth] = React.useState(0);
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, width] as const;
-};
-
-/** A column with a 4px rounded top and a square base. */
-const columnPath = (x: number, y: number, w: number, h: number) => {
-  const r = Math.min(4, w / 2, h);
-  return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
-};
 
 const HEIGHT = 200;
 const PAD = { top: 12, right: 8, bottom: 24, left: 36 };

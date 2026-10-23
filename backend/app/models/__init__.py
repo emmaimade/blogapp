@@ -1,4 +1,4 @@
-from .analytics import BlogVisitorDaily, PostViewDaily
+from .analytics import BlogSourceDaily, BlogVisitorDaily, PostViewDaily
 from .comment import Comment
 from .follower import BlogFollower, FollowerStatus
 from .comment_ban import BlogCommentBan
@@ -31,6 +31,7 @@ from .blog import (
 )
 
 __all__ = [
+    "BlogSourceDaily",
     "BlogVisitorDaily",
     "PostViewDaily",
     "BlogFollower",

@@ -7,7 +7,20 @@ from .followers import (
     FollowResult,
     FollowTokenPayload,
 )
-from .analytics import AnalyticsDay, AnalyticsTopPost, BlogAnalyticsRead, PostViewCreate, StatsRange
+from .analytics import (
+    AnalyticsDay,
+    AnalyticsFollowerPost,
+    AnalyticsOverviewDay,
+    AnalyticsOverviewRead,
+    AnalyticsPostRow,
+    AnalyticsPostSort,
+    AnalyticsSource,
+    AnalyticsTopPost,
+    AnalyticsTotals,
+    BlogAnalyticsRead,
+    PostViewCreate,
+    StatsRange,
+)
 from .audit import (AuditLogActor, AuditLogFilters, AuditLogLookup, AuditLogLookupUser, AuditLogLookupWorkspace,
     AuditLogQueryParams, AuditLogRead, AuditLogSummary, MyAuditLogRead, SuperadminAuditLogQueryParams)
 from .errors import ErrorResponse, ValidationErrorResponse
@@ -98,6 +111,13 @@ __all__ = [
     "FollowResult",
     "FollowTokenPayload",
     "AnalyticsDay",
+    "AnalyticsFollowerPost",
+    "AnalyticsOverviewDay",
+    "AnalyticsOverviewRead",
+    "AnalyticsPostRow",
+    "AnalyticsPostSort",
+    "AnalyticsSource",
+    "AnalyticsTotals",
     "AnalyticsTopPost",
     "BlogAnalyticsRead",
     "PostViewCreate",
