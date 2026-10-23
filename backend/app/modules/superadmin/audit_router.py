@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import and_, func, or_
 from sqlmodel import Session, select
 
+from app.core.csv_export import csv_safe
 from app.core.audit import add_audit_log
 from app.core.audit_catalog import (
     ACTIONS,
@@ -372,10 +373,8 @@ def lookup_audit_log_subjects(
     )
 
 
-def _csv_safe(value: object) -> str:
-    """Neutralise spreadsheet formulas in user-supplied text (CSV injection)."""
-    text = "" if value is None else str(value)
-    return f"'{text}" if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+# Shared with the follower export (modules/followers).
+_csv_safe = csv_safe
 
 
 @router.get("/export")

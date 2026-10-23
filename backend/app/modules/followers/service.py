@@ -6,25 +6,31 @@ The follow endpoint answers the same way whether or not an address already
 follows, has a pending confirmation, or was throttled — it never tells a
 visitor anything about who follows a blog.
 """
+import csv
 import hashlib
 import hmac
+import io
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, Request
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select
 
+from app.core.audit import add_audit_log
 from app.core.config import settings
+from app.core.csv_export import csv_safe
 from app.core.datetimes import as_utc, utc_now
 from app.core.email import dispatch_email
 from app.core.email_templates import get_follow_confirmation_template, get_follow_confirmation_template_text
 from app.core.error_codes import ErrorCode
-from app.core.exceptions import BadRequestError, GoneError, RateLimitError
-from app.core.plans import ensure_follower_capacity
-from app.models import Blog, BlogFollower, FollowerStatus, Post
+from app.core.exceptions import AuthorizationError, BadRequestError, GoneError, NotFoundError, RateLimitError
+from app.core.permissions import Permissions
+from app.core.plans import ensure_follower_capacity, get_blog_limits
+from app.models import Blog, BlogFollower, FollowerStatus, Post, User
 from app.models.post import PostStatus
-from app.schemas import FollowCreate
+from app.schemas import FollowCreate, FollowerRead, FollowerSummary
+from app.schemas.followers import FollowerSourcePost
 from app.services.auth_tokens import generate_secure_token
 
 CONFIRM_LINK_DAYS = 7
@@ -101,6 +107,8 @@ def follow(blog: Blog, payload: FollowCreate, background_tasks: BackgroundTasks,
     """Start (or restart) a follow and email the confirmation link."""
     if payload.website:
         return  # the honeypot was filled in: a bot
+    if not blog.followers_enabled:
+        raise AuthorizationError(ErrorCode.FOLLOWING_DISABLED)
 
     email = payload.email.strip().lower()
     follower = session.exec(
@@ -185,3 +193,176 @@ def unsubscribe(token: str, session: Session) -> str:
         session.add(follower)
         session.commit()
     return session.get(Blog, follower.blog_id).name
+
+
+# ── Studio: the Audience page ────────────────────────────────────────────────
+# Owners and editors see and manage followers. Exporting the list is the
+# owner's, or an editor's they've granted export_followers to.
+
+EXPORT_PERMISSION = "export_followers"
+
+
+def mask_email(email: str) -> str:
+    """'reader@example.com' -> 're***@example.com', for activity log entries."""
+    local, _, domain = email.partition("@")
+    return f"{local[:2]}***@{domain}"
+
+
+def follower_summary(blog: Blog, current_user: User, session: Session) -> FollowerSummary:
+    counts = dict(
+        session.exec(
+            select(BlogFollower.status, func.count())
+            .where(BlogFollower.blog_id == blog.id)
+            .group_by(BlogFollower.status)
+        ).all()
+    )
+    return FollowerSummary(
+        active=counts.get(FollowerStatus.ACTIVE, 0),
+        pending=counts.get(FollowerStatus.PENDING, 0),
+        unsubscribed=counts.get(FollowerStatus.UNSUBSCRIBED, 0),
+        max_followers=get_blog_limits(session, blog.id).max_followers,
+        followers_enabled=blog.followers_enabled,
+        can_export=Permissions.has_member_permission(current_user, blog.id, EXPORT_PERMISSION, session),
+    )
+
+
+def _filtered(blog_id: int, status: Optional[FollowerStatus], q: Optional[str]):
+    statement = select(BlogFollower).where(BlogFollower.blog_id == blog_id)
+    if status is not None:
+        statement = statement.where(BlogFollower.status == status)
+    if q and q.strip():
+        statement = statement.where(BlogFollower.email.contains(q.strip().lower()))
+    return statement
+
+
+def _to_reads(session: Session, followers: list[BlogFollower]) -> list[FollowerRead]:
+    post_ids = {f.source_post_id for f in followers if f.source_post_id}
+    posts = {
+        post.id: FollowerSourcePost(id=post.id, title=post.title, slug=post.slug)
+        for post in (session.exec(select(Post).where(Post.id.in_(post_ids))).all() if post_ids else [])
+    }
+    return [
+        FollowerRead(
+            id=f.id,
+            email=f.email,
+            status=f.status,
+            created_at=f.created_at,
+            confirmed_at=f.confirmed_at,
+            unsubscribed_at=f.unsubscribed_at,
+            source_post=posts.get(f.source_post_id),
+        )
+        for f in followers
+    ]
+
+
+def list_followers(
+    blog_id: int,
+    status: Optional[FollowerStatus],
+    q: Optional[str],
+    skip: int,
+    limit: int,
+    session: Session,
+) -> tuple[list[FollowerRead], int]:
+    statement = _filtered(blog_id, status, q)
+    total = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    followers = session.exec(
+        statement.order_by(BlogFollower.created_at.desc(), BlogFollower.id.desc()).offset(skip).limit(limit)
+    ).all()
+    return _to_reads(session, list(followers)), total
+
+
+def remove_follower(
+    blog_id: int,
+    follower_id: int,
+    current_user: User,
+    request: Optional[Request],
+    session: Session,
+) -> None:
+    """
+    Delete a follower outright: for junk sign-ups, and for a reader asking for
+    their data to be erased. (A reader unsubscribing themselves is kept as
+    unsubscribed instead, which the stats count.)
+    """
+    follower = session.get(BlogFollower, follower_id)
+    if not follower or follower.blog_id != blog_id:
+        raise NotFoundError(ErrorCode.RESOURCE_NOT_FOUND)
+    add_audit_log(
+        session,
+        action="follower.remove",
+        resource_type="follower",
+        resource_id=follower.id,
+        blog_id=blog_id,
+        actor=current_user,
+        details={"email": mask_email(follower.email), "status": follower.status.value},
+        request=request,
+    )
+    session.delete(follower)
+    session.commit()
+
+
+def export_followers_csv(
+    blog: Blog,
+    status: Optional[FollowerStatus],
+    current_user: User,
+    request: Optional[Request],
+    session: Session,
+) -> str:
+    if not Permissions.has_member_permission(current_user, blog.id, EXPORT_PERMISSION, session):
+        raise AuthorizationError(
+            ErrorCode.INSUFFICIENT_PERMISSIONS,
+            "Only the workspace owner, or an editor they've allowed, can export followers.",
+        )
+
+    followers = session.exec(
+        _filtered(blog.id, status, None).order_by(BlogFollower.created_at, BlogFollower.id)
+    ).all()
+    rows = _to_reads(session, list(followers))
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["email", "status", "followed_utc", "confirmed_utc", "unsubscribed_utc", "source_post"])
+    for row in rows:
+        writer.writerow([csv_safe(value) for value in (
+            row.email,
+            row.status.value,
+            row.created_at.isoformat(),
+            row.confirmed_at.isoformat() if row.confirmed_at else "",
+            row.unsubscribed_at.isoformat() if row.unsubscribed_at else "",
+            row.source_post.title if row.source_post else "",
+        )])
+
+    add_audit_log(
+        session,
+        action="follower.export",
+        resource_type="follower",
+        blog_id=blog.id,
+        actor=current_user,
+        details={"status": status.value if status else "all", "rows": len(rows)},
+        request=request,
+    )
+    session.commit()
+    return buffer.getvalue()
+
+
+def set_followers_enabled(
+    blog: Blog,
+    enabled: bool,
+    current_user: User,
+    request: Optional[Request],
+    session: Session,
+) -> bool:
+    if blog.followers_enabled != enabled:
+        blog.followers_enabled = enabled
+        session.add(blog)
+        add_audit_log(
+            session,
+            action="blog.followers_toggle",
+            resource_type="blog",
+            resource_id=blog.id,
+            blog_id=blog.id,
+            actor=current_user,
+            details={"followers_enabled": enabled},
+            request=request,
+        )
+        session.commit()
+    return blog.followers_enabled

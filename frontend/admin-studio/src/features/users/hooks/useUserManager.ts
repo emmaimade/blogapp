@@ -24,6 +24,8 @@ export interface BlogMember {
   };
   /** Over the plan's seat limit: can view, can't edit, until the owner upgrades. */
   access_paused?: boolean;
+  /** Extra abilities the owner granted on top of the role (editors only). */
+  permissions?: Record<string, boolean>;
 }
 
 export interface BlogInvitation {
@@ -109,6 +111,21 @@ export const useUserManager = () => {
     },
   });
 
+  // Extra abilities on top of a role; editors only (e.g. exporting followers).
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ memberId, permissions }: { memberId: number; permissions: Record<string, boolean> }) => {
+      if (!activeBlog?.id) throw new Error("No active workspace selected.");
+      return api.patch(`/blogs/${activeBlog.id}/members/${memberId}`, { permissions });
+    },
+    onSuccess: (_response, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['blogMembers', activeBlog?.id] });
+      toast.success(variables.permissions.export_followers ? 'They can now export followers.' : "They can no longer export followers.");
+    },
+    onError: (error) => {
+      toastApiError(error, "Couldn't change their permissions.");
+    },
+  });
+
   // 3. Mutation to remove a team member
   const removeMutation = useMutation({
     mutationFn: async (memberId: number) => {
@@ -171,6 +188,7 @@ export const useUserManager = () => {
     isOwner,
     isLoading,
     updateRoleMutation,
+    updatePermissionsMutation,
     removeMutation,
     transferOwnershipMutation,
   };

@@ -13,6 +13,7 @@ interface Blog {
   subdomain: string;
   tagline?: string | null;
   comments_enabled: boolean;
+  followers_enabled?: boolean;
 }
 
 // Interim tab title from the resolved tenant alone, so the tab is branded

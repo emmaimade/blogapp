@@ -27,7 +27,8 @@ export const FollowForm = ({ sourcePostId, className = '' }: { sourcePostId?: nu
       })).data,
   });
 
-  if (!blog) return null;
+  // The owner can switch the form off from the studio's Audience page.
+  if (!blog || blog.followers_enabled === false) return null;
 
   return (
     <section className={`card p-6 sm:p-8 ${className}`} aria-labelledby={`${inputId}-heading`}>

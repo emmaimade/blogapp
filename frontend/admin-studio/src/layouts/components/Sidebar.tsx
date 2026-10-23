@@ -1,4 +1,4 @@
-import { BarChart3, Building2, CreditCard, FileText, HelpCircle, LayoutDashboard, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users, LifeBuoy } from 'lucide-react';
+import { BarChart3, Building2, CreditCard, FileText, HelpCircle, LayoutDashboard, Mail, MessageSquare, Moon, PanelLeft, ScrollText, Settings, Sun, Tag, User, Users, LifeBuoy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
@@ -313,6 +313,7 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                     {activeRole === "owner" && (
                       <NavLink to={toWorkspace("/users")} icon={Users} label="Team" />
                     )}
+                    <NavLink to={toWorkspace("/audience")} icon={Mail} label="Audience" />
                     <NavLink
                       to={toWorkspace("/activity")}
                       icon={ScrollText}

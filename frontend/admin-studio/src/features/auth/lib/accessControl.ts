@@ -11,6 +11,7 @@ export type AdminCapability =
   | 'manage_users'
   | 'manage_settings'
   | 'view_audit_logs'
+  | 'view_audience'
   | 'view_platform_stats';
 
 export const ADMIN_CAPABILITIES: AdminCapability[] = [
@@ -22,6 +23,7 @@ export const ADMIN_CAPABILITIES: AdminCapability[] = [
   'manage_users',
   'manage_settings',
   'view_audit_logs',
+  'view_audience',
   'view_platform_stats',
 ];
 
@@ -38,12 +40,13 @@ export const SUPER_ADMIN_CAPABILITIES: AdminCapability[] = [
   'manage_users',
   'manage_settings',
   'view_audit_logs',
+  'view_audience',
   'view_platform_stats',
 ];
 
 const ROLE_CAPABILITIES: Record<NonNullable<BlogMembership['role']>, AdminCapability[]> = {
-  owner: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'manage_users', 'manage_settings', 'view_audit_logs'],
-  editor: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'view_audit_logs'],
+  owner: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'manage_users', 'manage_settings', 'view_audit_logs', 'view_audience'],
+  editor: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_tags', 'manage_comments', 'view_audit_logs', 'view_audience'],
   // Authors moderate comments on their own posts only — the API scopes it.
   author: [...BLOG_MEMBER_CAPABILITIES, 'manage_posts', 'manage_comments'],
 };
