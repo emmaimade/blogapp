@@ -33,6 +33,7 @@ class PlanLimits:
     activity_log_days: int
     stats_history_days: int
     max_followers: Optional[int]
+    can_export_analytics: bool
 
 
 PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
@@ -45,6 +46,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         activity_log_days=7,
         stats_history_days=30,
         max_followers=500,
+        can_export_analytics=False,
     ),
     SubscriptionPlan.PRO: PlanLimits(
         max_members=3,
@@ -55,6 +57,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         activity_log_days=90,
         stats_history_days=365,
         max_followers=5000,
+        can_export_analytics=True,
     ),
     SubscriptionPlan.TEAM: PlanLimits(
         max_members=15,
@@ -65,6 +68,7 @@ PLAN_LIMITS: dict[SubscriptionPlan, PlanLimits] = {
         activity_log_days=365,
         stats_history_days=365,
         max_followers=None,
+        can_export_analytics=True,
     ),
 }
 

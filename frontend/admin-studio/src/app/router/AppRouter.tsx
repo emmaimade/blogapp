@@ -22,6 +22,7 @@ import { BillingPage } from '../../features/billing/pages/BillingPage';
 import { BillingCallbackPage } from '../../features/billing/pages/BillingCallbackPage';
 import { ActivityLogPage } from '../../features/audit-log/pages/ActivityLogPage';
 import { AudiencePage } from '../../features/audience/pages/AudiencePage';
+import { AnalyticsPage } from '../../features/analytics/pages/AnalyticsPage';
 import { TagManager } from '../../features/tags/pages/TagManagerPage';
 import { UserManager } from '../../features/users/pages/UserManagerPage';
 import { SuperAdminDashboardPage } from '../../features/superadmin/pages/SuperAdminDashboardPage';
@@ -133,6 +134,12 @@ const router = createBrowserRouter(
               element={<ProtectedRoute requiredCapability="manage_comments" />}
             >
               <Route path="comments" element={<CommentManager />} />
+            </Route>
+
+            <Route
+              element={<ProtectedRoute requiredCapability="view_analytics" />}
+            >
+              <Route path="analytics" element={<AnalyticsPage />} />
             </Route>
 
             <Route

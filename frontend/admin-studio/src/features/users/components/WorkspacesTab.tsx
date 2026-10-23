@@ -31,6 +31,7 @@ const CAPABILITY_LABELS: Record<AdminCapability, { label: string; icon: LucideIc
   manage_settings: { label: "Alter Blog Settings", icon: Settings, category: 'admin' },
   view_audit_logs: { label: "Inspect Audit Trails", icon: Settings, category: 'admin' },
   view_audience: { label: "See & Manage Followers", icon: Settings, category: 'admin' },
+  view_analytics: { label: "View Blog Analytics", icon: Layout, category: 'core' },
   view_platform_stats: { label: "View Global Platform Stats", icon: ShieldAlert, category: 'admin' },
 };
 

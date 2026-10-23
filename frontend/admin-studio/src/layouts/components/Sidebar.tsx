@@ -284,6 +284,9 @@ export const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: Sidebar
                     icon={LayoutDashboard}
                     label="Dashboard"
                   />
+                  {(activeRole === "owner" || activeRole === "editor") && (
+                    <NavLink to={toWorkspace("/analytics")} icon={BarChart3} label="Analytics" />
+                  )}
                 </div>
               </div>
               <div className={sectionGapClass}>

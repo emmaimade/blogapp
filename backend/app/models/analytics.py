@@ -43,3 +43,20 @@ class BlogVisitorDaily(SQLModel, table=True):
     blog_id: int = Field(foreign_key="blog.id", index=True, ondelete="CASCADE")
     day: date = Field(sa_column=Column(Date, nullable=False))
     visitors: int = Field(default=0)
+
+
+class BlogSourceDaily(SQLModel, table=True):
+    """
+    Visits per blog per day by where they came from ("Google", "WhatsApp",
+    "Direct", a site's domain): counted once per visit, with its first view.
+    """
+    __tablename__ = "blog_source_daily"
+    __table_args__ = (
+        UniqueConstraint("blog_id", "day", "source", name="uq_blog_source_daily_blog_day_source"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    blog_id: int = Field(foreign_key="blog.id", index=True, ondelete="CASCADE")
+    day: date = Field(sa_column=Column(Date, nullable=False))
+    source: str = Field(max_length=100)
+    visits: int = Field(default=0)

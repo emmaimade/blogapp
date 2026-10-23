@@ -4,6 +4,9 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 
 export type StatsRange = '7d' | '30d' | '90d' | '12m';
 
+// Mirrors stats_history_days in backend/app/core/plans.py.
+export const FREE_HISTORY_DAYS = 30;
+
 export const STATS_RANGES: { key: StatsRange; label: string; days: number }[] = [
   { key: '7d', label: '7 days', days: 7 },
   { key: '30d', label: '30 days', days: 30 },
