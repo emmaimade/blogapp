@@ -60,3 +60,14 @@ class BlogSourceDaily(SQLModel, table=True):
     day: date = Field(sa_column=Column(Date, nullable=False))
     source: str = Field(max_length=100)
     visits: int = Field(default=0)
+
+
+class FollowerEmailDaily(SQLModel, table=True):
+    """
+    New-post emails sent per UTC day, platform-wide — what the daily limit
+    (FOLLOWER_EMAILS_DAILY_LIMIT) is checked against.
+    """
+    __tablename__ = "follower_email_daily"
+
+    day: date = Field(sa_column=Column(Date, primary_key=True))
+    sent: int = Field(default=0)

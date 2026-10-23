@@ -17,6 +17,8 @@ export interface PostForm {
   content: string;
   thumbnail_url: string;
   is_featured: boolean;
+  /** Email it to the blog's followers when it first goes live. */
+  notify_followers: boolean;
   status: PostStatus;
   published_at: string | null;
   tag_ids: number[];
@@ -42,6 +44,7 @@ export const usePostEditor = () => {
       title: '',
       content: '',
       is_featured: false,
+      notify_followers: true,
       status: 'draft',
       published_at: null,
       tag_ids: [],
@@ -55,6 +58,7 @@ export const usePostEditor = () => {
   const currentStatus = watch('status');
   const currentPubAt = watch('published_at');
   const isFeatured = watch('is_featured', false);
+  const notifyFollowers = watch('notify_followers', true);
 
   const { data: allTags = [] } = useQuery({
     queryKey: ['tags', activeBlog?.id],
@@ -168,6 +172,7 @@ export const usePostEditor = () => {
     if (existingPost) {
       reset({
         ...existingPost,
+        notify_followers: existingPost.notify_followers ?? true,
         status: existingPost.status ?? (existingPost.published ? 'published' : 'draft'),
         published_at: existingPost.published_at ?? null,
         tag_ids: existingPost.tags?.map((t: any) => t.id) ?? [],
@@ -231,5 +236,10 @@ export const usePostEditor = () => {
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
     isDirty, errors, scheduledPosts, savedTitle: existingPost?.title as string | undefined,
     editedAt: existingPost?.edited_at as string | null | undefined,
+    notifyFollowers,
+    // Followers are emailed the first time a post goes live, so the choice
+    // only matters until then (a past published_at means it already has).
+    hasGoneLive: !!existingPost?.published_at && new Date(existingPost.published_at) <= new Date()
+      && existingPost.status !== 'scheduled',
   };
 };

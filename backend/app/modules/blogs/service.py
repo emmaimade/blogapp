@@ -28,6 +28,7 @@ from app.core.exceptions import (
 from app.core.permissions import MEMBER_PERMISSIONS, Permissions
 from app.core.plans import ensure_can_use_custom_domain, ensure_member_capacity, get_effective_plan
 from app.core.security import ensure_strong_password, get_password_hash
+from app.core.text import plain_excerpt
 from app.modules.auth.service import build_login_response
 from app.modules.posts.service import upload_welcome_banner
 from app.modules.settings.router import blog_general_defaults, get_settings
@@ -451,16 +452,8 @@ _META_DESCRIPTION_LENGTH = 160
 
 
 def _plain_excerpt(markdown: str, length: int = _META_DESCRIPTION_LENGTH) -> str:
-    """Markdown → plain one-line text for a meta description (mirrors the blog's getPlainExcerpt)."""
-    text = re.sub(r"```[\s\S]*?```", "", markdown or "")
-    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
-    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"(\*\*|__|\*|_|`|~~)", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    if len(text) <= length:
-        return text
-    return text[:length].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+    """Markdown → plain one-line text for a meta description."""
+    return plain_excerpt(markdown, length)
 
 
 def get_page_meta(host: str, path: str, session: Session) -> PageMeta:

@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import SimpleMDE from 'react-simplemde-editor';
-import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Star } from 'lucide-react';
+import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Star, Mail } from 'lucide-react';
 
 import { usePostEditor } from '../hooks/usePostEditor';
 import { TagSelector } from '../components/TagSelector';
@@ -30,7 +30,7 @@ export const PostEditor: React.FC = () => {
     currentPubAt, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
-    isDirty, errors, scheduledPosts, savedTitle, editedAt
+    isDirty, errors, scheduledPosts, savedTitle, editedAt, notifyFollowers, hasGoneLive
   } = usePostEditor();
 
   // Saved title rather than the live input, so the tab doesn't churn while typing.
@@ -120,6 +120,30 @@ export const PostEditor: React.FC = () => {
               </span>
             )}
           </div>
+
+          {/* Email to followers: only before the post first goes live */}
+          {!hasGoneLive && (
+            <div className="flex flex-wrap items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 w-fit">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-2">Followers</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifyFollowers}
+                onClick={() => setValue("notify_followers", !notifyFollowers, { shouldDirty: true })}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  notifyFollowers
+                    ? "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300"
+                    : "bg-zinc-200/70 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                }`}
+              >
+                <Mail size={14} />
+                {notifyFollowers ? "Email to followers" : "Don't email followers"}
+              </button>
+              <span className="text-xs text-zinc-400 px-1">
+                {notifyFollowers ? "Sent when it goes live." : "Followers won't get this one."}
+              </span>
+            </div>
+          )}
 
           {/* Featured Image Block */}
           <div className="group flex flex-col items-start gap-4 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900/40 sm:flex-row sm:items-center">

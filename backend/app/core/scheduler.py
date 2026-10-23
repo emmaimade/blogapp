@@ -37,6 +37,10 @@ def publish_due_posts(session: Session) -> int:
     can't publish — and notify about — the same post twice. SQLite ignores
     the lock.
     """
+    # Imported here: the modules package loads every router, including the
+    # cron router that imports this module.
+    from app.modules.followers.emails import queue_new_post
+
     now = datetime.now(timezone.utc)
 
     due_posts = session.exec(
@@ -56,6 +60,7 @@ def publish_due_posts(session: Session) -> int:
     for post in due_posts:
         post.status    = PostStatus.PUBLISHED
         post.published = True
+        queue_new_post(post)
         session.add(post)
 
         add_audit_log(

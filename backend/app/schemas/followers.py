@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.follower import FollowerStatus
+from app.models.post import FollowerEmailStatus
 from app.schemas.datetime_mixin import UTCDatetimeMixin
 
 
@@ -58,3 +59,15 @@ class FollowerSummary(BaseModel):
 
 class FollowersSettingsUpdate(BaseModel):
     followers_enabled: bool
+
+
+class PostFollowerEmailRead(UTCDatetimeMixin, BaseModel):
+    """How emailing one post to the blog's followers is going, for its team."""
+    status: FollowerEmailStatus
+    notify_followers: bool
+    queued_at: Optional[datetime] = None
+    sent: int
+    # Followers it's going to: active, and following since before it went live.
+    recipients: int
+    # False while FOLLOWER_EMAILS_ENABLED is off: queued, waiting.
+    sending_enabled: bool

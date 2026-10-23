@@ -1,10 +1,10 @@
-from .analytics import BlogSourceDaily, BlogVisitorDaily, PostViewDaily
+from .analytics import BlogSourceDaily, BlogVisitorDaily, FollowerEmailDaily, PostViewDaily
 from .comment import Comment
 from .follower import BlogFollower, FollowerStatus
 from .comment_ban import BlogCommentBan
 from .audit import AuditLog
 from .moderation import ModerationAction, ModerationItem, ModerationReport
-from .post import Post, PostTagLink, ProjectMetadata, Tag
+from .post import FollowerEmailStatus, Post, PostTagLink, ProjectMetadata, Tag
 from .settings import SiteSettings, PlatformSettings
 from .user import User, PlatformRole
 from .auth_tokens import EmailVerification, PasswordResetToken, RefreshToken, LoginAttempt
@@ -33,6 +33,8 @@ from .blog import (
 __all__ = [
     "BlogSourceDaily",
     "BlogVisitorDaily",
+    "FollowerEmailDaily",
+    "FollowerEmailStatus",
     "PostViewDaily",
     "BlogFollower",
     "FollowerStatus",

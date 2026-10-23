@@ -6,6 +6,7 @@ from .followers import (
     FollowerSummary,
     FollowResult,
     FollowTokenPayload,
+    PostFollowerEmailRead,
 )
 from .analytics import (
     AnalyticsDay,
@@ -105,6 +106,7 @@ from .blog import (
 __all__ = [
     "FollowAccepted",
     "FollowerRead",
+    "PostFollowerEmailRead",
     "FollowersSettingsUpdate",
     "FollowerSummary",
     "FollowCreate",
