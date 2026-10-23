@@ -14,6 +14,7 @@ import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { formatLocalDate, formatScheduled } from '../../../shared/utils/dates';
 import { type Post } from '../../../shared/types';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { FollowerEmailStatus } from '../components/FollowerEmailStatus';
 
 // The single-post endpoint also returns how many live comments it has.
 type PostWithCommentCount = Post & { comment_count?: number };
@@ -217,6 +218,11 @@ export const PostView = () => {
               <Eye size={14} />
               <span>{post.views.toLocaleString()} view{post.views !== 1 ? 's' : ''}</span>
             </div>
+          )}
+
+          {/* New-post email to followers */}
+          {postStatus === 'published' && activeBlog && (
+            <FollowerEmailStatus blogId={activeBlog.id} postId={post.id} />
           )}
 
           {/* Comments — opens the Comments page filtered to this post */}

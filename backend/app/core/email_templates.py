@@ -477,3 +477,47 @@ def get_follow_confirmation_template_text(blog_name: str, confirm_url: str) -> s
         f"{confirm_url}\n\n"
         "This link expires in 7 days. If you didn't ask to follow this blog, ignore this email and nothing will happen.\n"
     )
+
+
+def get_new_post_template(
+    blog_name: str,
+    post_title: str,
+    excerpt: str,
+    post_url: str,
+    unsubscribe_url: str,
+    thumbnail_url: str | None = None,
+) -> str:
+    # Everything here was written by the blog's team and goes to its readers,
+    # so all of it is escaped.
+    name, title, summary = html.escape(blog_name), html.escape(post_title), html.escape(excerpt)
+    image = (
+        f'<img src="{html.escape(thumbnail_url, quote=True)}" alt="" width="476" '
+        'style="display:block; width:100%; max-width:476px; height:auto; border-radius:6px; margin:0 0 20px 0;" />'
+        if thumbnail_url else ""
+    )
+    body = f"""{image}<p style="margin:0 0 8px 0; font-size:12px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#7c3aed;">
+        New from {name}
+    </p>
+    <p style="margin:0 0 24px 0; color:#4b5563;">{summary}</p>"""
+    return _base_email(
+        preheader=summary[:140],
+        heading=title,
+        body_html=body,
+        cta_label="Read the post",
+        cta_url=html.escape(post_url, quote=True),
+        cta_color="#7c3aed",
+        footer_note=(
+            f'You\'re getting this because you follow {name}. '
+            f'<a href="{html.escape(unsubscribe_url, quote=True)}" style="color:#6b7280;">Unsubscribe</a>'
+        ),
+    )
+
+
+def get_new_post_template_text(blog_name: str, post_title: str, excerpt: str, post_url: str, unsubscribe_url: str) -> str:
+    return (
+        f"New from {blog_name}\n\n"
+        f"{post_title}\n\n"
+        f"{excerpt}\n\n"
+        f"Read the post: {post_url}\n\n"
+        f"You're getting this because you follow {blog_name}. Unsubscribe: {unsubscribe_url}\n"
+    )

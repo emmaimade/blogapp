@@ -24,6 +24,7 @@ from app.core.exceptions import AuthenticationError, NotFoundError
 from app.core.scheduler import publish_due_posts
 from app.core.tasks import purge_expired_soft_deleted_users
 from app.modules.billing.trial_notices import run_trial_notices
+from app.modules.followers.emails import run_follower_emails
 
 router = APIRouter(prefix="/internal/cron", tags=["cron"], include_in_schema=False)
 
@@ -57,3 +58,13 @@ def publish_scheduled(
 ) -> dict[str, int]:
     _require_cron_secret(authorization)
     return {"published": publish_due_posts(session)}
+
+
+@router.get("/follower-emails")
+def follower_emails(
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_session),
+) -> dict:
+    """New-post emails to followers, in batches. Pinged every minute from outside, like publish-scheduled."""
+    _require_cron_secret(authorization)
+    return asdict(run_follower_emails(session))

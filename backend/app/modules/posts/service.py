@@ -25,6 +25,7 @@ from app.core.exceptions import (
 )
 from app.core.logging_config import get_logger
 from app.core.plans import ensure_can_publish, ensure_can_schedule
+from app.modules.followers.emails import queue_new_post
 from app.models import Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
 from app.schemas import PostCreate, PostUpdate
@@ -238,6 +239,7 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
     new_post.status       = resolved_status
     new_post.published    = resolved_published
     new_post.published_at = resolved_published_at
+    queue_new_post(new_post)
 
     source_for_slug = post_data.slug if post_data.slug else post_data.title
     new_post.slug   = Post.generate_unique_slug(source_for_slug, blog_id, session)
@@ -536,6 +538,7 @@ def update_post(
         db_post.status       = resolved_status
         db_post.published    = resolved_published
         db_post.published_at = resolved_published_at
+    queue_new_post(db_post)
 
     if new_tags is not None:
         db_post.tags = new_tags

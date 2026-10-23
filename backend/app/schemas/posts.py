@@ -32,6 +32,8 @@ class PostCreate(UTCDatetimeMixin, BaseModel):
     status: PostStatus = PostStatus.DRAFT         
     published_at: Optional[datetime] = None       
     tag_ids: List[int] = Field(default_factory=list)
+    # Email it to the blog's followers when it first goes live.
+    notify_followers: bool = True
 
 
 class PostUpdate(UTCDatetimeMixin, BaseModel):
@@ -45,6 +47,7 @@ class PostUpdate(UTCDatetimeMixin, BaseModel):
     status: Optional[PostStatus] = None          
     published_at: Optional[datetime] = None      
     tag_ids: Optional[List[int]] = None
+    notify_followers: Optional[bool] = None
 
 
 class PostRead(UTCDatetimeMixin, BaseModel):
@@ -64,6 +67,9 @@ class PostRead(UTCDatetimeMixin, BaseModel):
     status: PostStatus
     published_at: Optional[datetime] = None
     edited_at: Optional[datetime] = None
+    # How it went is team-only (GET .../posts/{id}/follower-email): it
+    # reveals the audience's size, and this model is public.
+    notify_followers: bool = True
     created_at: datetime
     updated_at: datetime
     tags: List[TagRead] = Field(default_factory=list)

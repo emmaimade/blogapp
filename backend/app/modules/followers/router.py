@@ -3,11 +3,21 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from sqlmodel import Session
 
+from app.core.config import settings
 from app.core.datetimes import utc_now
 from app.core.db import get_session
-from app.core.permissions import get_current_blog, get_public_blog, require_blog_editor, require_blog_owner
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import NotFoundError
+from app.core.permissions import (
+    Permissions,
+    get_current_blog,
+    get_public_blog,
+    require_blog_author,
+    require_blog_editor,
+    require_blog_owner,
+)
 from app.core.security import get_current_user
-from app.models import Blog, FollowerStatus, User
+from app.models import Blog, FollowerStatus, Post, User
 from app.schemas import (
     FollowAccepted,
     FollowCreate,
@@ -17,7 +27,9 @@ from app.schemas import (
     FollowResult,
     FollowTokenPayload,
     PaginatedResponse,
+    PostFollowerEmailRead,
 )
+from . import emails as follower_emails
 from . import service as follower_service
 
 router = APIRouter(tags=["followers"])
@@ -40,6 +52,17 @@ def follow_blog(
 def confirm_follow(payload: FollowTokenPayload, session: Session = Depends(get_session)):
     """From the marketing site's /follow/confirm page, with the emailed token."""
     return FollowResult(blog_name=follower_service.confirm(payload.token, session))
+
+
+@router.post("/followers/unsubscribe/one-click")
+def unsubscribe_one_click(token: str = Query(..., max_length=200), session: Session = Depends(get_session)):
+    """
+    RFC 8058 one-click unsubscribe: the mail provider (Gmail, Yahoo) POSTs
+    here from the List-Unsubscribe-Post header, without the reader leaving
+    their inbox.
+    """
+    follower_service.unsubscribe(token, session)
+    return {"ok": True}
 
 
 @router.post("/followers/unsubscribe", response_model=FollowResult)
@@ -122,3 +145,25 @@ def update_followers_settings(
     """The blog's follow form on/off switch. Owner only."""
     enabled = follower_service.set_followers_enabled(blog, payload.followers_enabled, current_user, request, session)
     return FollowersSettingsUpdate(followers_enabled=enabled)
+
+
+@router.get("/blogs/{blog_id}/posts/{post_id}/follower-email", response_model=PostFollowerEmailRead)
+def get_post_follower_email(
+    blog_id: int,
+    post_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+):
+    """How emailing a post to the blog's followers is going. Team only: it reveals the audience's size."""
+    post = session.get(Post, post_id)
+    if not post or post.blog_id != blog_id or not Permissions.can_edit_post(current_user, post, session):
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
+    return PostFollowerEmailRead(
+        status=post.follower_email_status,
+        notify_followers=post.notify_followers,
+        queued_at=post.follower_email_queued_at,
+        sent=post.follower_emails_sent,
+        recipients=follower_emails.recipients_for(session, post),
+        sending_enabled=settings.FOLLOWER_EMAILS_ENABLED,
+    )

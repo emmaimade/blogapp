@@ -87,6 +87,9 @@ Use `sk_test_` keys outside production.
 | `PUBLIC_SITE_URL` | `http://localhost:5175` | Marketing site, used in email links |
 | `ADMIN_STUDIO_URL` | `http://localhost:5173` | Studio, used in email links |
 | `PUBLIC_LOGO_URL` | Inko logo | Logo shown in emails |
+| `PUBLIC_API_URL` | — | The API's public URL, for one-click unsubscribe in new-post emails (`List-Unsubscribe-Post`). Unset: emails still carry an unsubscribe link |
+| `FOLLOWER_EMAILS_ENABLED` | `false` | Send new posts to followers. Off until blog addresses resolve (a domain with wildcard subdomains): posts queue but nothing goes out, and anything queued over 3 days before it's switched on is skipped |
+| `FOLLOWER_EMAILS_DAILY_LIMIT` | `400` | New-post emails sent per UTC day, platform-wide; the rest wait for the next day. Keep it under your provider's cap alongside other mail (Gmail: about 500 recipients a day) |
 
 ### Jobs and observability
 
@@ -183,6 +186,10 @@ Members over a plan's seat limit are paused rather than removed.
   `Authorization: Bearer <CRON_SECRET>`. Vercel Cron's Hobby plan only runs daily, too
   rarely for scheduled posts. Safe to run alongside the in-process scheduler: a post is
   only ever published once.
+- **External pinger, new-post emails**: calls `GET /internal/cron/follower-emails` every
+  minute with the same header. Each run sends for about 8 seconds over one SMTP
+  connection and saves its place, so a long follower list carries on across runs; it does
+  nothing while `FOLLOWER_EMAILS_ENABLED` is off.
 
 ## Database Migrations
 

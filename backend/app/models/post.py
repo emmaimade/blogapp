@@ -16,6 +16,15 @@ class PostStatus(str, Enum):
     PUBLISHED = "published"
 
 
+class FollowerEmailStatus(str, Enum):
+    """Where a post is in being emailed to the blog's followers."""
+    NONE    = "none"     # not live yet: nothing to send
+    PENDING = "pending"  # went live; waiting for the cron job
+    SENDING = "sending"  # part-way through the follower list
+    SENT    = "sent"
+    SKIPPED = "skipped"  # opted out, a sample post, live before this existed, or waited too long
+
+
 class PostTagLink(SQLModel, table=True):
     post_id: Optional[int] = Field(default=None, foreign_key="post.id", primary_key=True)
     tag_id:  Optional[int] = Field(default=None, foreign_key="tag.id",  primary_key=True)
@@ -66,6 +75,19 @@ class Post(SQLModel, table=True):
     )
 
     blog_id: int = Field(foreign_key="blog.id", ondelete="CASCADE")
+
+    # Emailing the post to the blog's followers when it first goes live
+    # (modules/followers/emails.py). Queued once; edits never re-send.
+    notify_followers:        bool                = Field(default=True, nullable=False)
+    follower_email_status:   FollowerEmailStatus = Field(default=FollowerEmailStatus.NONE, nullable=False)
+    follower_email_queued_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(SQLDateTime(timezone=True)),
+        description="When the post went live and was queued; followers confirmed after it don't get it.",
+    )
+    # The last follower id emailed, so a send resumes across cron runs.
+    follower_email_cursor:   Optional[int]       = Field(default=None)
+    follower_emails_sent:    int                 = Field(default=0, nullable=False)
 
     blog:             "Blog"                = Relationship(back_populates="posts")
     author:           Optional["User"]      = Relationship(back_populates="posts")

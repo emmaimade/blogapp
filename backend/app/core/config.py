@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str = Field("no-reply@example.com", validation_alias="EMAIL_FROM")
     EMAILS_FROM_NAME: str = "Inko"
 
+    # ── New-post emails to followers ──
+    # Off until blog addresses resolve (a domain with wildcard subdomains):
+    # posts still queue, nothing is sent, and anything queued over three days
+    # before it's switched on is skipped rather than sent late.
+    FOLLOWER_EMAILS_ENABLED: bool = False
+    # Shared with every other email the API sends from the same account, so
+    # it sits under the provider's cap (Gmail: about 500 recipients a day).
+    FOLLOWER_EMAILS_DAILY_LIMIT: int = 400
+    # The API's own public URL, for one-click unsubscribe (List-Unsubscribe-Post).
+    PUBLIC_API_URL: Optional[str] = None
+
     # Recipient for the marketing site's contact form. Falls back to
     # EMAILS_FROM_EMAIL when unset, so this isn't required to get a working setup.
     CONTACT_NOTIFICATION_EMAIL: Optional[str] = None
