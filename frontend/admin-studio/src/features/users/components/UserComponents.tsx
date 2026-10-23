@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Check, ChevronDown, MoreHorizontal, Trash2, User, Crown } from "lucide-react";
+import { Check, ChevronDown, Download, MoreHorizontal, Trash2, User, Crown } from "lucide-react";
 import type { BlogRole, BlogMember } from "../hooks/useUserManager";
 import { Spinner } from "../../../shared/ui/Spinner";
 
@@ -109,6 +109,9 @@ interface MemberActionsMenuProps {
   onRemoveClick: () => void;
   /** Shown only to the owner, on other members' rows. */
   onMakeOwnerClick?: () => void;
+  /** Shown only to the owner, on editors' rows: the export_followers permission. */
+  canExportFollowers?: boolean;
+  onToggleExportFollowers?: () => void;
   direction?: "up" | "down";
 }
 
@@ -121,7 +124,7 @@ interface MemberActionsMenuProps {
 // against the hidden desktop row's node instead of the visible mobile one,
 // closing the menu on mousedown before the tap's click ever reached "View
 // Profile" / "Remove Member". Same fix as UserMenu in AdminLayout.tsx.
-export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMakeOwnerClick, direction = "down" }: MemberActionsMenuProps) => {
+export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMakeOwnerClick, canExportFollowers = false, onToggleExportFollowers, direction = "down" }: MemberActionsMenuProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -157,7 +160,7 @@ export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMak
       </button>
 
       {open && (
-        <div role="menu" className={`absolute right-0 z-50 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium ${positionClasses}`}>
+        <div role="menu" className={`absolute right-0 z-50 w-52 rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden py-1 text-sm font-medium ${positionClasses}`}>
           <Link
             to={profileHref}
             role="menuitem"
@@ -176,6 +179,21 @@ export const MemberActionsMenu = ({ profileHref, canRemove, onRemoveClick, onMak
               className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left"
             >
               <Crown size={14} /> Make owner
+            </button>
+          )}
+          {onToggleExportFollowers && (
+            <button
+              role="menuitemcheckbox"
+              aria-checked={canExportFollowers}
+              onClick={() => {
+                setOpen(false);
+                onToggleExportFollowers();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left"
+            >
+              <Download size={14} />
+              <span className="flex-1">Can export followers</span>
+              {canExportFollowers && <Check size={14} className="text-violet-600 dark:text-violet-400" />}
             </button>
           )}
           {canRemove && (
@@ -203,12 +221,14 @@ interface MemberActionSheetProps {
   onRoleSelect: (role: BlogRole) => void;
   onMakeOwnerClick: () => void;
   onRemoveClick: () => void;
+  /** Editors only: toggles the export_followers permission. */
+  onToggleExportFollowers?: () => void;
 }
 
 // Mobile counterpart to RoleDropdown + MemberActionsMenu: one bottom sheet
 // with thumb-sized rows, so nothing has to be positioned against a narrow
 // screen edge. Only opened for members the owner can actually manage.
-export const MemberActionSheet = ({ member, profileHref, onClose, onRoleSelect, onMakeOwnerClick, onRemoveClick }: MemberActionSheetProps) => {
+export const MemberActionSheet = ({ member, profileHref, onClose, onRoleSelect, onMakeOwnerClick, onRemoveClick, onToggleExportFollowers }: MemberActionSheetProps) => {
   useEffect(() => {
     if (!member) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -274,6 +294,18 @@ export const MemberActionSheet = ({ member, profileHref, onClose, onRoleSelect, 
           <button onClick={onMakeOwnerClick} className={`${rowClass} text-zinc-800 dark:text-zinc-200`}>
             <Crown size={18} className="text-zinc-400" /> Make owner
           </button>
+          {onToggleExportFollowers && member.role === "editor" && (
+            <button
+              role="menuitemcheckbox"
+              aria-checked={!!member.permissions?.export_followers}
+              onClick={onToggleExportFollowers}
+              className={`${rowClass} text-zinc-800 dark:text-zinc-200`}
+            >
+              <Download size={18} className="text-zinc-400" />
+              <span className="flex-1">Can export followers</span>
+              {member.permissions?.export_followers && <Check size={18} className="text-violet-600 dark:text-violet-400" />}
+            </button>
+          )}
           <button onClick={onRemoveClick} className={`${rowClass} text-red-600 dark:text-red-400`}>
             <Trash2 size={18} /> Remove from workspace
           </button>

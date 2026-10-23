@@ -1,5 +1,5 @@
-from typing import List, Optional
-from sqlalchemy import Column, DateTime as SQLDateTime
+from typing import Dict, List, Optional
+from sqlalchemy import JSON, Column, DateTime as SQLDateTime
 from sqlmodel import Session, select, Field, SQLModel, Relationship
 from datetime import datetime, timezone
 from enum import Enum
@@ -61,6 +61,12 @@ class BlogMember(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id", ondelete="CASCADE")
     blog_id: int = Field(foreign_key="blog.id", ondelete="CASCADE")
     role: BlogRole = Field(default=BlogRole.AUTHOR)
+    # Extra abilities the owner has granted on top of the role, keyed by
+    # MEMBER_PERMISSIONS (app.core.permissions), e.g. {"export_followers": true}.
+    permissions: Dict[str, bool] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False, server_default="{}"),
+    )
     invited_at: datetime = Field(
         default_factory=utcnow,
         sa_column=Column(SQLDateTime(timezone=True), nullable=False),
@@ -97,6 +103,8 @@ class Blog(SQLModel, table=True):
     favicon_url: Optional[str] = None
     default_post_visibility: PostVisibility = Field(default=PostVisibility.PUBLIC)
     comments_enabled: bool = Field(default=True)
+    # The blog's follow-by-email form; off stops new followers, keeps existing ones.
+    followers_enabled: bool = Field(default=True)
     posts_per_page: int = Field(default=10)
     timezone: str = Field(default="UTC")
 

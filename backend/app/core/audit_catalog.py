@@ -62,7 +62,10 @@ ACTIONS: dict[str, ActionInfo] = {
     # ── Workspace team ───────────────────────────────────────────────────
     "blog.member_add": ActionInfo("Added a member", "team", "info"),
     "blog.member_remove": ActionInfo("Removed a member", "team", "warning"),
-    "blog.member_permissions_update": ActionInfo("Changed a member's role", "team", "warning"),
+    "blog.member_permissions_update": ActionInfo("Changed a member's role or permissions", "team", "warning"),
+    "blog.followers_toggle": ActionInfo("Turned the follow form on or off", "settings", "info"),
+    "follower.remove": ActionInfo("Removed a follower", "users", "warning"),
+    "follower.export": ActionInfo("Exported the follower list", "users", "warning"),
     "blog.member_leave": ActionInfo("Left a workspace", "team", "info"),
     "blog.ownership_transfer": ActionInfo("Transferred workspace ownership", "team", "warning"),
     # ── Content ──────────────────────────────────────────────────────────

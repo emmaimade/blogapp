@@ -1,6 +1,6 @@
 from fastapi import Query
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional
 from pydantic import BaseModel, EmailStr
 
 from app.schemas.datetime_mixin import UTCDatetimeMixin
@@ -30,6 +30,7 @@ class MembershipBlogRead(UTCDatetimeMixin, BaseModel):
     onboarding_step: OnboardingStep
     onboarding_completed_at: Optional[datetime] = None
     comments_enabled: bool = True
+    followers_enabled: bool = True
     default_post_visibility: PostVisibility = PostVisibility.PUBLIC
 
     model_config = {"from_attributes": True}
@@ -58,6 +59,8 @@ class UserBlogMembershipRead(UTCDatetimeMixin, BaseModel):
     # The workspace's effective plan — filled in only on memberships the user
     # owns (see build_user_payload); billing isn't an editor's or author's business.
     plan: Optional[SubscriptionPlan] = None
+    # Extra abilities granted on top of the role (see MEMBER_PERMISSIONS).
+    permissions: Dict[str, bool] = {}
     # This user is over the workspace's seat limit, so it's read-only for them.
     access_paused: bool = False
 

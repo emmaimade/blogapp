@@ -107,6 +107,7 @@ class ErrorCode(str, Enum):
     WORKSPACE_FULL = "WORKSPACE_FULL"
     WORKSPACE_LIMIT_REACHED = "WORKSPACE_LIMIT_REACHED"
     FOLLOWERS_LIMIT_REACHED = "FOLLOWERS_LIMIT_REACHED"
+    FOLLOWING_DISABLED = "FOLLOWING_DISABLED"
     WORKSPACE_DEACTIVATED = "WORKSPACE_DEACTIVATED"
     MEMBER_ACCESS_PAUSED = "MEMBER_ACCESS_PAUSED"
     PAYMENT_METHOD_REQUIRED = "PAYMENT_METHOD_REQUIRED"
@@ -404,6 +405,10 @@ ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.FOLLOWERS_LIMIT_REACHED: ErrorSpec(
         status.HTTP_403_FORBIDDEN,
         "This blog isn't taking new followers right now. Please try again later.",
+    ),
+    ErrorCode.FOLLOWING_DISABLED: ErrorSpec(
+        status.HTTP_403_FORBIDDEN,
+        "This blog isn't taking new followers.",
     ),
 
     # ── Throttling ────────────────────────────────────────────────────────────

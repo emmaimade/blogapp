@@ -23,8 +23,9 @@ from app.core.exceptions import (
     GoneError,
     NotFoundError,
     RateLimitError,
+    ValidationError,
 )
-from app.core.permissions import Permissions
+from app.core.permissions import MEMBER_PERMISSIONS, Permissions
 from app.core.plans import ensure_can_use_custom_domain, ensure_member_capacity, get_effective_plan
 from app.core.security import ensure_strong_password, get_password_hash
 from app.modules.auth.service import build_login_response
@@ -1113,19 +1114,34 @@ def update_blog_member_permissions(
             "Ownership can't be changed with a role. Use \"Make owner\" on the Team page instead.",
         )
 
+    new_role = update_data.get("role") or membership.role
+    current_permissions = dict(membership.permissions or {})
+    new_permissions = current_permissions
+    if update_data.get("permissions") is not None:
+        unknown = sorted(set(update_data["permissions"]) - set(MEMBER_PERMISSIONS))
+        if unknown:
+            raise ValidationError(errors={"permissions": f"Unknown permission: {', '.join(unknown)}."})
+        new_permissions = {key: bool(value) for key, value in update_data["permissions"].items()}
+        if new_role != BlogRole.EDITOR and any(new_permissions.values()):
+            raise BadRequestError(
+                ErrorCode.OPERATION_NOT_ALLOWED,
+                "Only editors can be given extra permissions.",
+            )
+    # Extra permissions belong to the editor role: moving off it drops them.
+    if new_role != BlogRole.EDITOR:
+        new_permissions = {}
+
     # Capture BEFORE values so the audit log can say what actually changed
     # (e.g. role: editor -> owner) instead of just which fields were touched.
     changes = {}
     if "role" in update_data and update_data["role"] != membership.role:
         changes["role"] = {"from": membership.role, "to": update_data["role"]}
-    if "permissions" in update_data:
-        changes["permissions"] = {"from": membership.permissions, "to": update_data["permissions"]}
+    if new_permissions != current_permissions:
+        changes["permissions"] = {"from": current_permissions, "to": new_permissions}
 
-    for key, value in update_data.items():
-        if key == "permissions" and value is not None:
-            membership.permissions = json.dumps(value)
-        else:
-            setattr(membership, key, value)
+    if "role" in update_data and update_data["role"] is not None:
+        membership.role = update_data["role"]
+    membership.permissions = new_permissions
 
     session.add(membership)
     add_audit_log(

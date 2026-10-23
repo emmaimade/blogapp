@@ -14,10 +14,31 @@ from app.core.exceptions import AuthorizationError, NotFoundError
 from app.core.plans import is_member_paused
 from app.core.security import extract_bearer_token, get_current_user, get_current_user_optional
 
+# Extra abilities an owner can grant a member on top of their role, stored in
+# BlogMember.permissions. Only editors can hold them; owners can do all of
+# these anyway, and authors don't see the parts of the studio they unlock.
+MEMBER_PERMISSIONS: dict[str, str] = {
+    "export_followers": "Export the follower list",
+}
+
 class Permissions:
     @staticmethod
     def is_super_admin(user: User) -> bool:
         return user.is_super_admin or user.platform_role == PlatformRole.SUPER_ADMIN
+
+    @staticmethod
+    def has_member_permission(user: User, blog_id: int, key: str, session: Session) -> bool:
+        """Whether the user is the owner (or a superadmin), or an editor granted `key`."""
+        if Permissions.is_super_admin(user):
+            return True
+        membership = session.exec(
+            select(BlogMember).where(BlogMember.user_id == user.id, BlogMember.blog_id == blog_id)
+        ).first()
+        if not membership:
+            return False
+        if membership.role == BlogRole.OWNER:
+            return True
+        return membership.role == BlogRole.EDITOR and bool((membership.permissions or {}).get(key))
     
     @staticmethod
     def can_access_blog(user: User, blog_id: int, session: Session) -> bool:

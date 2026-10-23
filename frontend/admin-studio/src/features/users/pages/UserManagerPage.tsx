@@ -55,8 +55,14 @@ export const UserManager = () => {
     currentUser, activeBlog, queryClient, searchTerm, setSearchTerm,
     showInviteModal, setShowInviteModal,
     filteredMembers, pausedCount, pendingInvitations, revokeInvitationMutation,
-    isOwner, isLoading, updateRoleMutation, removeMutation, transferOwnershipMutation
+    isOwner, isLoading, updateRoleMutation, updatePermissionsMutation, removeMutation, transferOwnershipMutation
   } = useUserManager();
+
+  const toggleExportFollowers = (member: BlogMember) =>
+    updatePermissionsMutation.mutate({
+      memberId: member.id,
+      permissions: { ...member.permissions, export_followers: !member.permissions?.export_followers },
+    });
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -292,8 +298,9 @@ export const UserManager = () => {
                       const isCurrentUser = member.user_id === currentUser?.id;
                       const canRemove = isOwner && !isCurrentUser && member.role !== "owner";
 
-                      // Determine placement alignment dynamically
-                      const isFirstRow = index === 0;
+                      // Menus in the top half of the table open downward and the rest
+                      // upward, so a tall menu isn't clipped by the table's edge.
+                      const isFirstRow = index < Math.ceil((filteredMembers?.length ?? 0) / 2);
 
                       return (
                         <tr key={member.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
@@ -341,6 +348,8 @@ export const UserManager = () => {
                                 profileHref={toWorkspace(`/users/${member.user.id}`)}
                                 canRemove={canRemove}
                                 onMakeOwnerClick={canRemove ? () => askToMakeOwner(member) : undefined}
+                                canExportFollowers={!!member.permissions?.export_followers}
+                                onToggleExportFollowers={isOwner && member.role === "editor" ? () => toggleExportFollowers(member) : undefined}
                                 direction={isFirstRow ? "down" : "up"}
                                 onRemoveClick={() => askToRemove(member)}
                               />
@@ -406,6 +415,7 @@ export const UserManager = () => {
         }}
         onMakeOwnerClick={fromSheet(askToMakeOwner)}
         onRemoveClick={fromSheet(askToRemove)}
+        onToggleExportFollowers={fromSheet(toggleExportFollowers)}
       />
 
       <InviteModal

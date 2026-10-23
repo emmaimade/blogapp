@@ -42,6 +42,7 @@ class BlogRead(UTCDatetimeMixin, BaseModel):
     favicon_url: Optional[str] = None
     default_post_visibility: PostVisibility
     comments_enabled: bool
+    followers_enabled: bool = True
     posts_per_page: int
     timezone: str
     created_at: datetime
@@ -71,6 +72,8 @@ class BlogMemberRead(UTCDatetimeMixin, BaseModel):
     role: BlogRole
     invited_at: datetime
     user: UserRead
+    # Extra abilities granted on top of the role (see MEMBER_PERMISSIONS).
+    permissions: Dict[str, bool] = {}
     # Over the plan's seat limit, so read-only until the owner upgrades.
     access_paused: bool = False
 
