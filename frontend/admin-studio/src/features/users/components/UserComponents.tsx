@@ -78,12 +78,13 @@ export const RoleDropdown = ({ member, currentUserId, onRoleChange, isPending, d
       </button>
 
       {open && (
-        <div className={`absolute left-0 z-50 w-40 rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${dropdownClasses}`}>
+        <div role="menu" className={`absolute left-0 z-50 w-40 rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${dropdownClasses}`}>
           {ROLES.filter((r) => r !== "owner").map((r) => {
             const { label, color } = ROLE_META[r];
             return (
               <button
                 key={r}
+                role="menuitem"
                 onClick={() => {
                   onRoleChange(member.id, r);
                   setOpen(false);
