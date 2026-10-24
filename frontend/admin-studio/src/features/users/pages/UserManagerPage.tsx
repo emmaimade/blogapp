@@ -298,6 +298,9 @@ export const UserManager = () => {
                       const isCurrentUser = member.user_id === currentUser?.id;
                       const canRemove = isOwner && !isCurrentUser && member.role !== "owner";
 
+                      // Every cell with a menu is its own z-10 layer, so later rows would
+                      // paint over an open menu; the cell holding one (role="menu") lifts
+                      // to z-30 while it's open.
                       // Menus in the top half of the table open downward and the rest
                       // upward, so a tall menu isn't clipped by the table's edge.
                       const isFirstRow = index < Math.ceil((filteredMembers?.length ?? 0) / 2);
@@ -319,7 +322,7 @@ export const UserManager = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap relative z-10">
+                          <td className="px-6 py-4 whitespace-nowrap relative z-10 has-[[role=menu]]:z-30">
                             {/* Pass directional context down based on row indexing */}
                             {isOwner ? (
                               <RoleDropdown
@@ -342,7 +345,7 @@ export const UserManager = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500">{formatLocalDate(member.user.created_at)}</td>
 
-                          <td className="px-6 py-4 text-right whitespace-nowrap relative z-10">
+                          <td className="px-6 py-4 text-right whitespace-nowrap relative z-10 has-[[role=menu]]:z-30">
                             <div className="inline-block text-left">
                               <MemberActionsMenu
                                 profileHref={toWorkspace(`/users/${member.user.id}`)}

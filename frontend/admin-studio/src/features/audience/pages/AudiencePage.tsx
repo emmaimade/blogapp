@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Mail, Search, Trash2, UserCheck, UserMinus, Clock } from 'lucide-react';
+import { ChevronDown, Clock, Download, Mail, Search, Trash2, UserCheck, UserMinus } from 'lucide-react';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { useBlog } from '../../../app/providers/BlogProvider';
@@ -64,6 +64,9 @@ export const AudiencePage = () => {
   const { data: list, isLoading } = useFollowers(tab, query, page);
   const { remove, setEnabled, exportCsv } = useAudienceActions();
 
+  const countFor = (key: FollowerStatus | 'all') =>
+    !summary ? 0 : key === 'all' ? summary.active + summary.pending + summary.unsubscribed : summary[key];
+
   const limit = summary?.max_followers ?? null;
   const usage = summary && limit ? summary.active / limit : 0;
 
@@ -88,8 +91,44 @@ export const AudiencePage = () => {
         )}
       </div>
 
+      {/* Phones: one compact card, so the list isn't three tall cards away. */}
       {summary && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="admin-card p-4 sm:hidden">
+          <dl className="grid grid-cols-3 gap-2 text-center">
+            {([
+              ['Active', summary.active],
+              ['Pending', summary.pending],
+              ['Unsubscribed', summary.unsubscribed],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{label}</dt>
+                <dd className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">{value.toLocaleString()}</dd>
+              </div>
+            ))}
+          </dl>
+          {limit && (
+            <div className="mt-3">
+              <div className="mb-1 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                <span>{summary.active.toLocaleString()} of {limit.toLocaleString()} on your plan</span>
+                {usage >= 0.8 && (
+                  <Link to={toWorkspace('/settings/billing')} className="font-semibold text-violet-600 hover:underline dark:text-violet-400">
+                    Upgrade
+                  </Link>
+                )}
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-violet-100 dark:bg-violet-950/60">
+                <div
+                  className={`h-full rounded-full ${usage >= 1 ? 'bg-red-500' : usage >= 0.8 ? 'bg-amber-500' : 'bg-violet-600'}`}
+                  style={{ width: `${Math.min(100, usage * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {summary && (
+        <div className="hidden gap-4 sm:grid sm:grid-cols-3">
           <SummaryCard
             label="Active"
             value={summary.active}
@@ -153,7 +192,26 @@ export const AudiencePage = () => {
 
       <div className="admin-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-zinc-100 p-4 dark:border-zinc-800 md:flex-row md:items-center md:justify-between">
-          <div className="flex overflow-x-auto rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800" role="tablist" aria-label="Follower status">
+          {/* Phones: a dropdown, full width like the search box; four tabs don't fit evenly. */}
+          <div className="relative sm:hidden">
+            <select
+              value={tab}
+              onChange={(e) => {
+                setTab(e.target.value as FollowerStatus | 'all');
+                setPage(0);
+              }}
+              aria-label="Show followers"
+              className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-3 pr-9 text-sm font-semibold text-zinc-900 outline-none focus:ring-2 focus:ring-violet-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              {TABS.map(({ key, label }) => (
+                <option key={key} value={key}>
+                  {label}{summary ? ` · ${countFor(key).toLocaleString()}` : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          </div>
+          <div className="hidden rounded-xl bg-zinc-100 p-1 sm:flex dark:bg-zinc-800" role="tablist" aria-label="Follower status">
             {TABS.map(({ key, label }) => (
               <button
                 key={key}

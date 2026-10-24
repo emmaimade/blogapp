@@ -95,7 +95,7 @@ export const AnalyticsPage = () => {
               type="button"
               onClick={() => exportCsv.mutate(range)}
               disabled={exportCsv.isPending}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 sm:w-auto transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <Download size={16} /> {exportCsv.isPending ? 'Exporting…' : 'Export CSV'}
             </button>
@@ -103,7 +103,7 @@ export const AnalyticsPage = () => {
             <Link
               to={toWorkspace('/settings/billing')}
               title="Exporting analytics is available on Pro and Team"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-500 transition hover:text-violet-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-violet-400"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 px-4 py-2 sm:w-auto text-sm font-semibold text-zinc-500 transition hover:text-violet-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-violet-400"
             >
               <Lock size={14} /> Export CSV · Pro
             </Link>
@@ -181,7 +181,7 @@ export const AnalyticsPage = () => {
           <section className="admin-card min-w-0 overflow-hidden">
             <div className="flex flex-col gap-3 border-b border-zinc-100 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
               <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Posts</h2>
-              <div className="flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800" role="tablist" aria-label="Sort posts">
+              <div className="grid w-full grid-cols-3 rounded-xl bg-zinc-100 p-1 sm:flex sm:w-auto dark:bg-zinc-800" role="tablist" aria-label="Sort posts">
                 {SORTS.map(({ key, label }) => (
                   <button
                     key={key}
@@ -192,7 +192,7 @@ export const AnalyticsPage = () => {
                       setSort(key);
                       setPage(0);
                     }}
-                    className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:py-1 ${
                       sort === key
                         ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
                         : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -208,9 +208,33 @@ export const AnalyticsPage = () => {
               <p className="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">No published posts yet.</p>
             )}
 
+            {/* Phones: one card per post, the numbers under the title, rather than a table to scroll sideways. */}
             {posts && posts.items.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[480px] text-left text-sm">
+              <ul className="divide-y divide-zinc-100 sm:hidden dark:divide-zinc-800">
+                {posts.items.map((post) => (
+                  <li key={post.id} className="px-5 py-3">
+                    <Link
+                      to={toWorkspace(`/posts/view/${post.id}`)}
+                      className="line-clamp-2 text-sm font-medium text-zinc-800 hover:text-violet-600 dark:text-zinc-200 dark:hover:text-violet-400"
+                    >
+                      {post.title}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{formatLocalDate(post.published_at)}</p>
+                    <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                      <span><span className="font-semibold text-zinc-900 dark:text-white">{post.views_in_range.toLocaleString()}</span> views</span>
+                      {post.followers_gained > 0 && (
+                        <span><span className="font-semibold text-zinc-900 dark:text-white">+{post.followers_gained.toLocaleString()}</span> follower{post.followers_gained === 1 ? '' : 's'}</span>
+                      )}
+                      <span>{post.lifetime_views.toLocaleString()} all time</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {posts && posts.items.length > 0 && (
+              <div className="hidden sm:block">
+                <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-zinc-100 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                       <th scope="col" className="w-full px-5 py-2.5">Post</th>
