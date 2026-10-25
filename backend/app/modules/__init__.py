@@ -18,6 +18,7 @@ from .billing.router import router as billing_router
 from .cron.router import router as cron_router
 from .analytics.router import router as analytics_router
 from .followers.router import router as followers_router
+from .sponsors.router import router as sponsors_router
 
 __all__ = [
     "auth_router",
@@ -40,4 +41,5 @@ __all__ = [
     "cron_router",
     "analytics_router",
     "followers_router",
+    "sponsors_router",
 ]

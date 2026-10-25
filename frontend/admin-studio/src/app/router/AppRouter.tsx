@@ -23,6 +23,7 @@ import { BillingCallbackPage } from '../../features/billing/pages/BillingCallbac
 import { ActivityLogPage } from '../../features/audit-log/pages/ActivityLogPage';
 import { AudiencePage } from '../../features/audience/pages/AudiencePage';
 import { AnalyticsPage } from '../../features/analytics/pages/AnalyticsPage';
+import { SponsorsPage } from '../../features/sponsors/pages/SponsorsPage';
 import { TagManager } from '../../features/tags/pages/TagManagerPage';
 import { UserManager } from '../../features/users/pages/UserManagerPage';
 import { SuperAdminDashboardPage } from '../../features/superadmin/pages/SuperAdminDashboardPage';
@@ -140,6 +141,13 @@ const router = createBrowserRouter(
               element={<ProtectedRoute requiredCapability="view_analytics" />}
             >
               <Route path="analytics" element={<AnalyticsPage />} />
+            </Route>
+
+            {/* Owner only: sponsorships are business deals. */}
+            <Route
+              element={<ProtectedRoute requiredCapability="manage_settings" />}
+            >
+              <Route path="sponsors" element={<SponsorsPage />} />
             </Route>
 
             <Route

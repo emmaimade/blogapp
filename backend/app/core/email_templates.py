@@ -521,3 +521,40 @@ def get_new_post_template_text(blog_name: str, post_title: str, excerpt: str, po
         f"Read the post: {post_url}\n\n"
         f"You're getting this because you follow {blog_name}. Unsubscribe: {unsubscribe_url}\n"
     )
+
+
+def get_advertise_enquiry_template(
+    blog_name: str, name: str, email: str, company: str, budget: str, message: str, advertise_url: str,
+) -> str:
+    # Everything but the blog's name came from a stranger's form.
+    rows = "".join(
+        f'<tr><td style="padding:4px 12px 4px 0; color:#6b7280; vertical-align:top;">{label}</td>'
+        f'<td style="padding:4px 0; color:#111827;">{html.escape(value)}</td></tr>'
+        for label, value in (("Name", name), ("Email", email), ("Company", company), ("Budget", budget))
+        if value
+    )
+    body = f"""<p style="margin:0 0 16px 0; color:#4b5563;">
+        Someone wants to sponsor <strong>{html.escape(blog_name)}</strong>. Reply to them directly at the email below.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0; font-size:14px;">{rows}</table>
+    <p style="margin:0; padding:12px 16px; background:#f9fafb; border-radius:6px; color:#374151; white-space:pre-wrap;">{html.escape(message)}</p>"""
+    return _base_email(
+        preheader=f"Sponsorship enquiry from {html.escape(name)}",
+        heading="New sponsorship enquiry",
+        body_html=body,
+        cta_label="View your Advertise page",
+        cta_url=html.escape(advertise_url, quote=True),
+        cta_color="#7c3aed",
+        footer_note="Sent from the enquiry form on your blog's Advertise page.",
+    )
+
+
+def get_advertise_enquiry_template_text(
+    blog_name: str, name: str, email: str, company: str, budget: str, message: str,
+) -> str:
+    lines = [f"Someone wants to sponsor {blog_name}. Reply to them directly.", "", f"Name: {name}", f"Email: {email}"]
+    if company:
+        lines.append(f"Company: {company}")
+    if budget:
+        lines.append(f"Budget: {budget}")
+    return "\n".join(lines + ["", message, ""])
