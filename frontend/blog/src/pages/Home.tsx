@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Eye, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
 import { FollowForm } from '../components/FollowForm';
+import { SponsorCard } from '../components/SponsorCard';
 import { PostList, PostListSkeleton } from '../components/PostList';
 import { HeroSkeleton } from '../components/Skeletons';
 import { formatLocalDate } from '../utils/dates';
@@ -159,6 +160,8 @@ export const Home: React.FC = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-16">
+        <SponsorCard placement="home" className="mx-auto max-w-3xl" />
+
         {/* Latest posts */}
         <section>
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:flex-col lg:items-center lg:justify-start lg:text-center">

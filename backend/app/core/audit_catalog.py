@@ -67,6 +67,9 @@ ACTIONS: dict[str, ActionInfo] = {
     "follower.remove": ActionInfo("Removed a follower", "users", "warning"),
     "follower.export": ActionInfo("Exported the follower list", "users", "warning"),
     "analytics.export": ActionInfo("Exported analytics", "workspaces", "info"),
+    "sponsor.create": ActionInfo("Added a sponsor", "content", "info"),
+    "sponsor.update": ActionInfo("Changed a sponsor", "content", "info"),
+    "sponsor.delete": ActionInfo("Removed a sponsor", "content", "warning"),
     "blog.member_leave": ActionInfo("Left a workspace", "team", "info"),
     "blog.ownership_transfer": ActionInfo("Transferred workspace ownership", "team", "warning"),
     # ── Content ──────────────────────────────────────────────────────────

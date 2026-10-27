@@ -1,3 +1,15 @@
+from .sponsors import (
+    AdvertiseEnquiryCreate,
+    AdvertisePackage,
+    AdvertisePageRead,
+    AdvertiseSettings,
+    AdvertiseSource,
+    AdvertiseTopPost,
+    PublicSponsorRead,
+    SponsorCreate,
+    SponsorRead,
+    SponsorUpdate,
+)
 from .followers import (
     FollowAccepted,
     FollowCreate,
@@ -104,6 +116,16 @@ from .blog import (
 )
 
 __all__ = [
+    "AdvertiseEnquiryCreate",
+    "AdvertisePackage",
+    "AdvertisePageRead",
+    "AdvertiseSettings",
+    "AdvertiseSource",
+    "AdvertiseTopPost",
+    "PublicSponsorRead",
+    "SponsorCreate",
+    "SponsorRead",
+    "SponsorUpdate",
     "FollowAccepted",
     "FollowerRead",
     "PostFollowerEmailRead",

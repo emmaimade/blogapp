@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../api/blogApi';
 import { useSiteName, useSiteSettings } from '../hooks/useSiteSettings';
 import { useTenant } from '../contexts/TenantContext';
+import { useAdvertisePage } from '../hooks/useAdvertisePage';
 import { getActiveSocialLinks } from '../utils/social';
 import { tagUrl } from '../utils/posts';
 
@@ -26,6 +27,9 @@ export const Footer: React.FC = () => {
   const siteName = useSiteName();
   const logoUrl = branding?.logo_url;
   const { blog } = useTenant();
+  // "Advertise" appears only while the owner has the page switched on.
+  const { page: advertisePage } = useAdvertisePage();
+  const navLinks = advertisePage ? [...footerNavLinks, { to: '/advertise', label: 'Advertise' }] : footerNavLinks;
 
   const tagsEnabled = settings?.show_categories !== false;
   const { data: popularTags, isPending: tagsPending } = useQuery({
@@ -106,7 +110,7 @@ export const Footer: React.FC = () => {
               Explore
             </h2>
             <ul className="-my-1.5">
-              {footerNavLinks.map((link) => (
+              {navLinks.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={link.to}

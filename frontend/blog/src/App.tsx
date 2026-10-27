@@ -7,6 +7,7 @@ import BlogList from './pages/BlogList';
 import { AuthPage } from './pages/Auth';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
+import { Advertise } from './pages/Advertise';
 import { SearchResults } from './pages/SearchResults';
 import { NotFound } from './pages/NotFound';
 import { Navbar } from './components/Navbar';
@@ -170,6 +171,7 @@ function App() {
             {/* Static Pages */}
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/advertise" element={<Advertise />} />
             
             {/* Dynamic Pages */}
             <Route path="/tag/:tag" element={<TagRedirect />} />
