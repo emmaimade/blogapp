@@ -236,6 +236,21 @@ def click_through(sponsor_id: int, user_agent: Optional[str], current_user: Opti
     return sponsor.url
 
 
+def has_post_sidebar(blog: Blog, session: Session) -> bool:
+    """A sidebar sponsor is running, or the Advertise page is on with house ads to fill the slot."""
+    if get_blog_limits(session, blog.id).can_use_sponsors:
+        today = utc_now().date()
+        for sponsor in session.exec(
+            select(Sponsor).where(
+                Sponsor.blog_id == blog.id, Sponsor.placement == SponsorPlacement.SIDEBAR, Sponsor.is_active == True,  # noqa: E712
+            )
+        ).all():
+            if _state(sponsor, today) == "running":
+                return True
+    page = advertise_settings(blog, session)
+    return page.enabled and page.show_house_ads
+
+
 # ── "Advertise with us" ──────────────────────────────────────────────────────
 
 def advertise_settings(blog: Blog, session: Session) -> AdvertiseSettings:
@@ -307,6 +322,8 @@ def advertise_page(blog: Blog, session: Session) -> AdvertisePageRead:
         followers=followers,
         sources=sources,
         top_posts=top_posts,
+        show_house_ads=page.show_house_ads,
+        show_in_menu=page.show_in_menu,
     )
 
 

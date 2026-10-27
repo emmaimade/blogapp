@@ -269,3 +269,46 @@ def test_enquiries_are_refused_while_the_page_is_off(client, sent):
 
     assert res.status_code == 404
     assert sent == []
+
+
+# ── Sidebar and pointing readers to the Advertise page ───────────────────────
+
+def _resolve(client, blog_id: int) -> dict:
+    from app.models import Blog
+
+    with Session(engine) as session:
+        subdomain = session.get(Blog, blog_id).subdomain
+    return client.get("/blogs/resolve", params={"host": f"{subdomain}.inko.blog"}).json()
+
+
+def test_posts_get_a_sidebar_only_for_a_running_sidebar_sponsor_or_house_ads(client):
+    owner, blog_id, _, _ = _register(client)
+    _set_plan(blog_id, SubscriptionPlan.PRO)
+    assert _resolve(client, blog_id)["post_sidebar"] is False
+
+    _sponsor(client, owner, blog_id, placement="post_end")
+    assert _resolve(client, blog_id)["post_sidebar"] is False  # not a sidebar sponsor
+
+    res = _sponsor(client, owner, blog_id, name="Rail Co", placement="sidebar")
+    assert res.status_code == 201, res.text
+    assert _resolve(client, blog_id)["post_sidebar"] is True
+    assert client.get(f"/blogs/{blog_id}/sponsors/active", params={"placement": "sidebar"}).json()["name"] == "Rail Co"
+
+    _set_plan(blog_id, SubscriptionPlan.FREE)
+    assert _resolve(client, blog_id)["post_sidebar"] is False
+
+
+def test_house_ads_fill_the_sidebar_while_the_advertise_page_is_on(client):
+    owner, blog_id, _, _ = _register(client)
+    _set_plan(blog_id, SubscriptionPlan.FREE)
+
+    client.put(f"/blogs/{blog_id}/advertise/settings", json={"enabled": True}, headers=owner)
+    page = client.get(f"/blogs/{blog_id}/advertise").json()
+    assert (page["show_house_ads"], page["show_in_menu"]) == (True, False)  # the defaults
+    assert _resolve(client, blog_id)["post_sidebar"] is True
+
+    client.put(f"/blogs/{blog_id}/advertise/settings",
+               json={"enabled": True, "show_house_ads": False, "show_in_menu": True}, headers=owner)
+    page = client.get(f"/blogs/{blog_id}/advertise").json()
+    assert (page["show_house_ads"], page["show_in_menu"]) == (False, True)
+    assert _resolve(client, blog_id)["post_sidebar"] is False

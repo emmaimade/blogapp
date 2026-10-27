@@ -17,6 +17,7 @@ def utcnow() -> datetime:
 class SponsorPlacement(str, Enum):
     POST_END = "post_end"  # after a post's article, above the follow form
     HOME = "home"          # a banner on the blog's home page
+    SIDEBAR = "sidebar"    # sticky in a post's right-hand column; under the title on phones
 
 
 class Sponsor(SQLModel, table=True):

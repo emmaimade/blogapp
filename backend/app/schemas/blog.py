@@ -43,6 +43,10 @@ class BlogRead(UTCDatetimeMixin, BaseModel):
     default_post_visibility: PostVisibility
     comments_enabled: bool
     followers_enabled: bool = True
+    # Filled in by /blogs/resolve only: whether posts get a right-hand column
+    # for a sidebar sponsor (or a "your brand here" house ad), known before
+    # the page renders so the article doesn't shift once sponsors load.
+    post_sidebar: bool = False
     posts_per_page: int
     timezone: str
     created_at: datetime

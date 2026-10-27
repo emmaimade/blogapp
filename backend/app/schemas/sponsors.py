@@ -90,6 +90,10 @@ class AdvertiseSettings(BaseModel):
     show_followers: bool = True
     show_sources: bool = True
     show_top_posts: bool = True
+    # "Your brand here" in sponsor slots nobody's running, linking to the page.
+    show_house_ads: bool = True
+    # An "Advertise" link in the blog's top menu as well as its footer.
+    show_in_menu: bool = False
     # Enquiries go here, else to the blog owner.
     contact_email: Optional[EmailStr] = None
 
@@ -115,6 +119,9 @@ class AdvertisePageRead(BaseModel):
     followers: Optional[int] = None
     sources: Optional[List[AdvertiseSource]] = None
     top_posts: Optional[List[AdvertiseTopPost]] = None
+    # How the blog points readers here: house ads in empty slots, a top-menu link.
+    show_house_ads: bool = True
+    show_in_menu: bool = False
 
 
 class AdvertiseEnquiryCreate(BaseModel):

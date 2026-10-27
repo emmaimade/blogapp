@@ -8,7 +8,7 @@ const EMPTY: SponsorInput = {
   logo_url: null,
   tagline: '',
   url: 'https://',
-  placement: 'post_end',
+  placement: 'sidebar',
   starts_on: null,
   ends_on: null,
   is_active: true,
@@ -99,6 +99,7 @@ export const SponsorForm = ({ sponsor, saving, onSave, onCancel, uploadLogo }: S
         <label className={labelClass}>
           Where it shows
           <select value={data.placement} onChange={(e) => set('placement', e.target.value as SponsorInput['placement'])} className={fieldClass}>
+            <option value="sidebar">Post sidebar (most visible) · under the title on phones</option>
             <option value="post_end">End of every post</option>
             <option value="home">Home page banner</option>
           </select>

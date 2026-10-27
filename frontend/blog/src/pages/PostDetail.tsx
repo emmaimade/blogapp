@@ -9,6 +9,8 @@ import api from '../api/blogApi';
 import { Comments } from '../components/Comments';
 import { FollowForm } from '../components/FollowForm';
 import { SponsorCard } from '../components/SponsorCard';
+import { useTenant } from '../contexts/TenantContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { ArticleSkeleton } from '../components/Skeletons';
 import { ArticleHeader } from '../components/post/ArticleHeader';
 import { ArticleBody } from '../components/post/ArticleBody';
@@ -47,6 +49,9 @@ export const PostDetail = () => {
   const { popularPosts } = useSidebarData();
 
   const siteName = useSiteName();
+  const { blog } = useTenant();
+  // Tailwind's lg: the width the post sidebar appears at.
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   useRecordView(post?.id);
 
@@ -162,6 +167,10 @@ export const PostDetail = () => {
   // entries themselves only exist after the body mounts, and switching
   // between the centred and sidebar layouts then would shift the article.
   const hasToc = countMarkdownHeadings(post.content) > 1;
+  // A sidebar sponsor (or a house ad) also opens the right-hand column. It's
+  // known from the tenant, which loads first, so the layout is still settled
+  // before the article renders.
+  const hasSidebar = hasToc || !!blog?.post_sidebar;
   const nextPosts = relatedPosts.length > 0
     ? relatedPosts
     : popularPosts.filter((p) => p.id !== post.id).slice(0, 3);
@@ -186,14 +195,14 @@ export const PostDetail = () => {
 
       <div
         className={
-          hasToc
+          hasSidebar
             ? 'max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12'
             : 'max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10'
         }
       >
         {/* One reading column: header, image, body, related and comments all
             share the same left edge and a comfortable line length. */}
-        <div className={hasToc ? 'lg:col-span-8 min-w-0' : 'min-w-0'}>
+        <div className={hasSidebar ? 'lg:col-span-8 min-w-0' : 'min-w-0'}>
           <div className="max-w-3xl mx-auto lg:mx-0">
             {/* Only staff ever get an unpublished post back (signed in, by
                 direct link) — make it unmistakable that it isn't live. */}
@@ -211,6 +220,9 @@ export const PostDetail = () => {
             )}
 
             <ArticleHeader post={post} />
+
+            {/* Phones have no sidebar: the sidebar sponsor becomes a one-line strip under the title. */}
+            {blog?.post_sidebar && !isDesktop && <SponsorCard placement="sidebar" variant="strip" className="mb-8" />}
 
             {post.thumbnail_url && (
               <div className="mb-10 aspect-video overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800">
@@ -243,11 +255,12 @@ export const PostDetail = () => {
           </div>
         </div>
 
-        {/* Sidebar — the table of contents only, so nothing competes with the article */}
-        {hasToc && (
+        {/* Sidebar: the table of contents, then the sidebar sponsor, both staying in view. */}
+        {hasSidebar && (
           <div className="lg:col-span-4">
-            <div className="lg:sticky lg:top-24">
+            <div className="space-y-6 lg:sticky lg:top-24">
               {toc.length > 1 && <TableOfContents entries={toc} />}
+              {blog?.post_sidebar && isDesktop && <SponsorCard placement="sidebar" variant="sidebar" />}
             </div>
           </div>
         )}

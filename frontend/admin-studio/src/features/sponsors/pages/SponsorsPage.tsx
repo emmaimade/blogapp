@@ -21,7 +21,7 @@ const STATE_STYLE: Record<SponsorState, string> = {
   paused: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
 };
 
-const PLACEMENT_LABEL = { post_end: 'End of posts', home: 'Home page' } as const;
+const PLACEMENT_LABEL = { sidebar: 'Post sidebar', post_end: 'End of posts', home: 'Home page' } as const;
 
 const dates = (s: Sponsor) =>
   s.starts_on || s.ends_on
@@ -47,7 +47,7 @@ const SponsorsTab = () => {
             <div>
               <p className="text-sm font-bold text-zinc-900 dark:text-white">Sponsor slots are on Pro and Team</p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Run sponsors at the end of your posts or on your home page, and report impressions and clicks back to them.
+                Run sponsors beside your posts, at their end or on your home page, and report impressions and clicks back to them.
                 {sponsors.length > 0 && ' Your existing sponsors are kept but not shown on Free.'}
               </p>
             </div>

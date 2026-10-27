@@ -100,6 +100,16 @@ export const AdvertiseSettingsForm = ({ initial, saving, onSave, pageUrl }: Prop
             {label}
           </label>
         ))}
+        <p className="pt-2 text-sm font-bold text-zinc-900 dark:text-white">Pointing readers here</p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">There's always an "Advertise" link in your blog's footer, and under every sponsor.</p>
+        <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input type="checkbox" checked={data.show_house_ads} onChange={(e) => set('show_house_ads', e.target.checked)} className="mt-0.5 accent-violet-600" />
+          <span>Show “Your brand here” in sponsor spots nobody has booked <span className="text-zinc-500">(recommended)</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input type="checkbox" checked={data.show_in_menu} onChange={(e) => set('show_in_menu', e.target.checked)} className="mt-0.5 accent-violet-600" />
+          <span>Also add “Advertise” to your blog's top menu</span>
+        </label>
         <label className={`${labelClass} pt-2`}>
           Send enquiries to <span className="font-normal text-zinc-500">(optional, your account email otherwise)</span>
           <input type="email" value={data.contact_email ?? ''} onChange={(e) => set('contact_email', e.target.value)} className={fieldClass} />
