@@ -7,6 +7,7 @@ import { useSiteName, useSiteSettings } from '../hooks/useSiteSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { QuickSearch } from './QuickSearch';
+import { useAdvertisePage } from '../hooks/useAdvertisePage';
 
 // The logo is the way home, so the links only cover the other sections.
 const navLinks = [
@@ -37,6 +38,9 @@ export const Navbar: React.FC = () => {
   const { data: siteSettings } = useSiteSettings();
   const branding = siteSettings?.branding;
   const siteName = useSiteName();
+  // "Advertise" joins the menu only when the owner has the page on and chose to list it here.
+  const { page: advertisePage } = useAdvertisePage();
+  const menuLinks = advertisePage?.show_in_menu ? [...navLinks, { to: '/advertise', label: 'Advertise' }] : navLinks;
   const logoUrl = branding?.logo_url;
 
   const currentUrl = location.pathname + location.search;
@@ -179,7 +183,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {menuLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
@@ -278,7 +282,7 @@ export const Navbar: React.FC = () => {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
             <div className="flex flex-col gap-2">
-              {navLinks.map((link) => (
+              {menuLinks.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}

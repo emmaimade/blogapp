@@ -69,7 +69,11 @@ def resolve_blog_by_host(
     session: Session = Depends(get_session),
 ):
     """Resolves a tenant from a full request hostname — subdomain or custom domain alike."""
-    return blog_service.resolve_blog_by_host(host, session)
+    # Imported here: the sponsors module reaches back into blog-level modules.
+    from app.modules.sponsors.service import has_post_sidebar
+
+    blog = blog_service.resolve_blog_by_host(host, session)
+    return BlogRead.model_validate(blog).model_copy(update={"post_sidebar": has_post_sidebar(blog, session)})
 
 
 @router.get("/meta", response_model=PageMeta)

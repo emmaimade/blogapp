@@ -4,7 +4,7 @@ import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { toastApiError } from '../../../shared/lib/apiErrors';
 
-export type SponsorPlacement = 'post_end' | 'home';
+export type SponsorPlacement = 'sidebar' | 'post_end' | 'home';
 export type SponsorState = 'running' | 'scheduled' | 'ended' | 'paused';
 
 export interface SponsorInput {
@@ -39,6 +39,8 @@ export interface AdvertiseSettings {
   show_followers: boolean;
   show_sources: boolean;
   show_top_posts: boolean;
+  show_house_ads: boolean;
+  show_in_menu: boolean;
   contact_email: string | null;
 }
 

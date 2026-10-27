@@ -19,6 +19,10 @@ export interface AdvertisePageData {
   followers: number | null;
   sources: { source: string; share: number }[] | null;
   top_posts: { title: string; slug: string; views: number }[] | null;
+  /** "Your brand here" in empty sponsor slots */
+  show_house_ads: boolean;
+  /** An "Advertise" link in the top menu too */
+  show_in_menu: boolean;
 }
 
 /**

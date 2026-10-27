@@ -14,6 +14,8 @@ interface Blog {
   tagline?: string | null;
   comments_enabled: boolean;
   followers_enabled?: boolean;
+  /** Posts get a right-hand column for a sidebar sponsor or house ad (decided before render). */
+  post_sidebar?: boolean;
 }
 
 // Interim tab title from the resolved tenant alone, so the tab is branded
