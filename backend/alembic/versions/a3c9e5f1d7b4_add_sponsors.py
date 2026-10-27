@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 # Member names, as SQLModel stores str enums (see the other enum columns).
-SPONSOR_PLACEMENT = sa.Enum("POST_END", "HOME", "SIDEBAR", name="sponsorplacement")
+SPONSOR_PLACEMENT = sa.Enum("POST_END", "HOME", name="sponsorplacement")
 
 
 def upgrade() -> None:
