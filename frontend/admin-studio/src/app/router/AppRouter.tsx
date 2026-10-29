@@ -64,6 +64,7 @@ const LEGACY_WORKSPACE_PATHS = [
   '/admin/tags',
   '/admin/comments',
   '/admin/activity',
+  '/admin/audience',
   '/admin/settings/*',
 ];
 

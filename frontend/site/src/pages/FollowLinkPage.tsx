@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, MailCheck, MailX, XCircle } from "lucide-react";
 import axios from "axios";
 import { usePageMeta } from "../shared/hooks/usePageMeta";
 import { API_URL } from "../shared/config";
+import { FollowRecommendations, type RecommendedBlog } from "../shared/components/FollowRecommendations";
 
 type Kind = "confirm" | "unsubscribe";
 
@@ -54,6 +55,7 @@ export const FollowLinkPage = ({ kind }: { kind: Kind }) => {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"idle" | "working" | "success" | "error">(token ? "idle" : "error");
   const [blogName, setBlogName] = useState("");
+  const [recommendations, setRecommendations] = useState<RecommendedBlog[]>([]);
   const [message, setMessage] = useState(token ? "" : "This link is missing part of its address. Try copying the full link from the email.");
 
   usePageMeta(copy.title, copy.description);
@@ -63,6 +65,7 @@ export const FollowLinkPage = ({ kind }: { kind: Kind }) => {
     try {
       const res = await axios.post(`${API_URL}/followers/${kind}`, { token });
       setBlogName(res.data.blog_name);
+      setRecommendations(res.data.recommendations ?? []);
       setStatus("success");
     } catch (err) {
       setMessage(errorMessage(err) || "Something went wrong. Please try the link again.");
@@ -98,6 +101,9 @@ export const FollowLinkPage = ({ kind }: { kind: Kind }) => {
           </div>
           <h1 className="text-xl font-bold text-zinc-900">{copy.done(blogName)}</h1>
           <p className="text-sm text-zinc-500 leading-relaxed">{copy.doneDetail}</p>
+          {kind === "confirm" && token && recommendations.length > 0 && (
+            <FollowRecommendations blogName={blogName} token={token} blogs={recommendations} />
+          )}
         </div>
       )}
 

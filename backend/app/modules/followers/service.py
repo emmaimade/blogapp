@@ -153,8 +153,8 @@ def follow(blog: Blog, payload: FollowCreate, background_tasks: BackgroundTasks,
     )
 
 
-def confirm(token: str, session: Session) -> str:
-    """Activate the follow behind an emailed link; returns the blog's name."""
+def confirm(token: str, session: Session) -> BlogFollower:
+    """Activate the follow behind an emailed link; returns the follower."""
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     follower = session.exec(
         select(BlogFollower).where(BlogFollower.confirm_token_hash == token_hash)
@@ -162,9 +162,8 @@ def confirm(token: str, session: Session) -> str:
     if follower is None:
         raise BadRequestError(ErrorCode.INVALID_TOKEN)
 
-    blog = session.get(Blog, follower.blog_id)
     if follower.status == FollowerStatus.ACTIVE:
-        return blog.name
+        return follower
 
     sent_at = as_utc(follower.confirm_sent_at)
     if sent_at is None or utc_now() - sent_at > timedelta(days=CONFIRM_LINK_DAYS):
@@ -176,7 +175,7 @@ def confirm(token: str, session: Session) -> str:
     follower.confirmed_at = utc_now()
     session.add(follower)
     session.commit()
-    return blog.name
+    return follower
 
 
 def unsubscribe(token: str, session: Session) -> str:

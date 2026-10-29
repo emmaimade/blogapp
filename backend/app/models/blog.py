@@ -105,6 +105,8 @@ class Blog(SQLModel, table=True):
     comments_enabled: bool = Field(default=True)
     # The blog's follow-by-email form; off stops new followers, keeps existing ones.
     followers_enabled: bool = Field(default=True)
+    # Other Inko blogs may recommend this one to their readers (owners can opt out).
+    allow_recommendations: bool = Field(default=True)
     posts_per_page: int = Field(default=10)
     timezone: str = Field(default="UTC")
 

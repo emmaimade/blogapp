@@ -14,6 +14,7 @@ import {
   type Follower,
   type FollowerStatus,
 } from '../hooks/useAudience';
+import { RecommendationsTab } from '../components/RecommendationsTab';
 
 const TABS: { key: FollowerStatus | 'all'; label: string }[] = [
   { key: 'active', label: 'Active' },
@@ -44,6 +45,7 @@ export const AudiencePage = () => {
   const toWorkspace = useWorkspacePath();
   const { activeMembership } = useBlog();
   const isOwner = activeMembership?.role === 'owner';
+  const [section, setSection] = React.useState<'followers' | 'recommendations'>('followers');
 
   const [tab, setTab] = React.useState<FollowerStatus | 'all'>('active');
   const [search, setSearch] = React.useState('');
@@ -79,7 +81,7 @@ export const AudiencePage = () => {
             Readers who follow your blog by email.
           </p>
         </div>
-        {summary?.can_export && (
+        {section === 'followers' && summary?.can_export && (
           <button
             type="button"
             onClick={() => exportCsv.mutate(tab)}
@@ -90,6 +92,33 @@ export const AudiencePage = () => {
           </button>
         )}
       </div>
+
+      {/* Recommendations are the owner's; editors see followers only. */}
+      {isOwner && (
+        <div className="grid w-full grid-cols-2 rounded-xl bg-zinc-100 p-1 sm:inline-flex sm:w-auto dark:bg-zinc-800" role="tablist" aria-label="Audience sections">
+          {([['followers', 'Followers'], ['recommendations', 'Recommendations']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={section === key}
+              onClick={() => setSection(key)}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                section === key
+                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {section === 'recommendations' ? (
+        <RecommendationsTab />
+      ) : (
+      <>
 
       {/* Phones: one compact card, so the list isn't three tall cards away. */}
       {summary && (
@@ -318,6 +347,9 @@ export const AudiencePage = () => {
           </div>
         )}
       </div>
+
+      </>
+      )}
 
       <Modal
         isOpen={!!toRemove}

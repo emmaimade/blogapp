@@ -44,6 +44,8 @@ class BlogFollower(SQLModel, table=True):
 
     # The post they followed from, for "which posts bring followers in".
     source_post_id: Optional[int] = Field(default=None, foreign_key="post.id", ondelete="SET NULL")
+    # The blog whose recommendation brought them here, for "followers you sent / received".
+    referred_by_blog_id: Optional[int] = Field(default=None, foreign_key="blog.id", ondelete="SET NULL")
 
     created_at: datetime = Field(
         default_factory=utcnow, sa_column=Column(SQLDateTime(timezone=True), nullable=False),

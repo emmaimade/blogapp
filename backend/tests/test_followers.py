@@ -203,7 +203,7 @@ def test_confirming_activates_the_follower(client, sent):
 
     assert res.status_code == 200, res.text
     with Session(engine) as session:
-        assert res.json() == {"blog_name": session.get(Blog, blog_id).name}
+        assert res.json()["blog_name"] == session.get(Blog, blog_id).name
     follower = _follower(blog_id, email)
     assert follower.status == FollowerStatus.ACTIVE
     assert follower.confirmed_at is not None

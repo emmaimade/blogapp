@@ -35,6 +35,7 @@ from app.modules import (
     analytics_router,
     followers_router,
     sponsors_router,
+    recommendations_router,
 )
 
 # ── Lifespan — replaces deprecated @app.on_event ─────────────────────────────
@@ -126,6 +127,7 @@ app.include_router(cron_router)
 app.include_router(analytics_router)
 app.include_router(followers_router)
 app.include_router(sponsors_router)
+app.include_router(recommendations_router)
 
 
 @app.get("/")
