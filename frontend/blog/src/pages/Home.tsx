@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Eye, TrendingUp } from 'lucide-react';
 import api from '../api/blogApi';
 import { FollowForm } from '../components/FollowForm';
+import { RecommendedReads } from '../components/RecommendedReads';
 import { SponsorCard } from '../components/SponsorCard';
 import { PostList, PostListSkeleton } from '../components/PostList';
 import { HeroSkeleton } from '../components/Skeletons';
@@ -242,6 +243,8 @@ export const Home: React.FC = () => {
             </div>
           </section>
         )}
+
+        <RecommendedReads />
 
         <FollowForm className="mx-auto max-w-2xl" />
       </div>

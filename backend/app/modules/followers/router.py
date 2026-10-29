@@ -51,7 +51,14 @@ def follow_blog(
 @router.post("/followers/confirm", response_model=FollowResult)
 def confirm_follow(payload: FollowTokenPayload, session: Session = Depends(get_session)):
     """From the marketing site's /follow/confirm page, with the emailed token."""
-    return FollowResult(blog_name=follower_service.confirm(payload.token, session))
+    # Imported here: recommendations builds on this module.
+    from app.modules.recommendations.service import shown_recommendations
+
+    follower = follower_service.confirm(payload.token, session)
+    return FollowResult(
+        blog_name=session.get(Blog, follower.blog_id).name,
+        recommendations=shown_recommendations(follower.blog_id, session),
+    )
 
 
 @router.post("/followers/unsubscribe/one-click")

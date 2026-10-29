@@ -1,3 +1,13 @@
+from .followers import (
+    ReceivedRecommendation,
+    RecommendationFollowPayload,
+    RecommendationFollowResult,
+    RecommendationSettings,
+    RecommendationsOverview,
+    RecommendationsUpdate,
+    RecommendedBlog,
+    StudioRecommendation,
+)
 from .sponsors import (
     AdvertiseEnquiryCreate,
     AdvertisePackage,
@@ -116,6 +126,14 @@ from .blog import (
 )
 
 __all__ = [
+    "ReceivedRecommendation",
+    "RecommendationFollowPayload",
+    "RecommendationFollowResult",
+    "RecommendationSettings",
+    "RecommendationsOverview",
+    "RecommendationsUpdate",
+    "RecommendedBlog",
+    "StudioRecommendation",
     "AdvertiseEnquiryCreate",
     "AdvertisePackage",
     "AdvertisePageRead",
