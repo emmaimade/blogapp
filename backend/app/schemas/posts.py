@@ -48,6 +48,9 @@ class PostUpdate(UTCDatetimeMixin, BaseModel):
     published_at: Optional[datetime] = None      
     tag_ids: Optional[List[int]] = None
     notify_followers: Optional[bool] = None
+    # Set by the editor when this save puts back an older version, so the
+    # history labels it "restored". Not a field of the post.
+    restored_from_revision_id: Optional[int] = None
 
 
 class PostRead(UTCDatetimeMixin, BaseModel):
@@ -95,3 +98,16 @@ class PostShort(BaseModel):
     blog_id: int
     class Config:
         from_attributes = True
+
+class PostRevisionSummary(UTCDatetimeMixin, BaseModel):
+    id: int
+    title: str
+    reason: str
+    created_at: datetime
+    saved_by_name: Optional[str] = None
+    words: int
+
+
+class PostRevisionRead(PostRevisionSummary):
+    content: str
+    thumbnail_url: Optional[str] = None

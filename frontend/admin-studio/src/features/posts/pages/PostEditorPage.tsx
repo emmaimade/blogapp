@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import SimpleMDE from 'react-simplemde-editor';
-import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Star, Mail } from 'lucide-react';
+import { Eye, Edit3, ArrowLeft, Loader2, ImageIcon, Link as LinkIcon, Upload, Star, Mail, History } from 'lucide-react';
 
 import { usePostEditor } from '../hooks/usePostEditor';
 import { TagSelector } from '../components/TagSelector';
@@ -14,7 +14,11 @@ import { SchedulePublishPanel } from '../components/SchedulePublishPanel';
 import { EditorToolbarIcons } from '../components/EditorToolbarIcons';
 import { OutlineStarter } from '../components/OutlineStarter';
 import { FloatingSaveBar } from '../components/FloatingSaveBar';
+import { HistoryPanel } from '../components/HistoryPanel';
+import { useBlog } from '../../../app/providers/BlogProvider';
+import { useParams } from 'react-router-dom';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
+import { formatRelative } from '../../../shared/utils/dates';
 
 import 'easymde/dist/easymde.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
@@ -30,7 +34,8 @@ export const PostEditor: React.FC = () => {
     currentPubAt, isFeatured, allTags, filteredAvailableTags, exactMatchExists,
     createTagMutation, toggleTag, handleCreateTagSubmit, handleImageUpload,
     handleThumbnailUpload, isLoading, mutation, saveWithStatus, quickSave, navigate,
-    isDirty, errors, scheduledPosts, savedTitle, editedAt, notifyFollowers, hasGoneLive
+    isDirty, errors, scheduledPosts, savedTitle, editedAt, notifyFollowers, hasGoneLive,
+    localDraft, restoreLocalDraft, discardLocalDraft, restoreRevision
   } = usePostEditor();
 
   // Saved title rather than the live input, so the tab doesn't churn while typing.
@@ -38,6 +43,10 @@ export const PostEditor: React.FC = () => {
 
   // Asks before leaving with unsaved changes (reload, close, a link, or switching workspace).
   const unsavedChangesBlocker = useUnsavedChangesGuard(isDirty);
+
+  const { activeBlog } = useBlog();
+  const { id: postId } = useParams();
+  const [showHistory, setShowHistory] = useState(false);
 
   const editorOptions = useMemo(() => getEditorOptions(handleImageUpload), [handleImageUpload]);
   const [editor, setEditor] = useState<EasyMDE | null>(null);
@@ -71,6 +80,16 @@ export const PostEditor: React.FC = () => {
         >
           <ArrowLeft size={18} /> Back to Library
         </button>
+        <div className="flex items-center gap-2">
+        {isEditMode && (
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="admin-card flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <History size={16} /> History
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setIsPreview(!isPreview)}
@@ -78,7 +97,37 @@ export const PostEditor: React.FC = () => {
         >
           {isPreview ? <><Edit3 size={16} /> Edit</> : <><Eye size={16} /> Preview</>}
         </button>
+        </div>
       </div>
+
+      {showHistory && activeBlog && postId && (
+        <HistoryPanel
+          blogId={activeBlog.id}
+          postId={postId}
+          onClose={() => setShowHistory(false)}
+          onRestore={(revision) => {
+            restoreRevision(revision);
+            setShowHistory(false);
+          }}
+        />
+      )}
+
+      {/* Unsaved edits found in this browser from an earlier session */}
+      {localDraft && (
+        <div role="status" className="mb-6 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+          <p>
+            <span className="font-semibold">You have unsaved changes</span> from {formatRelative(new Date(localDraft.savedAt).toISOString())} on this device.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={discardLocalDraft} className="rounded-lg px-3 py-1.5 font-semibold hover:bg-amber-100 dark:hover:bg-amber-500/20">
+              Discard
+            </button>
+            <button type="button" onClick={restoreLocalDraft} className="rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white hover:bg-amber-700">
+              Restore
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Main Canvas Column */}
