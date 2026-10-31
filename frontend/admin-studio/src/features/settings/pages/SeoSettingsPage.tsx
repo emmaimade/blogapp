@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { BarChart3, ImageIcon, Loader2, Search, Upload } from 'lucide-react';
+import { BarChart3, ImageIcon, Loader2, Rss, Search, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../shared/api/client';
 import { useBlog } from '../../../app/providers/BlogProvider';
 import { useDocumentTitle } from '../../../shared/hooks/useDocumentTitle';
 import { toastApiError } from '../../../shared/lib/apiErrors';
-import { getBlogDisplayUrl } from '../../../shared/lib/blogUrl';
+import { getBlogDisplayUrl, getBlogUrl } from '../../../shared/lib/blogUrl';
 import { SettingsCard } from '../components/SettingsCard';
 import { SettingsForm } from '../components/SettingsForm';
 import { Field, hintClass, inputClass, labelClass, secondaryButtonClass } from '../components/SettingsFields';
@@ -253,6 +253,33 @@ export const SEOSettings: React.FC = () => {
           )}
         </Field>
       </SettingsCard>
+
+      {activeBlog && (
+        <SettingsCard title="Sitemap and RSS" icon={Rss} description="Made for you automatically, and kept up to date as you publish.">
+          {([
+            ['Sitemap', 'sitemap.xml', 'Submit this in Google Search Console (Sitemaps) so new posts are found sooner.'],
+            ['RSS feed', 'rss.xml', 'For feed readers and newsletters; browsers find it on your blog by themselves.'],
+          ] as const).map(([label, file, hint]) => {
+            const address = `${getBlogUrl(activeBlog)}/${file}`;
+            return (
+              <div key={file}>
+                <p className={labelClass}>{label}</p>
+                <div className="mt-1 flex gap-2">
+                  <input readOnly value={address} aria-label={`${label} address`} className={`${inputClass} font-mono`} onFocus={(e) => e.target.select()} />
+                  <button
+                    type="button"
+                    className={secondaryButtonClass}
+                    onClick={() => navigator.clipboard.writeText(address).then(() => toast.success(`${label} address copied.`), () => toast.error("Couldn't copy."))}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className={hintClass}>{hint}</p>
+              </div>
+            );
+          })}
+        </SettingsCard>
+      )}
     </SettingsForm>
   );
 };

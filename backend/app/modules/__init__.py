@@ -20,6 +20,7 @@ from .analytics.router import router as analytics_router
 from .followers.router import router as followers_router
 from .sponsors.router import router as sponsors_router
 from .recommendations.router import router as recommendations_router
+from .feeds.router import router as feeds_router
 
 __all__ = [
     "auth_router",
@@ -44,4 +45,5 @@ __all__ = [
     "followers_router",
     "sponsors_router",
     "recommendations_router",
+    "feeds_router",
 ]
