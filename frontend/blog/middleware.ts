@@ -23,6 +23,15 @@ export const config = {
 };
 
 const META_TIMEOUT_MS = 1500;
+// The blog's own sitemap.xml, rss.xml and robots.txt, built per blog by the API
+// (GET /feeds/<file>?host=). Without this the SPA rewrite would answer them
+// with index.html.
+const FEED_FILES: Record<string, string> = {
+  '/sitemap.xml': 'application/xml; charset=utf-8',
+  '/rss.xml': 'application/rss+xml; charset=utf-8',
+  '/robots.txt': 'text/plain; charset=utf-8',
+};
+const FEED_TIMEOUT_MS = 5000;
 const SEO_BLOCK = /<!-- seo:start -->[\s\S]*?<!-- seo:end -->/;
 
 interface PageMetaPost {
@@ -182,6 +191,7 @@ const renderHead = (url: URL, meta: PageMeta) => {
     `<link rel="icon" href="${escapeHtml(favicon)}" />`,
     ...(uploadedFavicon ? [`<link rel="apple-touch-icon" href="${escapeHtml(uploadedFavicon)}" />`] : []),
     `<link rel="canonical" href="${escapeHtml(canonical)}" />`,
+    `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(meta.site_name)}" href="${escapeHtml(`${url.origin}/rss.xml`)}" />`,
     ...tags.map(([attr, key, content]) => `<meta ${attr}="${key}" content="${escapeHtml(content)}" />`),
     `<script type="application/ld+json">${safeJsonLd(jsonLd)}</script>`,
   ].join('\n    ');
@@ -203,6 +213,21 @@ const fetchPageMeta = async (backendUrl: string, host: string, path: string): Pr
   }
 };
 
+const fetchFeed = async (backendUrl: string, host: string, path: string): Promise<string | null> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
+  try {
+    const endpoint = new URL(`/feeds${path}`, backendUrl);
+    endpoint.searchParams.set('host', host);
+    const res = await fetch(endpoint, { signal: controller.signal });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
   const backendUrl = process.env.BACKEND_URL;
@@ -216,7 +241,19 @@ export default async function middleware(request: Request): Promise<Response | u
     return Response.redirect(target.toString(), 301);
   }
 
-  // Files (favicon.ico, placeholder.svg, robots.txt…) and non-GETs pass through.
+  const feedType = FEED_FILES[url.pathname];
+  if (request.method === 'GET' && feedType && backendUrl) {
+    const feed = await fetchFeed(backendUrl, url.hostname, url.pathname);
+    if (feed !== null) {
+      return new Response(feed, {
+        status: 200,
+        headers: { 'content-type': feedType, 'cache-control': 'public, max-age=3600' },
+      });
+    }
+    return new Response('Not found', { status: 404 });
+  }
+
+  // Other files (favicon.ico, placeholder.svg…) and non-GETs pass through.
   if (request.method !== 'GET' || url.pathname.includes('.') || !backendUrl) return undefined;
 
   try {
