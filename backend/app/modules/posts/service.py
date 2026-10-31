@@ -25,6 +25,7 @@ from app.core.exceptions import (
 )
 from app.core.logging_config import get_logger
 from app.core.plans import ensure_can_publish, ensure_can_schedule
+from app.modules.posts.revisions import belongs_to, record_revision
 from app.modules.followers.emails import queue_new_post
 from app.models import Post, PostTagLink, Tag, User, BlogRole
 from app.models.post import PostStatus
@@ -250,6 +251,8 @@ def create_post(blog_id: int, post_data: PostCreate, session: Session, current_u
 
     if new_post.is_featured:
         _clear_other_featured_posts(session, blog_id, keep_post_id=new_post.id)
+
+    record_revision(session, new_post, current_user, "published" if resolved_status == PostStatus.PUBLISHED else "saved")
 
     add_audit_log(
         session,
@@ -496,8 +499,9 @@ def update_post(
 
     update_dict = post_data.model_dump(
         exclude_unset=True,
-        exclude={"tag_ids", "status", "published", "published_at"},
+        exclude={"tag_ids", "status", "published", "published_at", "restored_from_revision_id"},
     )
+    previous_status = db_post.status
 
     # Slug uniqueness
     if "slug" in update_dict and update_dict["slug"] != db_post.slug:
@@ -542,6 +546,13 @@ def update_post(
 
     if new_tags is not None:
         db_post.tags = new_tags
+
+    # A version for the history when the article itself changed, it just went
+    # live, or an older version was put back.
+    went_live = db_post.status == PostStatus.PUBLISHED and previous_status != PostStatus.PUBLISHED
+    restored = belongs_to(session, db_post.id, post_data.restored_from_revision_id)
+    if content_changed or went_live or restored:
+        record_revision(session, db_post, current_user, "restored" if restored else "published" if went_live else "saved")
 
     session.add(db_post)
     add_audit_log(

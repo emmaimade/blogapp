@@ -65,7 +65,7 @@ from .moderation import (
     ModerationQueueItemRead,
     ModerationQueueQueryParams,
 )
-from .posts import MetadataRead, PostCreate, PostDetailRead, PostRead, PostShort, PostUpdate
+from .posts import MetadataRead, PostCreate, PostDetailRead, PostRead, PostRevisionRead, PostRevisionSummary, PostShort, PostUpdate
 from .settings import (
     AboutPageSettings,
     AboutPageSettingsResponse,
@@ -126,6 +126,8 @@ from .blog import (
 )
 
 __all__ = [
+    "PostRevisionRead",
+    "PostRevisionSummary",
     "ReceivedRecommendation",
     "RecommendationFollowPayload",
     "RecommendationFollowResult",

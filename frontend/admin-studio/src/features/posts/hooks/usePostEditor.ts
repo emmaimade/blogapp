@@ -9,6 +9,8 @@ import { useBlog } from '../../../app/providers/BlogProvider';
 import { useWorkspacePath } from '../../../app/providers/useWorkspacePath';
 import { LEAVE_AFTER_SAVE } from '../../../shared/hooks/useUnsavedChangesGuard';
 import type { ScheduledPostSummary } from '../components/ScheduleCalendar';
+import type { Revision } from '../components/HistoryPanel';
+import { useLocalDraft } from './useLocalDraft';
 
 export type PostStatus = 'draft' | 'scheduled' | 'published';
 
@@ -168,6 +170,37 @@ export const usePostEditor = () => {
     enabled: isEditMode && !!activeBlog?.id,
   });
 
+  // Unsaved edits kept in this browser (see useLocalDraft), per post.
+  const title = watch('title', '');
+  const localDraft = useLocalDraft({
+    storageKey: activeBlog?.id ? `inko:post-draft:${activeBlog.id}:${id ?? 'new'}` : null,
+    values: { title, content, thumbnail_url: thumbnail ?? '', tag_ids: selectedTagIds },
+    isDirty,
+    savedAt: existingPost?.updated_at ?? null,
+    ready: !isEditMode || !!existingPost,
+  });
+
+  const restoreLocalDraft = () => {
+    const values = localDraft.pending?.values;
+    if (!values) return;
+    setValue('title', values.title, { shouldDirty: true });
+    setValue('content', values.content, { shouldDirty: true });
+    setValue('thumbnail_url', values.thumbnail_url, { shouldDirty: true });
+    setValue('tag_ids', values.tag_ids, { shouldDirty: true });
+    localDraft.clear();
+  };
+
+  // A version from the History panel loaded into the form; sent with the
+  // next save so the history labels it "restored".
+  const [restoredFromRevisionId, setRestoredFromRevisionId] = useState<number | null>(null);
+  const restoreRevision = (revision: Revision) => {
+    setValue('title', revision.title, { shouldDirty: true });
+    setValue('content', revision.content, { shouldDirty: true });
+    setValue('thumbnail_url', revision.thumbnail_url ?? '', { shouldDirty: true });
+    setRestoredFromRevisionId(revision.id);
+    toast.success('Version loaded. Save to keep it.');
+  };
+
   useEffect(() => {
     if (existingPost) {
       reset({
@@ -183,9 +216,13 @@ export const usePostEditor = () => {
   const mutation = useMutation({
     mutationFn: (data: PostForm) =>
       isEditMode
-        ? api.patch(`/blogs/${activeBlog!.id}/posts/${id}`, data)
+        ? api.patch(`/blogs/${activeBlog!.id}/posts/${id}`, { ...data, restored_from_revision_id: restoredFromRevisionId })
         : api.post(`/blogs/${activeBlog!.id}/posts/`, data),
     onSuccess: (res, variables) => {
+      // Saved: the browser copy and the restore marker have done their job.
+      localDraft.clear();
+      setRestoredFromRevisionId(null);
+      queryClient.invalidateQueries({ queryKey: ['postRevisions', activeBlog?.id] });
       queryClient.invalidateQueries({ queryKey: ['adminPosts', activeBlog?.id] });
       queryClient.invalidateQueries({ queryKey: ['scheduledPosts', activeBlog?.id] });
       const msg = variables.status === 'scheduled'
@@ -237,6 +274,10 @@ export const usePostEditor = () => {
     isDirty, errors, scheduledPosts, savedTitle: existingPost?.title as string | undefined,
     editedAt: existingPost?.edited_at as string | null | undefined,
     notifyFollowers,
+    localDraft: localDraft.pending,
+    restoreLocalDraft,
+    discardLocalDraft: localDraft.clear,
+    restoreRevision,
     // Followers are emailed the first time a post goes live, so the choice
     // only matters until then (a past published_at means it already has).
     hasGoneLive: !!existingPost?.published_at && new Date(existingPost.published_at) <= new Date()

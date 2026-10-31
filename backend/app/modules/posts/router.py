@@ -6,7 +6,9 @@ from sqlmodel import Session
 from app.core.db import get_session
 from app.core.moderation import flag_post, load_post_for_flag
 from app.core.security import get_current_user, get_current_user_optional, reject_unusable_token
-from app.core.permissions import get_public_blog, require_blog_author, require_completed_onboarding
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import NotFoundError
+from app.core.permissions import Permissions, get_public_blog, require_blog_author, require_completed_onboarding
 from app.models import Blog, Post, User
 from app.modules.comments.service import count_live_comments
 from app.schemas import (
@@ -16,8 +18,11 @@ from app.schemas import (
     PostCreate,
     PostDetailRead,
     PostRead,
+    PostRevisionRead,
+    PostRevisionSummary,
     PostUpdate,
 )
+from . import revisions as post_revisions
 from . import service as post_service
 
 router = APIRouter(prefix="/blogs/{blog_id}/posts", tags=["posts"])
@@ -229,3 +234,55 @@ def _with_comment_count(post: Post, session: Session) -> PostDetailRead:
     detail = PostDetailRead.model_validate(post)
     detail.comment_count = count_live_comments(session, post.id)
     return detail
+
+
+# ── Version history (the editor's History panel) ─────────────────────────────
+
+def _post_for_history(blog_id: int, post_id: int, current_user: User, session: Session) -> Post:
+    """Whoever may edit the post may see its history: owners and editors, and an author for their own."""
+    post = session.get(Post, post_id)
+    if not post or post.blog_id != blog_id or not Permissions.can_edit_post(current_user, post, session):
+        raise NotFoundError(ErrorCode.POST_NOT_FOUND)
+    return post
+
+
+def _summary(revision, saved_by) -> PostRevisionSummary:
+    return PostRevisionSummary(
+        id=revision.id,
+        title=revision.title,
+        reason=revision.reason,
+        created_at=revision.created_at,
+        saved_by_name=f"{saved_by.first_name} {saved_by.last_name}".strip() if saved_by else None,
+        words=len(revision.content.split()),
+    )
+
+
+@router.get("/{post_id}/revisions", response_model=List[PostRevisionSummary])
+def list_post_revisions(
+    blog_id: int,
+    post_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+    current_user: User = Depends(get_current_user),
+):
+    post = _post_for_history(blog_id, post_id, current_user, session)
+    return [_summary(revision, saved_by) for revision, saved_by in post_revisions.list_revisions(session, post)]
+
+
+@router.get("/{post_id}/revisions/{revision_id}", response_model=PostRevisionRead)
+def read_post_revision(
+    blog_id: int,
+    post_id: int,
+    revision_id: int,
+    session: Session = Depends(get_session),
+    _: None = Depends(require_blog_author),
+    current_user: User = Depends(get_current_user),
+):
+    post = _post_for_history(blog_id, post_id, current_user, session)
+    revision = post_revisions.get_revision(session, post, revision_id)
+    saved_by = session.get(User, revision.saved_by_id) if revision.saved_by_id else None
+    return PostRevisionRead(
+        **_summary(revision, saved_by).model_dump(),
+        content=revision.content,
+        thumbnail_url=revision.thumbnail_url,
+    )
